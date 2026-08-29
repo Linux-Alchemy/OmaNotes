@@ -215,9 +215,9 @@ public:
 
 **Blocks:**
 
-- [ ] **2.2.1** — Agree on the exact must-pass command matrix from Matt's daily Neovim habits.
-- [ ] **2.2.2** — Automate stable cases and document manual-only cases.
-- [ ] **2.2.3** — Record deviations as accept, configure around, or blocker; never quietly redefine Vim.
+- [x] **2.2.1** — Agree on the exact must-pass command matrix from Matt's daily Neovim habits.
+- [x] **2.2.2** — Automate stable cases and document manual-only cases.
+- [x] **2.2.3** — Record deviations as accept, configure around, or blocker; never quietly redefine Vim.
 - [ ] **2.2.4** — Verify: all mandatory automated cases pass and manual results are recorded.
 
 ### Task 2.3: Resolve the application leader
