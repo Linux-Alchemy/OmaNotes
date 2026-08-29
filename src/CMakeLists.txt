@@ -1,6 +1,8 @@
 add_executable(
     omanotes
     main.cpp
+    app/prefix_router.cpp
+    app/prefix_router.hpp
     editor/editor_adapter.hpp
     editor/ktext_editor_adapter.cpp
     editor/ktext_editor_adapter.hpp
