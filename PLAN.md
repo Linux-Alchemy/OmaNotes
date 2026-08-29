@@ -218,7 +218,7 @@ public:
 - [x] **2.2.1** — Agree on the exact must-pass command matrix from Matt's daily Neovim habits.
 - [x] **2.2.2** — Automate stable cases and document manual-only cases.
 - [x] **2.2.3** — Record deviations as accept, configure around, or blocker; never quietly redefine Vim.
-- [ ] **2.2.4** — Verify: all mandatory automated cases pass and manual results are recorded.
+- [x] **2.2.4** — Verify: all mandatory automated cases pass and manual results are recorded.
 
 ### Task 2.3: Resolve the application leader
 
@@ -250,7 +250,7 @@ public:
 - [ ] Full Phase 1 quality gates remain green.
 - [ ] Vim acceptance results contain no unexplained failures.
 - [ ] The leader decision is recorded, not merely encoded.
-- [ ] **Matt gate:** write and edit a substantial Markdown sample using real daily motions; approve the feel.
+- [x] **Matt gate:** write and edit a substantial Markdown sample using real daily motions; approve the feel.
 - [ ] If the editor feels wrong, stop and reassess the engine before Phase 3.
 
 ## Phase 3: Workspace Roots and File Navigation
