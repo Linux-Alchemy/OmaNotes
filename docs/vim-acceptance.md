@@ -38,10 +38,15 @@ the application-level binding reachable without swallowing an editor command.
 Matt will use a substantial Markdown sample to check:
 
 1. All mandatory motions, operators, text objects, searches, marks, and visual modes that are
-   awkward or brittle to simulate under the offscreen Qt test platform.
-2. Mouse cursor placement and selection in the real Wayland session.
+   awkward or brittle to simulate under the offscreen Qt test platform. **Passed 2026-08-29.**
+2. Mouse cursor placement and selection in the real Wayland session. **Passed 2026-08-29.**
 3. Undo grouping, selection edges, status-mode feedback, and whether the overall interaction feels
-   recognisably like daily Neovim use.
+   recognisably like daily Neovim use. **Passed 2026-08-29.**
+
+Matt reported that his usual Vim motions function and mouse dragging works. `Ctrl+H` does not move
+focus to the skeletal sidebar; that is expected in the Phase 2 single-editor constraint and is not
+an editor deviation. Pane and sidebar navigation will be evaluated when those application contexts
+become functional.
 
 Record each deviation below before the Phase 2 checkpoint.
 
