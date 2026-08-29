@@ -200,10 +200,10 @@ public:
 
 **Blocks:**
 
-- [ ] **2.1.1** — Host a KTextEditor document/view in Vi input mode through the adapter.
-- [ ] **2.1.2** — Configure Markdown highlighting, soft wrap, restrained chrome, and mode reporting.
-- [ ] **2.1.3** — Add lifetime, text round-trip, modified-state, and mode-transition tests.
-- [ ] **2.1.4** — Verify: sanitizer run reports no lifecycle errors while repeatedly creating and destroying the editor.
+- [x] **2.1.1** — Host a KTextEditor document/view in Vi input mode through the adapter.
+- [x] **2.1.2** — Configure Markdown highlighting, soft wrap, restrained chrome, and mode reporting.
+- [x] **2.1.3** — Add lifetime, text round-trip, modified-state, and mode-transition tests.
+- [x] **2.1.4** — Verify: sanitizer run reports no lifecycle errors while repeatedly creating and destroying the editor.
 
 ### Task 2.2: Define and run the Vim acceptance suite
 

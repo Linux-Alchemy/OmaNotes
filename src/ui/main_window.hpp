@@ -3,11 +3,19 @@
 
 #include <QMainWindow>
 
+#include <memory>
+
 namespace omanotes {
+
+class EditorAdapter;
 
 class MainWindow final : public QMainWindow {
   public:
     explicit MainWindow(QWidget* parent = nullptr);
+    ~MainWindow() override;
+
+  private:
+    std::unique_ptr<EditorAdapter> editor_;
 };
 
 } // namespace omanotes
