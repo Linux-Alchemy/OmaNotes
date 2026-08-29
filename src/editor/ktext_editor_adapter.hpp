@@ -21,6 +21,7 @@ class KTextEditorAdapter final : public EditorAdapter {
     [[nodiscard]] QString text() const override;
     void setText(const QString& text) override;
     [[nodiscard]] bool isModified() const noexcept override;
+    [[nodiscard]] EditorMode mode() const noexcept override;
     [[nodiscard]] QString modeName() const override;
 
   private:

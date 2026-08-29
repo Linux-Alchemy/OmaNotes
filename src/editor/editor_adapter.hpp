@@ -4,9 +4,13 @@
 #include <QObject>
 #include <QString>
 
+#include <cstdint>
+
 class QWidget;
 
 namespace omanotes {
+
+enum class EditorMode : std::uint8_t { Normal, Insert, Visual, Replace, Other };
 
 class EditorAdapter : public QObject {
     Q_OBJECT
@@ -19,6 +23,7 @@ class EditorAdapter : public QObject {
     [[nodiscard]] virtual QString text() const = 0;
     virtual void setText(const QString& text) = 0;
     [[nodiscard]] virtual bool isModified() const noexcept = 0;
+    [[nodiscard]] virtual EditorMode mode() const noexcept = 0;
     [[nodiscard]] virtual QString modeName() const = 0;
 
   signals:

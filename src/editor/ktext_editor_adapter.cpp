@@ -63,6 +63,26 @@ void KTextEditorAdapter::setText(const QString& text) { document_->setText(text)
 
 bool KTextEditorAdapter::isModified() const noexcept { return document_->isModified(); }
 
+EditorMode KTextEditorAdapter::mode() const noexcept {
+    switch (view_->viewMode()) {
+    case KTextEditor::View::ViModeNormal:
+        return EditorMode::Normal;
+    case KTextEditor::View::ViModeInsert:
+        return EditorMode::Insert;
+    case KTextEditor::View::ViModeVisual:
+    case KTextEditor::View::ViModeVisualLine:
+    case KTextEditor::View::ViModeVisualBlock:
+        return EditorMode::Visual;
+    case KTextEditor::View::ViModeReplace:
+        return EditorMode::Replace;
+    case KTextEditor::View::NormalModeInsert:
+    case KTextEditor::View::NormalModeOverwrite:
+        return EditorMode::Other;
+    }
+
+    return EditorMode::Other;
+}
+
 QString KTextEditorAdapter::modeName() const { return view_->viewModeHuman(); }
 
 } // namespace omanotes

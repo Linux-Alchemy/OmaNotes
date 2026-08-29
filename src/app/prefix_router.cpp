@@ -45,6 +45,12 @@ bool PrefixRouter::route(QKeyEvent& event, EditorMode mode) {
 
 bool PrefixRouter::isPending() const noexcept { return pending_; }
 
+void PrefixRouter::cancelPending() {
+    if (pending_) {
+        cancel(QStringLiteral("Application prefix cancelled"));
+    }
+}
+
 LeaderKey PrefixRouter::leader() const noexcept { return leader_; }
 
 bool PrefixRouter::matchesLeader(const QKeyEvent& event) const noexcept {

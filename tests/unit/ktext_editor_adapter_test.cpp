@@ -42,6 +42,7 @@ void KTextEditorAdapterTest::configuresMarkdownWritingView() {
 
     QVERIFY(view != nullptr);
     QCOMPARE(view->viewInputMode(), KTextEditor::View::ViInputMode);
+    QCOMPARE(adapter.mode(), omanotes::EditorMode::Normal);
     QCOMPARE(view->document()->highlightingMode(), QStringLiteral("Markdown"));
     QCOMPARE(view->configValue(QStringLiteral("dynamic-word-wrap")).toBool(), true);
     QCOMPARE(view->configValue(QStringLiteral("line-numbers")).toBool(), false);
@@ -89,8 +90,10 @@ void KTextEditorAdapterTest::reportsViModeTransitions() {
     QVERIFY(adapter.modeName().contains(QStringLiteral("NORMAL"), Qt::CaseInsensitive));
     QTest::keyClicks(eventTarget, QStringLiteral("i"));
     QTRY_VERIFY(adapter.modeName().contains(QStringLiteral("INSERT"), Qt::CaseInsensitive));
+    QCOMPARE(adapter.mode(), omanotes::EditorMode::Insert);
     QTest::keyClick(eventTarget, Qt::Key_Escape);
     QTRY_VERIFY(adapter.modeName().contains(QStringLiteral("NORMAL"), Qt::CaseInsensitive));
+    QCOMPARE(adapter.mode(), omanotes::EditorMode::Normal);
     QVERIFY(modeSpy.count() >= 2);
 }
 
