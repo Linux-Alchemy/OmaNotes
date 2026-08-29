@@ -22,6 +22,7 @@ When handed one or more block addresses:
 7. Report completion by block address with the exact commands run and their actual results. “Done” is an emotion, not evidence.
 8. Stop at every phase checkpoint. Matt must run and accept the build before any block in the next phase begins.
 9. If blocked, report the address, cause, evidence, and smallest decision needed. Do not improvise around the gate.
+10. Work on a named branch and open a pull request for Matt's review. Never commit or push feature work directly to `main`, merge an agent-authored pull request without explicit approval, or rewrite a shared branch without approval.
 
 ## Build-wide quality contract
 
@@ -770,7 +771,7 @@ public:
 - [ ] Install/upgrade/uninstall preserve notes and handle XDG state as documented.
 - [ ] Architecture and security documents match the shipped code.
 - [ ] **Matt gate:** use the packaged build for an agreed daily-use trial and approve any public-release step separately.
-- [ ] No publication, push, release, or plugin-board submission occurs without explicit approval.
+- [ ] No direct push to `main`, release, public-repository change, or plugin-board submission occurs without explicit approval. Approved work may be pushed to a review branch solely to open its pull request.
 
 ## Quick Reference: Phase Boundaries
 
@@ -807,3 +808,4 @@ Decision required: approve / request changes / stop and redesign
 - **2026-08-28:** Initial plan created from approved `OUTLINE.md`; session snapshot/restore added as a core Phase 7 capability inspired by Herdr's structural persistence pattern.
 - **2026-08-29:** Native application distribution fixed as Arch/AUR/Omarchy Package Repository; `omarchyplugins.com` is reserved for an optional, separate QML companion plugin with meaningful shell integration.
 - **2026-08-29:** Phase 1 manually accepted after verifying typing, window resizing, and sidebar resizing; Phase 2 remains separately approval-gated.
+- **2026-08-29:** Adopted a branch-and-pull-request workflow: agents may push approved work to review branches, but Matt reviews and controls merging into `main`.
