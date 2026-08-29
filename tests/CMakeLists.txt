@@ -35,6 +35,22 @@ omanotes_enable_sanitizers(omanotes_editor_tests)
 add_test(NAME editor-adapter COMMAND omanotes_editor_tests)
 
 add_executable(
+    omanotes_prefix_tests
+    unit/prefix_router_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/app/prefix_router.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/prefix_router.hpp"
+)
+
+target_link_libraries(omanotes_prefix_tests PRIVATE Qt6::Test Qt6::Widgets)
+target_include_directories(omanotes_prefix_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+
+omanotes_enable_warnings(omanotes_prefix_tests)
+omanotes_enable_hardening(omanotes_prefix_tests)
+omanotes_enable_sanitizers(omanotes_prefix_tests)
+
+add_test(NAME prefix-router COMMAND omanotes_prefix_tests)
+
+add_executable(
     omanotes_vim_tests
     integration/vim_behaviour_test.cpp
     "${CMAKE_SOURCE_DIR}/src/editor/editor_adapter.hpp"
@@ -66,6 +82,6 @@ set(
 )
 
 set_tests_properties(
-    editor-adapter ui-structure process-startup vim-behaviour
+    editor-adapter prefix-router ui-structure process-startup vim-behaviour
     PROPERTIES ENVIRONMENT "${OMANOTES_TEST_ENVIRONMENT}"
 )

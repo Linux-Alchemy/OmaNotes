@@ -240,7 +240,7 @@ public:
 
 **Blocks:**
 
-- [ ] **2.3.1** — Prototype Space and `Ctrl+B` routing against the Vim acceptance suite.
+- [x] **2.3.1** — Prototype Space and `Ctrl+B` routing against the Vim acceptance suite.
 - [ ] **2.3.2** — Select the default with Matt; preserve `Ctrl+B` page-backward unless explicitly rejected.
 - [ ] **2.3.3** — Display pending prefix and invalid-sequence feedback in the status area.
 - [ ] **2.3.4** — Verify: typing, Insert mode, Normal mode, and mouse workflows show no swallowed input.
