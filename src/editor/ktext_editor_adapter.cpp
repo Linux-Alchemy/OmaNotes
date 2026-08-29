@@ -4,9 +4,32 @@
 #include <KTextEditor/Editor>
 #include <KTextEditor/View>
 
+#include <KActionCollection>
+#include <QAction>
+#include <QKeySequence>
 #include <QWidget>
 
 namespace omanotes {
+
+namespace {
+
+void releaseShortcutToVi(KTextEditor::View& view, const QKeySequence& sequence) {
+    for (auto* action : view.actionCollection()->actions()) {
+        auto shortcuts = action->shortcuts();
+        if (shortcuts.removeAll(sequence) > 0) {
+            action->setShortcuts(shortcuts);
+        }
+    }
+}
+
+void releaseCanonicalViShortcuts(KTextEditor::View& view) {
+    releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+B")));
+    releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+F")));
+    releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+R")));
+    releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+V")));
+}
+
+} // namespace
 
 KTextEditorAdapter::KTextEditorAdapter(QWidget* viewParent, QObject* parent)
     : EditorAdapter(parent), document_(KTextEditor::Editor::instance()->createDocument(this)),
@@ -21,6 +44,7 @@ KTextEditorAdapter::KTextEditorAdapter(QWidget* viewParent, QObject* parent)
     view_->setConfigValue(QStringLiteral("dynamic-word-wrap"), true);
     view_->setConfigValue(QStringLiteral("scrollbar-minimap"), false);
     document_->setHighlightingMode(QStringLiteral("Markdown"));
+    releaseCanonicalViShortcuts(*view_);
 
     connect(
         view_, &KTextEditor::View::viewModeChanged, this,

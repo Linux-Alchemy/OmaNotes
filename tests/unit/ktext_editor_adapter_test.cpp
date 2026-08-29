@@ -3,6 +3,9 @@
 #include <KTextEditor/Document>
 #include <KTextEditor/View>
 
+#include <KActionCollection>
+#include <QAction>
+#include <QKeySequence>
 #include <QPointer>
 #include <QSignalSpy>
 #include <QVBoxLayout>
@@ -46,6 +49,15 @@ void KTextEditorAdapterTest::configuresMarkdownWritingView() {
     QCOMPARE(view->configValue(QStringLiteral("folding-bar")).toBool(), false);
     QCOMPARE(view->configValue(QStringLiteral("scrollbar-minimap")).toBool(), false);
     QVERIFY(!view->isStatusBarEnabled());
+
+    const auto viSequences = {
+        QKeySequence(QStringLiteral("Ctrl+B")), QKeySequence(QStringLiteral("Ctrl+F")),
+        QKeySequence(QStringLiteral("Ctrl+R")), QKeySequence(QStringLiteral("Ctrl+V"))};
+    for (const auto& sequence : viSequences) {
+        for (const auto* action : view->actionCollection()->actions()) {
+            QVERIFY2(!action->shortcuts().contains(sequence), qPrintable(action->objectName()));
+        }
+    }
 }
 
 void KTextEditorAdapterTest::roundTripsTextAndTracksModification() {
