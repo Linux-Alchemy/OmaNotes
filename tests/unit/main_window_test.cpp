@@ -16,6 +16,7 @@ class MainWindowTest final : public QObject {
     void editorReceivesInitialFocus();
     void resizesWithoutLosingRegions();
     void statusTracksEditorState();
+    void spacePrefixDoesNotSwallowInsertTextOrControlB();
     void closesCleanly();
 };
 
@@ -48,6 +49,38 @@ void MainWindowTest::statusTracksEditorState() {
     QVERIFY(eventTarget != nullptr);
     QTest::keyClicks(eventTarget, QStringLiteral("i"));
     QTRY_VERIFY(status->text().contains(QStringLiteral("INSERT"), Qt::CaseInsensitive));
+}
+
+void MainWindowTest::spacePrefixDoesNotSwallowInsertTextOrControlB() {
+    omanotes::MainWindow window;
+    window.show();
+    auto* editor = window.findChild<KTextEditor::View*>(QStringLiteral("editorPane"));
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    QVERIFY(editor != nullptr);
+    QVERIFY(status != nullptr);
+
+    editor->document()->setText(QStringLiteral("alpha"));
+    editor->document()->setModified(false);
+    editor->setCursorPosition(KTextEditor::Cursor(0, 0));
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    auto* eventTarget = QApplication::focusWidget();
+    QVERIFY(eventTarget != nullptr);
+
+    QTest::keyClick(eventTarget, Qt::Key_Space);
+    QTRY_COMPARE(status->text(), QStringLiteral("Space …"));
+    QTest::keyClicks(eventTarget, QStringLiteral("x"));
+    QTRY_COMPARE(status->text(), QStringLiteral("Unknown application command: Space+x"));
+    QCOMPARE(editor->document()->text(), QStringLiteral("alpha"));
+
+    QTest::keyClicks(eventTarget, QStringLiteral("ihello world"));
+    QCOMPARE(editor->document()->text(), QStringLiteral("hello worldalpha"));
+    QTest::keyClick(eventTarget, Qt::Key_Escape);
+
+    editor->document()->setText(QString(40, QLatin1Char('\n')));
+    editor->setCursorPosition(KTextEditor::Cursor(39, 0));
+    QTest::keyClick(eventTarget, Qt::Key_B, Qt::ControlModifier);
+    QVERIFY(editor->cursorPosition().line() < 39);
 }
 
 void MainWindowTest::editorReceivesInitialFocus() {

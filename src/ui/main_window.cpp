@@ -1,9 +1,11 @@
 #include "ui/main_window.hpp"
 
+#include "app/prefix_router.hpp"
 #include "editor/editor_adapter.hpp"
 #include "editor/ktext_editor_adapter.hpp"
 
 #include <QFrame>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QListWidget>
 #include <QSplitter>
@@ -44,7 +46,8 @@ QFrame* buildSidebar(QWidget* parent) {
     return sidebar;
 }
 
-QWidget* buildWritingArea(QWidget* parent, std::unique_ptr<EditorAdapter>& editor) {
+QWidget* buildWritingArea(QWidget* parent, std::unique_ptr<EditorAdapter>& editor,
+                          PrefixRouter& prefixRouter) {
     auto* writingArea = new QWidget(parent);
     writingArea->setObjectName(QStringLiteral("writingArea"));
     editor = std::make_unique<KTextEditorAdapter>(writingArea);
@@ -72,6 +75,8 @@ QWidget* buildWritingArea(QWidget* parent, std::unique_ptr<EditorAdapter>& edito
     };
     QObject::connect(editor.get(), &EditorAdapter::modeChanged, status, updateStatus);
     QObject::connect(editor.get(), &EditorAdapter::modifiedChanged, status, updateStatus);
+    QObject::connect(&prefixRouter, &PrefixRouter::feedbackChanged, status,
+                     [status](const QString& message) { status->setText(message); });
     updateStatus();
 
     layout->addWidget(buffers);
@@ -93,7 +98,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     splitter->setAccessibleName(QStringLiteral("Workspace and editor panes"));
     splitter->setChildrenCollapsible(false);
     splitter->addWidget(buildSidebar(splitter));
-    splitter->addWidget(buildWritingArea(splitter, editor_));
+    prefixRouter_ = std::make_unique<PrefixRouter>(LeaderKey::Space);
+    splitter->addWidget(buildWritingArea(splitter, editor_, *prefixRouter_));
     splitter->setStretchFactor(0, 0);
     splitter->setStretchFactor(1, 1);
     splitter->setSizes({240, 860});
@@ -101,10 +107,27 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setCentralWidget(splitter);
 
     if (editor_->widget() != nullptr) {
+        editor_->widget()->installEventFilter(this);
+        if (auto* focusProxy = editor_->widget()->focusProxy(); focusProxy != nullptr) {
+            focusProxy->installEventFilter(this);
+        }
         editor_->widget()->setFocus(Qt::OtherFocusReason);
     }
 }
 
 MainWindow::~MainWindow() = default;
+
+bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
+    if (event->type() == QEvent::MouseButtonPress) {
+        prefixRouter_->cancelPending();
+    } else if (event->type() == QEvent::KeyPress) {
+        auto& keyEvent = *static_cast<QKeyEvent*>(event);
+        if (prefixRouter_->route(keyEvent, editor_->mode())) {
+            return true;
+        }
+    }
+
+    return QMainWindow::eventFilter(watched, event);
+}
 
 } // namespace omanotes

@@ -1,15 +1,18 @@
 #ifndef OMANOTES_APP_PREFIX_ROUTER_HPP
 #define OMANOTES_APP_PREFIX_ROUTER_HPP
 
+#include "editor/editor_adapter.hpp"
+
 #include <QObject>
 #include <QString>
+
+#include <cstdint>
 
 class QKeyEvent;
 
 namespace omanotes {
 
-enum class EditorMode { Normal, Insert, Visual, Replace, Other };
-enum class LeaderKey { Space, ControlB };
+enum class LeaderKey : std::uint8_t { Space, ControlB };
 
 class PrefixRouter final : public QObject {
     Q_OBJECT
@@ -18,6 +21,7 @@ class PrefixRouter final : public QObject {
     explicit PrefixRouter(LeaderKey leader, QObject* parent = nullptr);
 
     [[nodiscard]] bool route(QKeyEvent& event, EditorMode mode);
+    void cancelPending();
     [[nodiscard]] bool isPending() const noexcept;
     [[nodiscard]] LeaderKey leader() const noexcept;
 

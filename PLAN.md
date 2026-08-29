@@ -222,7 +222,7 @@ public:
 
 ### Task 2.3: Resolve the application leader
 
-**Files:** `docs/decisions/0002-application-leader.md`, `src/app/prefix_router.*`
+**Files:** `docs/decisions/0003-application-leader.md`, `src/app/prefix_router.*`
 
 **Skeleton:**
 
@@ -241,15 +241,15 @@ public:
 **Blocks:**
 
 - [x] **2.3.1** — Prototype Space and `Ctrl+B` routing against the Vim acceptance suite.
-- [ ] **2.3.2** — Select the default with Matt; preserve `Ctrl+B` page-backward unless explicitly rejected.
-- [ ] **2.3.3** — Display pending prefix and invalid-sequence feedback in the status area.
+- [x] **2.3.2** — Select the default with Matt; preserve `Ctrl+B` page-backward unless explicitly rejected.
+- [x] **2.3.3** — Display pending prefix and invalid-sequence feedback in the status area.
 - [ ] **2.3.4** — Verify: typing, Insert mode, Normal mode, and mouse workflows show no swallowed input.
 
 ### Phase 2 Checkpoint
 
-- [ ] Full Phase 1 quality gates remain green.
-- [ ] Vim acceptance results contain no unexplained failures.
-- [ ] The leader decision is recorded, not merely encoded.
+- [x] Full Phase 1 quality gates remain green.
+- [x] Vim acceptance results contain no unexplained failures.
+- [x] The leader decision is recorded, not merely encoded.
 - [x] **Matt gate:** write and edit a substantial Markdown sample using real daily motions; approve the feel.
 - [ ] If the editor feels wrong, stop and reassess the engine before Phase 3.
 
@@ -809,3 +809,4 @@ Decision required: approve / request changes / stop and redesign
 - **2026-08-29:** Native application distribution fixed as Arch/AUR/Omarchy Package Repository; `omarchyplugins.com` is reserved for an optional, separate QML companion plugin with meaningful shell integration.
 - **2026-08-29:** Phase 1 manually accepted after verifying typing, window resizing, and sidebar resizing; Phase 2 remains separately approval-gated.
 - **2026-08-29:** Adopted a branch-and-pull-request workflow: agents may push approved work to review branches, but Matt reviews and controls merging into `main`.
+- **2026-08-29:** Selected Space as the application leader after the Phase 2 prototype; preserved `Ctrl+B` page-backward and renumbered the leader decision to ADR 0003 because ADR 0002 already exists.

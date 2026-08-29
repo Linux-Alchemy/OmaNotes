@@ -1,6 +1,8 @@
 add_executable(
     omanotes_ui_tests
     unit/main_window_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/app/prefix_router.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/prefix_router.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/editor_adapter.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.cpp"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
