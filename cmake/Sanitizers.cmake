@@ -1,0 +1,12 @@
+function(omanotes_enable_sanitizers target)
+    if(NOT OMANOTES_ENABLE_SANITIZERS)
+        return()
+    endif()
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options("${target}" PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+        target_link_options("${target}" PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+    else()
+        message(FATAL_ERROR "Sanitizers are only configured for Clang and GCC")
+    endif()
+endfunction()
