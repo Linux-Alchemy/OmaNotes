@@ -19,6 +19,7 @@ class PrefixRouterTest final : public QObject {
   private slots:
     void spaceCandidateRoutesKnownSequence();
     void spaceCandidateLeavesOrdinaryInputAndControlBAlone();
+    void modifierKeyDoesNotCancelPendingPrefix();
     void unknownSequenceCancelsWithFeedback();
     void escapeCancelsPendingPrefix();
     void controlBCandidateConsumesPageBackward();
@@ -50,6 +51,19 @@ void PrefixRouterTest::spaceCandidateLeavesOrdinaryInputAndControlBAlone() {
     QVERIFY(!router.route(insertSpace, omanotes::EditorMode::Insert));
     QVERIFY(!router.route(insertSpace, omanotes::EditorMode::Visual));
     QVERIFY(!router.route(controlB, omanotes::EditorMode::Normal));
+}
+
+void PrefixRouterTest::modifierKeyDoesNotCancelPendingPrefix() {
+    omanotes::PrefixRouter router(omanotes::LeaderKey::Space);
+    auto space = keyEvent(Qt::Key_Space, QStringLiteral(" "));
+    auto shift = keyEvent(Qt::Key_Shift, {}, Qt::ShiftModifier);
+    auto help = keyEvent(Qt::Key_Question, QStringLiteral("?"), Qt::ShiftModifier);
+
+    QVERIFY(router.route(space, omanotes::EditorMode::Normal));
+    QVERIFY(!router.route(shift, omanotes::EditorMode::Normal));
+    QVERIFY(router.isPending());
+    QVERIFY(router.route(help, omanotes::EditorMode::Normal));
+    QVERIFY(!router.isPending());
 }
 
 void PrefixRouterTest::unknownSequenceCancelsWithFeedback() {

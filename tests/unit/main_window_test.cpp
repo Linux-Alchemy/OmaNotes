@@ -73,6 +73,16 @@ void MainWindowTest::spacePrefixDoesNotSwallowInsertTextOrControlB() {
     QTRY_COMPARE(status->text(), QStringLiteral("Unknown application command: Space+x"));
     QCOMPARE(editor->document()->text(), QStringLiteral("alpha"));
 
+    QTest::keyClick(eventTarget, Qt::Key_Space);
+    QKeyEvent shiftPress(QEvent::KeyPress, Qt::Key_Shift, Qt::ShiftModifier);
+    QApplication::sendEvent(eventTarget, &shiftPress);
+    QTRY_COMPARE(status->text(), QStringLiteral("Space …"));
+    QKeyEvent questionPress(QEvent::KeyPress, Qt::Key_Question, Qt::ShiftModifier,
+                            QStringLiteral("?"));
+    QApplication::sendEvent(eventTarget, &questionPress);
+    QTRY_COMPARE(status->text(), QStringLiteral("Space+? command is not available yet"));
+    QCOMPARE(editor->document()->text(), QStringLiteral("alpha"));
+
     QTest::keyClicks(eventTarget, QStringLiteral("ihello world"));
     QCOMPARE(editor->document()->text(), QStringLiteral("hello worldalpha"));
     QTest::keyClick(eventTarget, Qt::Key_Escape);
