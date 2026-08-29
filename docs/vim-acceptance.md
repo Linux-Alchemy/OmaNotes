@@ -13,15 +13,15 @@ around**, or **blocker**. Omanotes does not quietly redefine Vim.
 | Area | Required behaviour | Check |
 | --- | --- | --- |
 | Modes | Normal, Insert, Visual character, Visual line, and Visual block | Automated pass |
-| Motions | `h j k l`, `w b e`, `0 ^ $`, `gg G`, `{ }`, and counts | Automated core pass; manual full pass pending |
-| Operators | `d c y` with motions; `dd cc yy`; `x`, `r`, `J` | Automated core pass; manual full pass pending |
-| Text objects | `iw aw`, `i" a"`, `i( a(`, and `ip ap` | Automated core pass; manual full pass pending |
+| Motions | `h j k l`, `w b e`, `0 ^ $`, `gg G`, `{ }`, and counts | Automated core pass; manual pass |
+| Operators | `d c y` with motions; `dd cc yy`; `x`, `r`, `J` | Automated core pass; manual pass |
+| Text objects | `iw aw`, `i" a"`, `i( a(`, and `ip ap` | Automated core pass; manual pass |
 | Registers and paste | Unnamed, named, black-hole, `p`, and `P` | Automated pass with accepted deviation below |
 | History and repeat | `u`, `Ctrl+R`, and `.` | Automated pass |
-| Search | `/`, `?`, `n`, `N`, `*`, and `#` | Automated core pass; manual full pass pending |
-| Marks | `ma`, `'a`, and `` `a `` | Automated core pass; manual full pass pending |
+| Search | `/`, `?`, `n`, `N`, `*`, and `#` | Automated core pass; manual pass |
+| Marks | `ma`, `'a`, and `` `a `` | Automated core pass; manual pass |
 | Command mode | Enter/cancel command mode and substitute text | Automated pass |
-| Mouse | Cursor placement and character, line, and drag selection | Manual pass pending |
+| Mouse | Cursor placement and character, line, and drag selection | Manual pass |
 | Mappings | Define, exercise, and remove one Normal-mode mapping | Automated pass |
 
 Macros, `f/F/t/T`, `%`, and change-list navigation are useful but are not Phase 2 blockers unless
@@ -47,6 +47,12 @@ Matt reported that his usual Vim motions function and mouse dragging works. `Ctr
 focus to the skeletal sidebar; that is expected in the Phase 2 single-editor constraint and is not
 an editor deviation. Pane and sidebar navigation will be evaluated when those application contexts
 become functional.
+
+The final leader smoke test passed in the real Wayland session: Insert-mode spaces, Normal-mode
+commands, `Ctrl+B`, and mouse workflows were not swallowed. `Space+?` initially exposed a physical
+key-event bug where the leading Shift cancelled the pending prefix and `/` opened editor search.
+Modifier-only keypresses now leave the prefix pending; an automated regression test and Matt's
+manual retest both confirm that `Space+?` reaches the planned unavailable-command feedback.
 
 Record each deviation below before the Phase 2 checkpoint.
 

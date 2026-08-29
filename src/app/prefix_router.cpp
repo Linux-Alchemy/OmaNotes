@@ -4,6 +4,23 @@
 
 namespace omanotes {
 
+namespace {
+
+bool isModifierKey(const QKeyEvent& event) noexcept {
+    switch (event.key()) {
+    case Qt::Key_Shift:
+    case Qt::Key_Control:
+    case Qt::Key_Alt:
+    case Qt::Key_Meta:
+    case Qt::Key_AltGr:
+        return true;
+    default:
+        return false;
+    }
+}
+
+} // namespace
+
 PrefixRouter::PrefixRouter(LeaderKey leader, QObject* parent) : QObject(parent), leader_(leader) {}
 
 bool PrefixRouter::route(QKeyEvent& event, EditorMode mode) {
@@ -27,6 +44,10 @@ bool PrefixRouter::route(QKeyEvent& event, EditorMode mode) {
     if (event.key() == Qt::Key_Escape) {
         cancel(QStringLiteral("Application prefix cancelled"));
         return true;
+    }
+
+    if (isModifierKey(event)) {
+        return false;
     }
 
     const auto key = event.text();

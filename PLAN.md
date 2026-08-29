@@ -243,7 +243,7 @@ public:
 - [x] **2.3.1** — Prototype Space and `Ctrl+B` routing against the Vim acceptance suite.
 - [x] **2.3.2** — Select the default with Matt; preserve `Ctrl+B` page-backward unless explicitly rejected.
 - [x] **2.3.3** — Display pending prefix and invalid-sequence feedback in the status area.
-- [ ] **2.3.4** — Verify: typing, Insert mode, Normal mode, and mouse workflows show no swallowed input.
+- [x] **2.3.4** — Verify: typing, Insert mode, Normal mode, and mouse workflows show no swallowed input.
 
 ### Phase 2 Checkpoint
 
@@ -251,7 +251,7 @@ public:
 - [x] Vim acceptance results contain no unexplained failures.
 - [x] The leader decision is recorded, not merely encoded.
 - [x] **Matt gate:** write and edit a substantial Markdown sample using real daily motions; approve the feel.
-- [ ] If the editor feels wrong, stop and reassess the engine before Phase 3.
+- [x] Editor feel accepted; no engine reassessment required before Phase 3.
 
 ## Phase 3: Workspace Roots and File Navigation
 
@@ -810,3 +810,4 @@ Decision required: approve / request changes / stop and redesign
 - **2026-08-29:** Phase 1 manually accepted after verifying typing, window resizing, and sidebar resizing; Phase 2 remains separately approval-gated.
 - **2026-08-29:** Adopted a branch-and-pull-request workflow: agents may push approved work to review branches, but Matt reviews and controls merging into `main`.
 - **2026-08-29:** Selected Space as the application leader after the Phase 2 prototype; preserved `Ctrl+B` page-backward and renumbered the leader decision to ADR 0003 because ADR 0002 already exists.
+- **2026-08-29:** Phase 2 accepted after the real-session Vim feel and Space-leader smoke tests; fixed and regression-tested shifted `Space+?` routing before closing the phase.
