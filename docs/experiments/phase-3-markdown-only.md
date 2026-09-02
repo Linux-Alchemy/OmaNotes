@@ -31,4 +31,7 @@ than stacked on this branch.
 
 ## Manual comparison
 
-Pending Matt's real-session review before the general-purpose sibling is implemented.
+Accepted by Matt on 2026-09-02. The real-session test passed Markdown-only filtering, directory
+navigation, mouse opening, `j/k/h/l/Enter`, `Ctrl+H`/`Ctrl+L` pane focus, and memory-only editing.
+This accepts the experiment as a valid candidate; the final Phase 3 sidebar policy remains pending
+comparison with the general-purpose sibling.
