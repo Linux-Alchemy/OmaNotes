@@ -32,4 +32,9 @@ new modal editing behaviour in this experiment. KTextEditor remains the capabili
 
 ## Manual comparison
 
-Pending Matt's real-session review against the accepted Markdown-only experiment.
+Passed Matt's real-session checks on 2026-09-02. Showing and opening general text worked as
+designed, including Kate-provided syntax behaviour and the shared navigation paths.
+
+This branch is retained as a viable experiment but parked. Matt chose the Markdown-only sibling
+for continued development because the general-purpose direction risks drifting toward a prettier
+Neovim rather than Omanotes' focused writing goal.
