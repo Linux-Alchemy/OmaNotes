@@ -1,6 +1,7 @@
 add_executable(
     omanotes_ui_tests
     unit/main_window_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/app/launch_request.hpp"
     "${CMAKE_SOURCE_DIR}/src/app/prefix_router.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/prefix_router.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/editor_adapter.hpp"
@@ -8,6 +9,12 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
     "${CMAKE_SOURCE_DIR}/src/ui/main_window.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/main_window.hpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/sidebar.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/sidebar.hpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/file_tree_model.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/file_tree_model.hpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.hpp"
 )
 
 target_link_libraries(omanotes_ui_tests PRIVATE KF6::TextEditor Qt6::Test Qt6::Widgets)
@@ -53,6 +60,42 @@ omanotes_enable_sanitizers(omanotes_prefix_tests)
 add_test(NAME prefix-router COMMAND omanotes_prefix_tests)
 
 add_executable(
+    omanotes_launch_tests
+    unit/launch_request_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/app/launch_request.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/launch_request.hpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.hpp"
+)
+
+target_link_libraries(omanotes_launch_tests PRIVATE Qt6::Test)
+target_include_directories(omanotes_launch_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+
+omanotes_enable_warnings(omanotes_launch_tests)
+omanotes_enable_hardening(omanotes_launch_tests)
+omanotes_enable_sanitizers(omanotes_launch_tests)
+
+add_test(NAME launch-request COMMAND omanotes_launch_tests)
+
+add_executable(
+    omanotes_file_tree_tests
+    unit/file_tree_model_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/workspace/file_tree_model.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/file_tree_model.hpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.hpp"
+)
+
+target_link_libraries(omanotes_file_tree_tests PRIVATE Qt6::Test)
+target_include_directories(omanotes_file_tree_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+
+omanotes_enable_warnings(omanotes_file_tree_tests)
+omanotes_enable_hardening(omanotes_file_tree_tests)
+omanotes_enable_sanitizers(omanotes_file_tree_tests)
+
+add_test(NAME file-tree-model COMMAND omanotes_file_tree_tests)
+
+add_executable(
     omanotes_vim_tests
     integration/vim_behaviour_test.cpp
     "${CMAKE_SOURCE_DIR}/src/editor/editor_adapter.hpp"
@@ -84,6 +127,7 @@ set(
 )
 
 set_tests_properties(
-    editor-adapter prefix-router ui-structure process-startup vim-behaviour
+    editor-adapter file-tree-model launch-request prefix-router ui-structure process-startup
+    vim-behaviour
     PROPERTIES ENVIRONMENT "${OMANOTES_TEST_ENVIRONMENT}"
 )

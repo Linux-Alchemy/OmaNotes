@@ -20,6 +20,7 @@ class KTextEditorAdapterTest final : public QObject {
     void ownsEditorLifetime();
     void configuresMarkdownWritingView();
     void roundTripsTextAndTracksModification();
+    void loadsFileTextAsCleanMemoryOnlyContent();
     void reportsViModeTransitions();
 };
 
@@ -51,14 +52,26 @@ void KTextEditorAdapterTest::configuresMarkdownWritingView() {
     QCOMPARE(view->configValue(QStringLiteral("scrollbar-minimap")).toBool(), false);
     QVERIFY(!view->isStatusBarEnabled());
 
-    const auto viSequences = {
-        QKeySequence(QStringLiteral("Ctrl+B")), QKeySequence(QStringLiteral("Ctrl+F")),
-        QKeySequence(QStringLiteral("Ctrl+R")), QKeySequence(QStringLiteral("Ctrl+V"))};
-    for (const auto& sequence : viSequences) {
+    const auto releasedSequences = {
+        QKeySequence(QStringLiteral("Ctrl+H")),      QKeySequence(QStringLiteral("Ctrl+B")),
+        QKeySequence(QStringLiteral("Ctrl+F")),      QKeySequence(QStringLiteral("Ctrl+R")),
+        QKeySequence(QStringLiteral("Ctrl+V")),      QKeySequence(QStringLiteral("Ctrl+S")),
+        QKeySequence(QStringLiteral("Ctrl+Shift+S"))};
+    for (const auto& sequence : releasedSequences) {
         for (const auto* action : view->actionCollection()->actions()) {
             QVERIFY2(!action->shortcuts().contains(sequence), qPrintable(action->objectName()));
         }
     }
+}
+
+void KTextEditorAdapterTest::loadsFileTextAsCleanMemoryOnlyContent() {
+    QWidget parent;
+    omanotes::KTextEditorAdapter adapter(&parent);
+
+    adapter.loadText(QStringLiteral("# Loaded\n"));
+
+    QCOMPARE(adapter.text(), QStringLiteral("# Loaded\n"));
+    QVERIFY(!adapter.isModified());
 }
 
 void KTextEditorAdapterTest::roundTripsTextAndTracksModification() {
