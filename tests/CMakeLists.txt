@@ -114,6 +114,19 @@ add_test(NAME vim-behaviour COMMAND omanotes_vim_tests)
 
 add_test(NAME process-startup COMMAND omanotes --smoke-test)
 
+add_executable(omanotes_process_tests integration/launch_process_test.cpp)
+target_link_libraries(omanotes_process_tests PRIVATE Qt6::Test)
+target_compile_definitions(
+    omanotes_process_tests PRIVATE OMANOTES_BINARY_PATH="$<TARGET_FILE:omanotes>"
+)
+add_dependencies(omanotes_process_tests omanotes)
+
+omanotes_enable_warnings(omanotes_process_tests)
+omanotes_enable_hardening(omanotes_process_tests)
+omanotes_enable_sanitizers(omanotes_process_tests)
+
+add_test(NAME launch-process COMMAND omanotes_process_tests)
+
 set(
     OMANOTES_TEST_ENVIRONMENT
     "QT_QPA_PLATFORM=offscreen"
@@ -127,7 +140,7 @@ set(
 )
 
 set_tests_properties(
-    editor-adapter file-tree-model launch-request prefix-router ui-structure process-startup
-    vim-behaviour
+    editor-adapter file-tree-model launch-process launch-request prefix-router ui-structure
+    process-startup vim-behaviour
     PROPERTIES ENVIRONMENT "${OMANOTES_TEST_ENVIRONMENT}"
 )

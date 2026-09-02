@@ -320,7 +320,7 @@ public:
 
 - [x] Launch-contract and root-boundary tests pass under sanitizers.
 - [x] Sidebar never escapes the root through `..` or symlinks.
-- [ ] The application remains runnable with an empty, missing-file, and populated workspace.
+- [x] The application remains runnable with an empty, missing-file, and populated workspace.
 - [ ] **Matt gate:** launch using every command form, navigate with keys and mouse, and approve root/sidebar behaviour.
 
 ## Phase 4: Buffers, Saving, and External Changes
@@ -812,3 +812,4 @@ Decision required: approve / request changes / stop and redesign
 - **2026-08-29:** Selected Space as the application leader after the Phase 2 prototype; preserved `Ctrl+B` page-backward and renumbered the leader decision to ADR 0003 because ADR 0002 already exists.
 - **2026-08-29:** Phase 2 accepted after the real-session Vim feel and Space-leader smoke tests; fixed and regression-tested shifted `Space+?` routing before closing the phase.
 - **2026-09-02:** Phase 3 sidebar policy moved to two isolated sibling experiments from the accepted Phase 2 tip: Markdown-only first, then general-purpose within KTextEditor capabilities. No Neovim feature reimplementation is part of either experiment.
+- **2026-09-02:** Both Phase 3 sidebar experiments passed; continued development selected the Markdown-only branch for product focus, while retaining the general-purpose branch as a parked alternative.
