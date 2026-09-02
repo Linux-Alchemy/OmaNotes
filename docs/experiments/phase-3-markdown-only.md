@@ -26,7 +26,9 @@ than stacked on this branch.
   outside-root, non-UTF-8-name, and 500-file-directory fixtures.
 - UI tests pass mouse activation, in-memory-only loading, explicit non-Markdown rejection,
   `j/k/h/l/Enter`, and `Ctrl+H`/`Ctrl+L` pane focus.
-- The full seven-test suite passes under the development sanitizer preset.
+- The real executable passes empty and populated roots; relative directory, relative file, nested
+  file, absolute file, and `--fresh` launches; and safe missing-file rejection.
+- The full eight-test suite passes under the development sanitizer preset.
 - Formatting, clang-tidy, and executable hardening checks pass.
 
 ## Manual comparison
@@ -35,3 +37,7 @@ Accepted by Matt on 2026-09-02. The real-session test passed Markdown-only filte
 navigation, mouse opening, `j/k/h/l/Enter`, `Ctrl+H`/`Ctrl+L` pane focus, and memory-only editing.
 This accepts the experiment as a valid candidate; the final Phase 3 sidebar policy remains pending
 comparison with the general-purpose sibling.
+
+The general-purpose sibling also passed, but Matt selected this Markdown-only branch for continued
+development. The alternative remains parked for possible future work; Omanotes will stay focused
+rather than drifting into a prettier Neovim.

@@ -3,11 +3,11 @@
 
 #include <QApplication>
 #include <QCoreApplication>
-#include <QDebug>
 #include <QTimer>
 
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 #include <span>
 #include <string_view>
 #include <system_error>
@@ -41,14 +41,14 @@ int main(int argc, char* argv[]) {
     std::error_code currentDirectoryError;
     const auto currentDirectory = std::filesystem::current_path(currentDirectoryError);
     if (currentDirectoryError) {
-        qCritical().noquote() << "Cannot resolve current directory:"
-                              << QString::fromStdString(currentDirectoryError.message());
+        std::cerr << "Cannot resolve current directory: " << currentDirectoryError.message()
+                  << '\n';
         return 2;
     }
 
     auto launchRequest = omanotes::resolveLaunchRequest(launchArguments, currentDirectory);
     if (!launchRequest) {
-        qCritical().noquote() << QString::fromStdString(launchRequest.error().message);
+        std::cerr << launchRequest.error().message << '\n';
         return 2;
     }
 
