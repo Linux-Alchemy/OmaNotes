@@ -76,6 +76,9 @@ void LaunchProcessTest::startsForEveryApprovedLaunchForm() {
     const auto smoke = QStringLiteral("--smoke-test");
     verifySuccess(runOmanotes({smoke}, temporary.path()));
     verifySuccess(runOmanotes({smoke, QStringLiteral("Notes")}, temporary.path()));
+    verifySuccess(
+        runOmanotes({smoke, QString::fromStdString(std::filesystem::canonical(notes).string())},
+                    temporary.path()));
     verifySuccess(runOmanotes({smoke, QStringLiteral("idea.md")}, temporary.path()));
     verifySuccess(runOmanotes({smoke, QStringLiteral("projects/nested.md")}, temporary.path()));
     verifySuccess(runOmanotes({smoke, QString::fromStdString((notes / "absolute.md").string())},

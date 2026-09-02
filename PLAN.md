@@ -321,7 +321,7 @@ public:
 - [x] Launch-contract and root-boundary tests pass under sanitizers.
 - [x] Sidebar never escapes the root through `..` or symlinks.
 - [x] The application remains runnable with an empty, missing-file, and populated workspace.
-- [ ] **Matt gate:** launch using every command form, navigate with keys and mouse, and approve root/sidebar behaviour.
+- [x] **Matt gate:** launch using every command form, navigate with keys and mouse, and approve root/sidebar behaviour.
 
 ## Phase 4: Buffers, Saving, and External Changes
 

@@ -26,8 +26,8 @@ than stacked on this branch.
   outside-root, non-UTF-8-name, and 500-file-directory fixtures.
 - UI tests pass mouse activation, in-memory-only loading, explicit non-Markdown rejection,
   `j/k/h/l/Enter`, and `Ctrl+H`/`Ctrl+L` pane focus.
-- The real executable passes empty and populated roots; relative directory, relative file, nested
-  file, absolute file, and `--fresh` launches; and safe missing-file rejection.
+- The real executable passes empty and populated roots; relative and absolute directories;
+  relative, nested, and absolute files; `--fresh`; and safe missing-file rejection.
 - The full eight-test suite passes under the development sanitizer preset.
 - Formatting, clang-tidy, and executable hardening checks pass.
 
@@ -41,3 +41,14 @@ comparison with the general-purpose sibling.
 The general-purpose sibling also passed, but Matt selected this Markdown-only branch for continued
 development. The alternative remains parked for possible future work; Omanotes will stay focused
 rather than drifting into a prettier Neovim.
+
+The Phase 3 checkpoint was accepted on 2026-09-02 after hands-on launches with no argument,
+relative and absolute directories, relative and nested-relative files, an absolute file, and
+`--fresh`. The missing-file form produced a clear diagnostic and exited with status 2. Sidebar
+navigation worked with mouse and keys, roots could not be escaped upward, and closing after opening
+`PLAN.md` left the worktree untouched.
+
+During an instrumented real-GUI shutdown, LeakSanitizer reported retained allocations entirely in
+Qt's GTK/Pango/fontconfig theme stack. Manual GUI launches therefore used
+`ASAN_OPTIONS=detect_leaks=0:halt_on_error=1`, matching the automated GUI-test environment while
+retaining AddressSanitizer's memory-error checks.
