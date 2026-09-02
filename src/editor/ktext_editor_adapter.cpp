@@ -23,10 +23,13 @@ void releaseShortcutToVi(KTextEditor::View& view, const QKeySequence& sequence) 
 }
 
 void releaseCanonicalViShortcuts(KTextEditor::View& view) {
+    releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+H")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+B")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+F")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+R")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+V")));
+    releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+S")));
+    releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+Shift+S")));
 }
 
 } // namespace
@@ -60,6 +63,11 @@ QWidget* KTextEditorAdapter::widget() noexcept { return view_; }
 QString KTextEditorAdapter::text() const { return document_->text(); }
 
 void KTextEditorAdapter::setText(const QString& text) { document_->setText(text); }
+
+void KTextEditorAdapter::loadText(const QString& text) {
+    document_->setText(text);
+    document_->setModified(false);
+}
 
 bool KTextEditorAdapter::isModified() const noexcept { return document_->isModified(); }
 
