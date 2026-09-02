@@ -15,6 +15,7 @@ namespace omanotes {
 
 Sidebar::Sidebar(const std::filesystem::path& root, QWidget* parent)
     : QFrame(parent), model_(new FileTreeModel(root, this)), tree_(new QTreeView(this)) {
+    model_->setShowAllFiles(true);
     setObjectName(QStringLiteral("sidebar"));
     setAccessibleName(QStringLiteral("Workspace files"));
     setFrameShape(QFrame::NoFrame);

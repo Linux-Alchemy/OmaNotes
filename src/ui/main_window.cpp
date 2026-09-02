@@ -32,10 +32,6 @@ QString displayName(const std::filesystem::path& path) {
     return QFile::decodeName(QByteArray::fromStdString(path.filename().native()));
 }
 
-bool isMarkdown(const std::filesystem::path& path) {
-    return displayName(path.extension()).compare(QStringLiteral(".md"), Qt::CaseInsensitive) == 0;
-}
-
 QWidget* buildWritingArea(QWidget* parent, std::unique_ptr<EditorAdapter>& editor,
                           QTabBar*& buffers, QLabel*& status) {
     auto* writingArea = new QWidget(parent);
@@ -95,7 +91,7 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
     connect(prefixRouter_.get(), &PrefixRouter::feedbackChanged, statusArea_,
             [this](const QString& message) { statusArea_->setText(message); });
     connect(sidebar_, &Sidebar::fileActivated, this,
-            [this](const std::filesystem::path& path) { loadMarkdownFile(path); });
+            [this](const std::filesystem::path& path) { loadFile(path); });
     connect(sidebar_, &Sidebar::editorFocusRequested, this, [this] {
         if (editor_->widget() != nullptr) {
             editor_->widget()->setFocus(Qt::ShortcutFocusReason);
@@ -119,7 +115,7 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
     }
 
     if (launchRequest_.requestedFile.has_value()) {
-        loadMarkdownFile(*launchRequest_.requestedFile);
+        loadFile(*launchRequest_.requestedFile);
     }
 }
 
@@ -149,7 +145,7 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
     return QMainWindow::eventFilter(watched, event);
 }
 
-void MainWindow::loadMarkdownFile(const std::filesystem::path& path) {
+void MainWindow::loadFile(const std::filesystem::path& path) {
     auto workspace = WorkspaceRoot::resolve(launchRequest_.root);
     if (!workspace) {
         statusArea_->setText(QString::fromStdString(workspace.error().message));
@@ -160,11 +156,6 @@ void MainWindow::loadMarkdownFile(const std::filesystem::path& path) {
         statusArea_->setText(QString::fromStdString(resolved.error().message));
         return;
     }
-    if (!isMarkdown(*resolved)) {
-        statusArea_->setText(QStringLiteral("Only Markdown (.md) files can be opened"));
-        return;
-    }
-
     std::ifstream input(*resolved, std::ios::binary);
     if (!input) {
         statusArea_->setText(QStringLiteral("Could not read %1").arg(displayName(*resolved)));
@@ -188,7 +179,7 @@ void MainWindow::loadMarkdownFile(const std::filesystem::path& path) {
 
     currentFile_ = *resolved;
     bufferStrip_->setTabText(0, displayName(*resolved));
-    editor_->loadText(text);
+    editor_->loadText({text, displayName(*resolved)});
     refreshEditorStatus();
 }
 

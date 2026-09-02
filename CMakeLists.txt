@@ -21,6 +21,7 @@ include(Sanitizers)
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets Test)
 find_package(KF6TextEditor 6.9 REQUIRED)
+find_package(KF6SyntaxHighlighting 6.9 REQUIRED)
 
 enable_testing()
 

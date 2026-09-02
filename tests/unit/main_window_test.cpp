@@ -51,9 +51,10 @@ class MainWindowTest final : public QObject {
     void resizesWithoutLosingRegions();
     void statusTracksEditorState();
     void spacePrefixDoesNotSwallowInsertTextOrControlB();
-    void markdownSidebarFiltersAndLoadsWithoutWriting();
+    void generalSidebarShowsAndLoadsTextWithoutWriting();
     void supportsVimStyleSidebarAndPaneNavigation();
-    void rejectsExplicitNonMarkdownFileClearly();
+    void loadsExplicitTextFileWithKateHighlighting();
+    void rejectsBinaryLookingFileClearly();
     void closesCleanly();
 };
 
@@ -130,13 +131,14 @@ void MainWindowTest::spacePrefixDoesNotSwallowInsertTextOrControlB() {
     QVERIFY(editor->cursorPosition().line() < 39);
 }
 
-void MainWindowTest::markdownSidebarFiltersAndLoadsWithoutWriting() {
+void MainWindowTest::generalSidebarShowsAndLoadsTextWithoutWriting() {
     QTemporaryDir temporary;
     QVERIFY(temporary.isValid());
     const auto root = pathFor(temporary.path());
     std::filesystem::create_directory(root / "folder");
     writeFile(root / "note.md", "# Original\n");
-    writeFile(root / "ignored.txt", "not a note\n");
+    writeFile(root / "script.py", "print('hello')\n");
+    writeFile(root / ".env", "VISIBLE=yes\n");
 
     omanotes::MainWindow window({std::filesystem::canonical(root), std::nullopt, false});
     window.show();
@@ -151,21 +153,23 @@ void MainWindowTest::markdownSidebarFiltersAndLoadsWithoutWriting() {
     if (model->canFetchMore({})) {
         model->fetchMore({});
     }
-    const auto note = findIndex(*model, QStringLiteral("note.md"));
-    QVERIFY(note.isValid());
-    QVERIFY(!findIndex(*model, QStringLiteral("ignored.txt")).isValid());
+    const auto script = findIndex(*model, QStringLiteral("script.py"));
+    QVERIFY(script.isValid());
+    QVERIFY(findIndex(*model, QStringLiteral("note.md")).isValid());
+    QVERIFY(findIndex(*model, QStringLiteral(".env")).isValid());
 
-    tree->scrollTo(note);
+    tree->scrollTo(script);
     QTest::mouseClick(tree->viewport(), Qt::LeftButton, Qt::NoModifier,
-                      tree->visualRect(note).center());
-    QTRY_COMPARE(editor->document()->text(), QStringLiteral("# Original\n"));
-    QCOMPARE(buffers->tabText(0), QStringLiteral("note.md"));
+                      tree->visualRect(script).center());
+    QTRY_COMPARE(editor->document()->text(), QStringLiteral("print('hello')\n"));
+    QCOMPARE(editor->document()->highlightingMode(), QStringLiteral("Python"));
+    QCOMPARE(buffers->tabText(0), QStringLiteral("script.py"));
     QVERIFY(!editor->document()->isModified());
 
     editor->document()->setText(QStringLiteral("changed in memory"));
-    QFile diskFile(QString::fromStdString((root / "note.md").string()));
+    QFile diskFile(QString::fromStdString((root / "script.py").string()));
     QVERIFY(diskFile.open(QIODevice::ReadOnly));
-    QCOMPARE(diskFile.readAll(), QByteArray("# Original\n"));
+    QCOMPARE(diskFile.readAll(), QByteArray("print('hello')\n"));
 }
 
 void MainWindowTest::supportsVimStyleSidebarAndPaneNavigation() {
@@ -218,22 +222,41 @@ void MainWindowTest::supportsVimStyleSidebarAndPaneNavigation() {
     QTRY_VERIFY(editor->hasFocus());
 }
 
-void MainWindowTest::rejectsExplicitNonMarkdownFileClearly() {
+void MainWindowTest::loadsExplicitTextFileWithKateHighlighting() {
     QTemporaryDir temporary;
     QVERIFY(temporary.isValid());
     const auto root = pathFor(temporary.path());
-    const auto textFile = root / "plain.txt";
-    writeFile(textFile, "plain text\n");
+    const auto textFile = root / "script.py";
+    writeFile(textFile, "value = 42\n");
 
     omanotes::MainWindow window(
         {std::filesystem::canonical(root), std::filesystem::canonical(textFile), false});
+    window.show();
+    auto* editor = window.findChild<KTextEditor::View*>(QStringLiteral("editorPane"));
+    auto* buffers = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    QVERIFY(editor != nullptr);
+    QVERIFY(buffers != nullptr);
+    QCOMPARE(editor->document()->text(), QStringLiteral("value = 42\n"));
+    QCOMPARE(editor->document()->highlightingMode(), QStringLiteral("Python"));
+    QCOMPARE(buffers->tabText(0), QStringLiteral("script.py"));
+}
+
+void MainWindowTest::rejectsBinaryLookingFileClearly() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = pathFor(temporary.path());
+    const auto binaryFile = root / "sample.bin";
+    writeFile(binaryFile, QByteArray("text\0binary", 11));
+
+    omanotes::MainWindow window(
+        {std::filesystem::canonical(root), std::filesystem::canonical(binaryFile), false});
     window.show();
     auto* editor = window.findChild<KTextEditor::View*>(QStringLiteral("editorPane"));
     auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
     QVERIFY(editor != nullptr);
     QVERIFY(status != nullptr);
     QCOMPARE(editor->document()->text(), QString{});
-    QCOMPARE(status->text(), QStringLiteral("Only Markdown (.md) files can be opened"));
+    QCOMPARE(status->text(), QStringLiteral("Refusing binary-looking file: sample.bin"));
 }
 
 void MainWindowTest::editorReceivesInitialFocus() {

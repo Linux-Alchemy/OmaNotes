@@ -21,6 +21,7 @@ class KTextEditorAdapterTest final : public QObject {
     void configuresMarkdownWritingView();
     void roundTripsTextAndTracksModification();
     void loadsFileTextAsCleanMemoryOnlyContent();
+    void fallsBackToPlainTextForUnknownFileType();
     void reportsViModeTransitions();
 };
 
@@ -44,7 +45,7 @@ void KTextEditorAdapterTest::configuresMarkdownWritingView() {
     QVERIFY(view != nullptr);
     QCOMPARE(view->viewInputMode(), KTextEditor::View::ViInputMode);
     QCOMPARE(adapter.mode(), omanotes::EditorMode::Normal);
-    QCOMPARE(view->document()->highlightingMode(), QStringLiteral("Markdown"));
+    QCOMPARE(view->document()->highlightingMode(), QStringLiteral("None"));
     QCOMPARE(view->configValue(QStringLiteral("dynamic-word-wrap")).toBool(), true);
     QCOMPARE(view->configValue(QStringLiteral("line-numbers")).toBool(), false);
     QCOMPARE(view->configValue(QStringLiteral("icon-bar")).toBool(), false);
@@ -68,9 +69,22 @@ void KTextEditorAdapterTest::loadsFileTextAsCleanMemoryOnlyContent() {
     QWidget parent;
     omanotes::KTextEditorAdapter adapter(&parent);
 
-    adapter.loadText(QStringLiteral("# Loaded\n"));
+    adapter.loadText({QStringLiteral("# Loaded\n"), QStringLiteral("README.md")});
 
     QCOMPARE(adapter.text(), QStringLiteral("# Loaded\n"));
+    QCOMPARE(qobject_cast<KTextEditor::View*>(adapter.widget())->document()->highlightingMode(),
+             QStringLiteral("Markdown"));
+    QVERIFY(!adapter.isModified());
+}
+
+void KTextEditorAdapterTest::fallsBackToPlainTextForUnknownFileType() {
+    QWidget parent;
+    omanotes::KTextEditorAdapter adapter(&parent);
+
+    adapter.loadText({QStringLiteral("opaque text\n"), QStringLiteral("file.omanotes-unknown")});
+
+    QCOMPARE(qobject_cast<KTextEditor::View*>(adapter.widget())->document()->highlightingMode(),
+             QStringLiteral("None"));
     QVERIFY(!adapter.isModified());
 }
 

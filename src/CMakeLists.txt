@@ -18,7 +18,7 @@ add_executable(
     workspace/workspace_root.hpp
 )
 
-target_link_libraries(omanotes PRIVATE KF6::TextEditor Qt6::Widgets)
+target_link_libraries(omanotes PRIVATE KF6::SyntaxHighlighting KF6::TextEditor Qt6::Widgets)
 target_include_directories(omanotes PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 omanotes_enable_warnings(omanotes)

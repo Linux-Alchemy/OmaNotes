@@ -5,6 +5,8 @@
 #include <KTextEditor/View>
 
 #include <KActionCollection>
+#include <KSyntaxHighlighting/Definition>
+#include <KSyntaxHighlighting/Repository>
 #include <QAction>
 #include <QKeySequence>
 #include <QWidget>
@@ -38,7 +40,7 @@ KTextEditorAdapter::KTextEditorAdapter(QWidget* viewParent, QObject* parent)
     : EditorAdapter(parent), document_(KTextEditor::Editor::instance()->createDocument(this)),
       view_(document_->createView(viewParent)) {
     view_->setObjectName(QStringLiteral("editorPane"));
-    view_->setAccessibleName(QStringLiteral("Markdown editor"));
+    view_->setAccessibleName(QStringLiteral("Text editor"));
     view_->setViewInputMode(KTextEditor::View::ViInputMode);
     view_->setStatusBarEnabled(false);
     view_->setConfigValue(QStringLiteral("line-numbers"), false);
@@ -46,7 +48,7 @@ KTextEditorAdapter::KTextEditorAdapter(QWidget* viewParent, QObject* parent)
     view_->setConfigValue(QStringLiteral("folding-bar"), false);
     view_->setConfigValue(QStringLiteral("dynamic-word-wrap"), true);
     view_->setConfigValue(QStringLiteral("scrollbar-minimap"), false);
-    document_->setHighlightingMode(QStringLiteral("Markdown"));
+    document_->setHighlightingMode(QStringLiteral("None"));
     releaseCanonicalViShortcuts(*view_);
 
     connect(
@@ -64,8 +66,12 @@ QString KTextEditorAdapter::text() const { return document_->text(); }
 
 void KTextEditorAdapter::setText(const QString& text) { document_->setText(text); }
 
-void KTextEditorAdapter::loadText(const QString& text) {
-    document_->setText(text);
+void KTextEditorAdapter::loadText(const LoadedText& loadedText) {
+    static const KSyntaxHighlighting::Repository repository;
+    const auto definition = repository.definitionForFileName(loadedText.fileName);
+    const auto highlighting = definition.isValid() ? definition.name() : QStringLiteral("None");
+    document_->setHighlightingMode(highlighting);
+    document_->setText(loadedText.contents);
     document_->setModified(false);
 }
 

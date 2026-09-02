@@ -175,7 +175,7 @@ std::vector<std::unique_ptr<FileTreeModel::Node>> FileTreeModel::enumerate(Node&
     for (std::filesystem::directory_iterator entry(parentNode.path, options, error), end;
          !error && entry != end; entry.increment(error)) {
         const auto& path = entry->path();
-        if (isHidden(path)) {
+        if (!showAllFiles_ && isHidden(path)) {
             continue;
         }
 

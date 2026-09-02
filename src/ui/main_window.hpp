@@ -27,7 +27,7 @@ class MainWindow final : public QMainWindow {
     bool eventFilter(QObject* watched, QEvent* event) override;
 
   private:
-    void loadMarkdownFile(const std::filesystem::path& path);
+    void loadFile(const std::filesystem::path& path);
     void refreshEditorStatus();
 
     LaunchRequest launchRequest_;

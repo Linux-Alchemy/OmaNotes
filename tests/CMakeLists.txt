@@ -17,7 +17,9 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.hpp"
 )
 
-target_link_libraries(omanotes_ui_tests PRIVATE KF6::TextEditor Qt6::Test Qt6::Widgets)
+target_link_libraries(
+    omanotes_ui_tests PRIVATE KF6::SyntaxHighlighting KF6::TextEditor Qt6::Test Qt6::Widgets
+)
 target_include_directories(omanotes_ui_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
 
 omanotes_enable_warnings(omanotes_ui_tests)
@@ -34,7 +36,9 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
 )
 
-target_link_libraries(omanotes_editor_tests PRIVATE KF6::TextEditor Qt6::Test Qt6::Widgets)
+target_link_libraries(
+    omanotes_editor_tests PRIVATE KF6::SyntaxHighlighting KF6::TextEditor Qt6::Test Qt6::Widgets
+)
 target_include_directories(omanotes_editor_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
 
 omanotes_enable_warnings(omanotes_editor_tests)
@@ -103,7 +107,9 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
 )
 
-target_link_libraries(omanotes_vim_tests PRIVATE KF6::TextEditor Qt6::Test Qt6::Widgets)
+target_link_libraries(
+    omanotes_vim_tests PRIVATE KF6::SyntaxHighlighting KF6::TextEditor Qt6::Test Qt6::Widgets
+)
 target_include_directories(omanotes_vim_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
 
 omanotes_enable_warnings(omanotes_vim_tests)

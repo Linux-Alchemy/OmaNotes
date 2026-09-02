@@ -37,6 +37,7 @@ class FileTreeModelTest final : public QObject {
 
   private slots:
     void isLazyAndShowsOnlyDirectoriesAndMarkdownByDefault();
+    void showAllFilesIncludesOtherAndHiddenEntries();
     void skipsHiddenEntriesSymlinksAndUnreadableChildrenSafely();
     void preservesLargeDirectoryLazinessAndNonUtf8Paths();
 };
@@ -62,6 +63,25 @@ void FileTreeModelTest::isLazyAndShowsOnlyDirectoriesAndMarkdownByDefault() {
     QVERIFY(!findIndex(model, QStringLiteral("ignored.txt")).isValid());
 
     QAbstractItemModelTester tester(&model, QAbstractItemModelTester::FailureReportingMode::QtTest);
+}
+
+void FileTreeModelTest::showAllFilesIncludesOtherAndHiddenEntries() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = pathFor(temporary.path());
+    std::filesystem::create_directory(root / ".config");
+    writeFile(root / "note.md");
+    writeFile(root / "script.cpp", "int main() {}\n");
+    writeFile(root / ".env", "VISIBLE=yes\n");
+
+    omanotes::FileTreeModel model(root);
+    model.setShowAllFiles(true);
+    model.fetchMore({});
+
+    QVERIFY(findIndex(model, QStringLiteral(".config")).isValid());
+    QVERIFY(findIndex(model, QStringLiteral("note.md")).isValid());
+    QVERIFY(findIndex(model, QStringLiteral("script.cpp")).isValid());
+    QVERIFY(findIndex(model, QStringLiteral(".env")).isValid());
 }
 
 void FileTreeModelTest::skipsHiddenEntriesSymlinksAndUnreadableChildrenSafely() {
