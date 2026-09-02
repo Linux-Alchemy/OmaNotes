@@ -3,15 +3,23 @@
 #include "app/prefix_router.hpp"
 #include "editor/editor_adapter.hpp"
 #include "editor/ktext_editor_adapter.hpp"
+#include "ui/sidebar.hpp"
+#include "workspace/workspace_root.hpp"
 
-#include <QFrame>
+#include <QApplication>
+#include <QByteArray>
+#include <QFile>
 #include <QKeyEvent>
 #include <QLabel>
-#include <QListWidget>
+#include <QShortcut>
 #include <QSplitter>
+#include <QStringDecoder>
 #include <QTabBar>
 #include <QVBoxLayout>
 #include <QWidget>
+
+#include <fstream>
+#include <iterator>
 
 namespace omanotes {
 
@@ -20,34 +28,16 @@ namespace {
 constexpr auto kWindowTitle = "Omanotes";
 constexpr auto kNoNameLabel = "[No Name]";
 
-QFrame* buildSidebar(QWidget* parent) {
-    auto* sidebar = new QFrame(parent);
-    sidebar->setObjectName(QStringLiteral("sidebar"));
-    sidebar->setAccessibleName(QStringLiteral("Workspace files"));
-    sidebar->setFrameShape(QFrame::NoFrame);
-    sidebar->setMinimumWidth(180);
+QString displayName(const std::filesystem::path& path) {
+    return QFile::decodeName(QByteArray::fromStdString(path.filename().native()));
+}
 
-    auto* layout = new QVBoxLayout(sidebar);
-    layout->setContentsMargins(12, 12, 8, 12);
-    layout->setSpacing(8);
-
-    auto* heading = new QLabel(QStringLiteral("Workspace"), sidebar);
-    heading->setObjectName(QStringLiteral("sidebarHeading"));
-
-    auto* placeholder = new QListWidget(sidebar);
-    placeholder->setObjectName(QStringLiteral("fileTreePlaceholder"));
-    placeholder->setAccessibleName(QStringLiteral("Workspace file tree"));
-    placeholder->addItem(QStringLiteral("No Markdown files loaded"));
-    placeholder->setEnabled(false);
-    placeholder->setFrameShape(QFrame::NoFrame);
-
-    layout->addWidget(heading);
-    layout->addWidget(placeholder, 1);
-    return sidebar;
+bool isMarkdown(const std::filesystem::path& path) {
+    return displayName(path.extension()).compare(QStringLiteral(".md"), Qt::CaseInsensitive) == 0;
 }
 
 QWidget* buildWritingArea(QWidget* parent, std::unique_ptr<EditorAdapter>& editor,
-                          PrefixRouter& prefixRouter) {
+                          QTabBar*& buffers, QLabel*& status) {
     auto* writingArea = new QWidget(parent);
     writingArea->setObjectName(QStringLiteral("writingArea"));
     editor = std::make_unique<KTextEditorAdapter>(writingArea);
@@ -56,28 +46,17 @@ QWidget* buildWritingArea(QWidget* parent, std::unique_ptr<EditorAdapter>& edito
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    auto* buffers = new QTabBar(writingArea);
+    buffers = new QTabBar(writingArea);
     buffers->setObjectName(QStringLiteral("bufferStrip"));
     buffers->setAccessibleName(QStringLiteral("Open buffers"));
     buffers->setExpanding(false);
     buffers->setMovable(false);
     buffers->addTab(QString::fromLatin1(kNoNameLabel));
 
-    auto* status = new QLabel(writingArea);
+    status = new QLabel(writingArea);
     status->setObjectName(QStringLiteral("statusArea"));
     status->setAccessibleName(QStringLiteral("Editor status"));
     status->setContentsMargins(10, 6, 10, 6);
-
-    const auto updateStatus = [status, editorPtr = editor.get()]() {
-        const auto modifiedMarker = editorPtr->isModified() ? QStringLiteral(" [+]") : QString{};
-        status->setText(QStringLiteral("%1    [No Name]%2")
-                            .arg(editorPtr->modeName().toUpper(), modifiedMarker));
-    };
-    QObject::connect(editor.get(), &EditorAdapter::modeChanged, status, updateStatus);
-    QObject::connect(editor.get(), &EditorAdapter::modifiedChanged, status, updateStatus);
-    QObject::connect(&prefixRouter, &PrefixRouter::feedbackChanged, status,
-                     [status](const QString& message) { status->setText(message); });
-    updateStatus();
 
     layout->addWidget(buffers);
     layout->addWidget(editor->widget(), 1);
@@ -87,9 +66,12 @@ QWidget* buildWritingArea(QWidget* parent, std::unique_ptr<EditorAdapter>& edito
 
 } // namespace
 
-MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
+MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
+    : QMainWindow(parent), launchRequest_(std::move(launchRequest)) {
     setObjectName(QStringLiteral("mainWindow"));
-    setWindowTitle(QString::fromLatin1(kWindowTitle));
+    const auto rootName =
+        QFile::decodeName(QByteArray::fromStdString(launchRequest_.root.native()));
+    setWindowTitle(QStringLiteral("%1 — %2").arg(QString::fromLatin1(kWindowTitle), rootName));
     setMinimumSize(720, 480);
     resize(1100, 720);
 
@@ -97,30 +79,67 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     splitter->setObjectName(QStringLiteral("workspaceSplitter"));
     splitter->setAccessibleName(QStringLiteral("Workspace and editor panes"));
     splitter->setChildrenCollapsible(false);
-    splitter->addWidget(buildSidebar(splitter));
+    sidebar_ = new Sidebar(launchRequest_.root, splitter);
+    splitter->addWidget(sidebar_);
     prefixRouter_ = std::make_unique<PrefixRouter>(LeaderKey::Space);
-    splitter->addWidget(buildWritingArea(splitter, editor_, *prefixRouter_));
+    splitter->addWidget(buildWritingArea(splitter, editor_, bufferStrip_, statusArea_));
     splitter->setStretchFactor(0, 0);
     splitter->setStretchFactor(1, 1);
     splitter->setSizes({240, 860});
 
     setCentralWidget(splitter);
 
-    if (editor_->widget() != nullptr) {
-        editor_->widget()->installEventFilter(this);
-        if (auto* focusProxy = editor_->widget()->focusProxy(); focusProxy != nullptr) {
-            focusProxy->installEventFilter(this);
+    connect(editor_.get(), &EditorAdapter::modeChanged, this, [this] { refreshEditorStatus(); });
+    connect(editor_.get(), &EditorAdapter::modifiedChanged, this,
+            [this] { refreshEditorStatus(); });
+    connect(prefixRouter_.get(), &PrefixRouter::feedbackChanged, statusArea_,
+            [this](const QString& message) { statusArea_->setText(message); });
+    connect(sidebar_, &Sidebar::fileActivated, this,
+            [this](const std::filesystem::path& path) { loadMarkdownFile(path); });
+    connect(sidebar_, &Sidebar::editorFocusRequested, this, [this] {
+        if (editor_->widget() != nullptr) {
+            editor_->widget()->setFocus(Qt::ShortcutFocusReason);
         }
+    });
+    auto* focusSidebar = new QShortcut(QKeySequence(QStringLiteral("Ctrl+H")), this);
+    focusSidebar->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(focusSidebar, &QShortcut::activated, this, [this] {
+        if (editor_->mode() == EditorMode::Normal) {
+            prefixRouter_->cancelPending();
+            sidebar_->focusTree();
+        }
+    });
+    refreshEditorStatus();
+
+    if (auto* application = QApplication::instance(); application != nullptr) {
+        application->installEventFilter(this);
+    }
+    if (editor_->widget() != nullptr) {
         editor_->widget()->setFocus(Qt::OtherFocusReason);
+    }
+
+    if (launchRequest_.requestedFile.has_value()) {
+        loadMarkdownFile(*launchRequest_.requestedFile);
     }
 }
 
-MainWindow::~MainWindow() = default;
+MainWindow::~MainWindow() {
+    if (auto* application = QApplication::instance(); application != nullptr) {
+        application->removeEventFilter(this);
+    }
+}
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
-    if (event->type() == QEvent::MouseButtonPress) {
+    const auto* watchedWidget = qobject_cast<QWidget*>(watched);
+    const auto insideWindow =
+        watchedWidget != nullptr && (watchedWidget == this || isAncestorOf(watchedWidget));
+    const auto insideEditor =
+        watchedWidget != nullptr && editor_->widget() != nullptr &&
+        (watchedWidget == editor_->widget() || editor_->widget()->isAncestorOf(watchedWidget));
+
+    if (insideWindow && event->type() == QEvent::MouseButtonPress) {
         prefixRouter_->cancelPending();
-    } else if (event->type() == QEvent::KeyPress) {
+    } else if (insideEditor && event->type() == QEvent::KeyPress) {
         auto& keyEvent = *static_cast<QKeyEvent*>(event);
         if (prefixRouter_->route(keyEvent, editor_->mode())) {
             return true;
@@ -128,6 +147,57 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
     }
 
     return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::loadMarkdownFile(const std::filesystem::path& path) {
+    auto workspace = WorkspaceRoot::resolve(launchRequest_.root);
+    if (!workspace) {
+        statusArea_->setText(QString::fromStdString(workspace.error().message));
+        return;
+    }
+    auto resolved = workspace->resolveFile(path);
+    if (!resolved) {
+        statusArea_->setText(QString::fromStdString(resolved.error().message));
+        return;
+    }
+    if (!isMarkdown(*resolved)) {
+        statusArea_->setText(QStringLiteral("Only Markdown (.md) files can be opened"));
+        return;
+    }
+
+    std::ifstream input(*resolved, std::ios::binary);
+    if (!input) {
+        statusArea_->setText(QStringLiteral("Could not read %1").arg(displayName(*resolved)));
+        return;
+    }
+    const std::string bytes(std::istreambuf_iterator<char>(input), {});
+    if (bytes.find('\0') != std::string::npos) {
+        statusArea_->setText(
+            QStringLiteral("Refusing binary-looking file: %1").arg(displayName(*resolved)));
+        return;
+    }
+
+    QStringDecoder decoder(QStringDecoder::Utf8);
+    const auto encoded = QByteArray::fromStdString(bytes);
+    const QString text = decoder(encoded);
+    if (decoder.hasError()) {
+        statusArea_->setText(
+            QStringLiteral("File is not valid UTF-8: %1").arg(displayName(*resolved)));
+        return;
+    }
+
+    currentFile_ = *resolved;
+    bufferStrip_->setTabText(0, displayName(*resolved));
+    editor_->loadText(text);
+    refreshEditorStatus();
+}
+
+void MainWindow::refreshEditorStatus() {
+    const auto modifiedMarker = editor_->isModified() ? QStringLiteral(" [+]") : QString{};
+    const auto fileName =
+        currentFile_.has_value() ? displayName(*currentFile_) : QString::fromLatin1(kNoNameLabel);
+    statusArea_->setText(
+        QStringLiteral("%1    %2%3").arg(editor_->modeName().toUpper(), fileName, modifiedMarker));
 }
 
 } // namespace omanotes
