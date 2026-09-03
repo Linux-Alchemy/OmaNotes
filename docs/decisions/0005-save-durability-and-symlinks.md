@@ -50,7 +50,9 @@ user's umask, so saving never widens access beyond what the user's environment i
   deliberate consequence of the root boundary, and it will surprise the first user who hits it.
 - Saving does not create directories; `:w notes/idea.md` fails when `notes` does not exist, as it
   does in Vim without `++p`.
-- Saving is restricted to `.md` targets, matching the files Omanotes is willing to open.
+- Saving is restricted to `.md` targets, matching the files Omanotes is willing to open. A
+  refused target names the `.md` path that would have been accepted, so the rule never costs
+  the user a guess.
 
 ## Rejected alternatives
 
