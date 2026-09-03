@@ -13,7 +13,7 @@
 
 namespace omanotes {
 
-enum class BufferErrorCode : std::uint8_t { NotFound, Modified, InvalidPath };
+enum class BufferErrorCode : std::uint8_t { NotFound, Modified, InvalidPath, AlreadyOpen };
 
 struct BufferError {
     BufferErrorCode code;
@@ -52,6 +52,11 @@ class BufferRegistry final {
     [[nodiscard]] std::optional<BufferId> findByPath(const std::filesystem::path& path) const;
     [[nodiscard]] std::optional<std::size_t> indexOf(BufferId id) const noexcept;
     [[nodiscard]] std::size_t count() const noexcept;
+
+    /// Give a buffer a file identity after a save. Refuses when another buffer
+    /// already holds that file, so one file never gains two buffers.
+    [[nodiscard]] std::expected<void, BufferError> assignPath(BufferId id,
+                                                              const std::filesystem::path& path);
 
     /// Record the editor's modified state. Returns false when `id` is unknown.
     bool setModified(BufferId id, bool modified);

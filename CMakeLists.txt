@@ -42,6 +42,12 @@ set(OMANOTES_FORMAT_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/editor_adapter.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ktext_editor_adapter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/save_command.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/save_command.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/persistence/atomic_file_writer.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/persistence/document_store.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/persistence/document_store.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/buffer_strip.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/buffer_strip.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/main_window.cpp"
@@ -53,6 +59,8 @@ set(OMANOTES_FORMAT_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/workspace_root.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/workspace_root.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/buffer_registry_test.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/document_store_test.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/atomic_save_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/launch_request_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/file_tree_model_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/main_window_test.cpp"
@@ -80,6 +88,8 @@ add_custom_target(
         omanotes
         omanotes_buffer_tests
         omanotes_editor_tests
+        omanotes_persistence_tests
+        omanotes_save_tests
         omanotes_prefix_tests
         omanotes_process_tests
         omanotes_ui_tests

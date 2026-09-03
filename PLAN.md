@@ -389,10 +389,10 @@ public:
 
 **Blocks:**
 
-- [ ] **4.2.1** — Implement save/save-as through the root policy using the temp-file-and-rename pattern.
-- [ ] **4.2.2** — Test permission failures, disk-write interruption simulation, symlinks, existing targets, and cleanup.
-- [ ] **4.2.3** — Connect scratch naming and file saves to the buffer registry.
-- [ ] **4.2.4** — Verify: failure injection never corrupts or truncates the original file.
+- [x] **4.2.1** — Implement save/save-as through the root policy using the temp-file-and-rename pattern.
+- [x] **4.2.2** — Test permission failures, disk-write interruption simulation, symlinks, existing targets, and cleanup.
+- [x] **4.2.3** — Connect scratch naming and file saves to the buffer registry.
+- [x] **4.2.4** — Verify: failure injection never corrupts or truncates the original file.
 
 ### Task 4.3: Detect external changes and conflicts
 
@@ -821,3 +821,7 @@ Decision required: approve / request changes / stop and redesign
   editor documents. Buffer switching follows Matt's LazyVim habit (`Shift+H`/`Shift+L`) and is
   recorded as ADR 0004 with its Vim deviation; buffer close bindings were deliberately left to
   the Phase 5 command language.
+- **2026-09-03:** Task 4.2 added atomic saves with fsync durability and symlink-preserving writes
+  (ADR 0005). Found and closed two input-routing defects: the Space leader was eating spaces typed
+  in KTextEditor's own command line and search bar, and KTextEditor's Vi mode implements `:w`
+  internally through its own writer, which bypassed the workspace root and the atomic replace.

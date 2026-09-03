@@ -104,6 +104,32 @@ std::optional<std::size_t> BufferRegistry::indexOf(BufferId id) const noexcept {
 
 std::size_t BufferRegistry::count() const noexcept { return buffers_.size(); }
 
+std::expected<void, BufferError> BufferRegistry::assignPath(BufferId id,
+                                                            const std::filesystem::path& path) {
+    if (path.empty()) {
+        return std::unexpected(BufferError{BufferErrorCode::InvalidPath, "No file was named"});
+    }
+
+    const auto match =
+        std::ranges::find_if(buffers_, [id](const BufferState& buffer) { return buffer.id == id; });
+    if (match == buffers_.end()) {
+        return std::unexpected(BufferError{BufferErrorCode::NotFound, "That buffer is not open"});
+    }
+
+    const auto identity = canonicalIdentity(path);
+    const auto clash = std::ranges::find_if(buffers_, [&identity, id](const BufferState& buffer) {
+        return buffer.id != id && buffer.path == identity;
+    });
+    if (clash != buffers_.end()) {
+        return std::unexpected(
+            BufferError{BufferErrorCode::AlreadyOpen, "That file is already open in another tab"});
+    }
+
+    match->path = identity;
+    match->displayName = fileDisplayName(identity);
+    return {};
+}
+
 bool BufferRegistry::setModified(BufferId id, bool modified) {
     const auto match =
         std::ranges::find_if(buffers_, [id](const BufferState& buffer) { return buffer.id == id; });
