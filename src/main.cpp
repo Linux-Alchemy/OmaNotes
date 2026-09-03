@@ -1,3 +1,4 @@
+#include "app/launch_request.hpp"
 #include "ui/main_window.hpp"
 
 #include <QApplication>
@@ -5,8 +6,12 @@
 #include <QTimer>
 
 #include <algorithm>
+#include <filesystem>
+#include <iostream>
 #include <span>
 #include <string_view>
+#include <system_error>
+#include <vector>
 
 namespace {
 
@@ -24,7 +29,30 @@ int main(int argc, char* argv[]) {
     QCoreApplication::setApplicationName(QStringLiteral("Omanotes"));
     QCoreApplication::setOrganizationName(QStringLiteral("Omanotes"));
 
-    omanotes::MainWindow window;
+    std::vector<std::string_view> launchArguments;
+    launchArguments.reserve(static_cast<std::size_t>(std::max(0, argc - 1)));
+    for (int index = 1; index < argc; ++index) {
+        const auto argument = std::string_view(argv[index]);
+        if (argument != "--smoke-test") {
+            launchArguments.push_back(argument);
+        }
+    }
+
+    std::error_code currentDirectoryError;
+    const auto currentDirectory = std::filesystem::current_path(currentDirectoryError);
+    if (currentDirectoryError) {
+        std::cerr << "Cannot resolve current directory: " << currentDirectoryError.message()
+                  << '\n';
+        return 2;
+    }
+
+    auto launchRequest = omanotes::resolveLaunchRequest(launchArguments, currentDirectory);
+    if (!launchRequest) {
+        std::cerr << launchRequest.error().message << '\n';
+        return 2;
+    }
+
+    omanotes::MainWindow window(std::move(*launchRequest));
     window.show();
 
     if (smokeTestRequested(argc, argv)) {

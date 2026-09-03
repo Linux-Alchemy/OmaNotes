@@ -7,7 +7,7 @@ project(
     LANGUAGES CXX
 )
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -34,12 +34,23 @@ set(OMANOTES_FORMAT_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/app/prefix_router.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/app/prefix_router.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/launch_request.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/launch_request.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/editor_adapter.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ktext_editor_adapter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/main_window.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/main_window.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/sidebar.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/sidebar.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/file_tree_model.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/file_tree_model.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/workspace_root.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/workspace_root.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/launch_request_test.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/file_tree_model_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/main_window_test.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/launch_process_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/ktext_editor_adapter_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/prefix_router_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/vim_behaviour_test.cpp"
@@ -59,7 +70,13 @@ add_custom_target(
         -p "${CMAKE_BINARY_DIR}"
         "-source-filter=^${CMAKE_SOURCE_DIR}/(src|tests)/"
         -quiet
-    DEPENDS omanotes omanotes_editor_tests omanotes_prefix_tests omanotes_ui_tests omanotes_vim_tests
+    DEPENDS
+        omanotes
+        omanotes_editor_tests
+        omanotes_prefix_tests
+        omanotes_process_tests
+        omanotes_ui_tests
+        omanotes_vim_tests
     COMMENT "Running clang-tidy"
     VERBATIM
 )
