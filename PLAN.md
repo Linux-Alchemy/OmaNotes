@@ -166,7 +166,7 @@ public:
 - [x] `./build/dev/src/omanotes` opens the basic layout on Omarchy.
 - [x] No files appear in the workspace or XDG state/config directories.
 - [x] **Matt gate:** run it, resize it, inspect the four regions, and approve or request layout changes.
-- [ ] Do not begin Phase 2 without explicit approval.
+- [x] Do not begin Phase 2 without explicit approval.
 
 ## Phase 2: KTextEditor and the Vim Feel Gate
 
@@ -813,3 +813,7 @@ Decision required: approve / request changes / stop and redesign
 - **2026-08-29:** Phase 2 accepted after the real-session Vim feel and Space-leader smoke tests; fixed and regression-tested shifted `Space+?` routing before closing the phase.
 - **2026-09-02:** Phase 3 sidebar policy moved to two isolated sibling experiments from the accepted Phase 2 tip: Markdown-only first, then general-purpose within KTextEditor capabilities. No Neovim feature reimplementation is part of either experiment.
 - **2026-09-02:** Both Phase 3 sidebar experiments passed; continued development selected the Markdown-only branch for product focus, while retaining the general-purpose branch as a parked alternative.
+- **2026-09-03:** Published the parked general-purpose sidebar experiment to `origin` as branch
+  `experiment/phase-3-general-purpose` and immutable tag `parked/phase-3-general-purpose-sidebar`;
+  it had existed only as an unpushed local branch. Added a second development machine and
+  re-validated the Phase 1-3 gates on it.

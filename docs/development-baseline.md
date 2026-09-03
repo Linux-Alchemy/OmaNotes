@@ -17,6 +17,19 @@
 | GCC toolchain | 16.2.1+r23+gd564253eb6c8-1 |
 | Extra CMake Modules | 6.29.0-1 |
 
+## Development environments
+
+Omanotes is developed from two machines, both running the same Omarchy and toolchain versions.
+
+| Machine | Role | Validated |
+| --- | --- | --- |
+| `legion` | Original development machine; captured the baseline above | Phases 1-3 |
+| `shadowvault` | Second development machine, prepared 2026-09-03 | Phases 1-3 re-validated from a clean build directory |
+
+Both report Omarchy 4.0.1-1, qt6-base 6.11.2-2, ktexteditor 6.29.0-1, cmake 4.4.2-1, and clang 22.1.8-1.
+Any additional machine must install the approved dependency set below and pass the canonical local
+checks before its results count as evidence at a phase gate.
+
 These are the versions used to validate the initial walking skeleton. They are not yet the minimum supported versions; release minimums will be derived from the target Omarchy packaging environment after the KTextEditor integration is proven.
 
 ## Approved development dependencies

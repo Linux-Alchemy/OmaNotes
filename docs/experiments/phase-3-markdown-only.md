@@ -39,8 +39,9 @@ This accepts the experiment as a valid candidate; the final Phase 3 sidebar poli
 comparison with the general-purpose sibling.
 
 The general-purpose sibling also passed, but Matt selected this Markdown-only branch for continued
-development. The alternative remains parked for possible future work; Omanotes will stay focused
-rather than drifting into a prettier Neovim.
+development. The alternative remains parked for possible future work on branch
+`experiment/phase-3-general-purpose`, fixed by the tag `parked/phase-3-general-purpose-sidebar`;
+Omanotes will stay focused rather than drifting into a prettier Neovim.
 
 The Phase 3 checkpoint was accepted on 2026-09-02 after hands-on launches with no argument,
 relative and absolute directories, relative and nested-relative files, an absolute file, and
