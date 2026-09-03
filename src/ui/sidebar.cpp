@@ -57,6 +57,8 @@ void Sidebar::focusTree() {
     }
 }
 
+void Sidebar::noteFileCreated(const std::filesystem::path& path) { model_->noteFileCreated(path); }
+
 bool Sidebar::eventFilter(QObject* watched, QEvent* event) {
     if (watched == tree_ && event->type() == QEvent::KeyPress) {
         const auto& keyEvent = *static_cast<QKeyEvent*>(event);

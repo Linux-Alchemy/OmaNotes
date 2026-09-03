@@ -2,11 +2,14 @@
 #include "ui/main_window.hpp"
 #include "workspace/file_tree_model.hpp"
 
+#include <KTextEditor/Command>
 #include <KTextEditor/Document>
+#include <KTextEditor/Editor>
 #include <KTextEditor/View>
 
 #include <QFile>
 #include <QLabel>
+#include <QLineEdit>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QTabBar>
@@ -64,6 +67,14 @@ class MainWindowTest final : public QObject {
     void reopeningAnOpenFileKeepsUnsavedEditsAndDoesNotDuplicate();
     void switchesBufferWhenTheStripIsClicked();
     void leavesShiftMotionsToTheEditorWithASingleBuffer();
+    void savesAnOpenFileWithControlS();
+    void namesAScratchBufferBeforeWritingIt();
+    void cancelsScratchNamingWithoutWriting();
+    void savesThroughTheEditorWriteCommand();
+    void savesWhenWriteIsTypedOnTheViCommandLine();
+    void showsANewlySavedNoteInTheSidebar();
+    void refusesEditorWriteCommandsItDoesNotImplementYet();
+    void doesNotLetNormalModeWriteShortcutsReachTheEditorsWriter();
     void closesCleanly();
 };
 
@@ -393,6 +404,280 @@ void MainWindowTest::leavesShiftMotionsToTheEditorWithASingleBuffer() {
     QKeyEvent topOfView(QEvent::KeyPress, Qt::Key_H, Qt::ShiftModifier, QStringLiteral("H"));
     QApplication::sendEvent(eventTarget, &topOfView);
     QTRY_COMPARE(editor->cursorPosition().line(), 0);
+}
+
+void MainWindowTest::savesAnOpenFileWithControlS() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = pathFor(temporary.path());
+    const auto note = root / "note.md";
+    writeFile(note, "# Original\n");
+
+    omanotes::MainWindow window(
+        {std::filesystem::canonical(root), std::filesystem::canonical(note), false});
+    window.show();
+    auto* buffers = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(buffers != nullptr);
+    QVERIFY(status != nullptr);
+    QVERIFY(editor != nullptr);
+
+    editor->document()->setText(QStringLiteral("# Edited\n"));
+    QTRY_COMPARE(buffers->tabText(0), QStringLiteral("note.md [+]"));
+
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_S, Qt::ControlModifier);
+
+    QTRY_COMPARE(buffers->tabText(0), QStringLiteral("note.md"));
+    QVERIFY(status->text().contains(QStringLiteral("Wrote note.md")));
+    QVERIFY(!editor->document()->isModified());
+
+    QFile written(QString::fromStdString(note.string()));
+    QVERIFY(written.open(QIODevice::ReadOnly));
+    QCOMPARE(written.readAll(), QByteArray("# Edited\n"));
+}
+
+void MainWindowTest::namesAScratchBufferBeforeWritingIt() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* buffers = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    auto* prompt = window.findChild<QLineEdit*>(QStringLiteral("namePrompt"));
+    auto* editor = activeEditor(window);
+    QVERIFY(buffers != nullptr);
+    QVERIFY(prompt != nullptr);
+    QVERIFY(editor != nullptr);
+    QVERIFY(!prompt->isVisible());
+    QCOMPARE(buffers->tabText(0), QStringLiteral("[No Name]"));
+
+    editor->document()->setText(QStringLiteral("# Fresh\n"));
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_S, Qt::ControlModifier);
+
+    // Nothing may reach the disk until the buffer has been named.
+    QTRY_VERIFY(prompt->isVisible());
+    QCOMPARE(std::distance(std::filesystem::directory_iterator(root),
+                           std::filesystem::directory_iterator{}),
+             std::ptrdiff_t{0});
+
+    QTest::keyClicks(prompt, QStringLiteral("idea.md"));
+    QTest::keyClick(prompt, Qt::Key_Return);
+
+    QTRY_COMPARE(buffers->tabText(0), QStringLiteral("idea.md"));
+    QVERIFY(!prompt->isVisible());
+    QFile written(QString::fromStdString((root / "idea.md").string()));
+    QVERIFY(written.open(QIODevice::ReadOnly));
+    QCOMPARE(written.readAll(), QByteArray("# Fresh\n"));
+}
+
+void MainWindowTest::cancelsScratchNamingWithoutWriting() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* prompt = window.findChild<QLineEdit*>(QStringLiteral("namePrompt"));
+    auto* editor = activeEditor(window);
+    QVERIFY(prompt != nullptr);
+    QVERIFY(editor != nullptr);
+
+    editor->document()->setText(QStringLiteral("# Fresh\n"));
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_S, Qt::ControlModifier);
+    QTRY_VERIFY(prompt->isVisible());
+
+    QTest::keyClicks(prompt, QStringLiteral("unwanted.md"));
+    QTest::keyClick(prompt, Qt::Key_Escape);
+
+    QTRY_VERIFY(!prompt->isVisible());
+    QVERIFY(!std::filesystem::exists(root / "unwanted.md"));
+    QCOMPARE(std::distance(std::filesystem::directory_iterator(root),
+                           std::filesystem::directory_iterator{}),
+             std::ptrdiff_t{0});
+    QTRY_VERIFY(editor->hasFocus());
+}
+
+void MainWindowTest::savesThroughTheEditorWriteCommand() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* buffers = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    auto* editor = activeEditor(window);
+    QVERIFY(buffers != nullptr);
+    QVERIFY(editor != nullptr);
+    editor->document()->setText(QStringLiteral("# Written by command\n"));
+
+    // `:w` must be the application's save, not any editor-internal write.
+    auto* command = KTextEditor::Editor::instance()->queryCommand(QStringLiteral("w"));
+    QVERIFY(command != nullptr);
+
+    QString message;
+    QVERIFY2(command->exec(editor, QStringLiteral("w typed.md"), message), qPrintable(message));
+
+    QTRY_COMPARE(buffers->tabText(0), QStringLiteral("typed.md"));
+    QFile written(QString::fromStdString((root / "typed.md").string()));
+    QVERIFY(written.open(QIODevice::ReadOnly));
+    QCOMPARE(written.readAll(), QByteArray("# Written by command\n"));
+
+    // A bare `:w` on an already-named buffer writes it again.
+    editor->document()->setText(QStringLiteral("# Second write\n"));
+    QVERIFY2(command->exec(editor, QStringLiteral("w"), message), qPrintable(message));
+    QFile again(QString::fromStdString((root / "typed.md").string()));
+    QVERIFY(again.open(QIODevice::ReadOnly));
+    QCOMPARE(again.readAll(), QByteArray("# Second write\n"));
+}
+
+void MainWindowTest::savesWhenWriteIsTypedOnTheViCommandLine() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* buffers = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    auto* editor = activeEditor(window);
+    QVERIFY(buffers != nullptr);
+    QVERIFY(editor != nullptr);
+
+    editor->document()->setText(QStringLiteral("# Typed colon w\n"));
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+
+    // Drive the editor's own command line exactly as a Vim user would. The
+    // colon moves focus to the command line, so the rest must be typed there.
+    auto* editorTarget = QApplication::focusWidget();
+    QVERIFY(editorTarget != nullptr);
+    QTest::keyClick(editorTarget, Qt::Key_Colon);
+    QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
+                QApplication::focusWidget() != editorTarget);
+
+    auto* commandLine = QApplication::focusWidget();
+    QTest::keyClicks(commandLine, QStringLiteral("w colon.md"));
+    // The space in the command must survive the application leader.
+    QCOMPARE(qobject_cast<QLineEdit*>(commandLine)->text(), QStringLiteral("w colon.md"));
+    QTest::keyClick(commandLine, Qt::Key_Return);
+
+    QTRY_COMPARE(buffers->tabText(0), QStringLiteral("colon.md"));
+    QFile written(QString::fromStdString((root / "colon.md").string()));
+    QVERIFY(written.open(QIODevice::ReadOnly));
+    QCOMPARE(written.readAll(), QByteArray("# Typed colon w\n"));
+}
+
+void MainWindowTest::refusesEditorWriteCommandsItDoesNotImplementYet() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr);
+    QVERIFY(editor != nullptr);
+    editor->document()->setText(QStringLiteral("# Text\n"));
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+
+    // :wq must never reach KTextEditor's own save, which would open a modal
+    // dialog and write outside the workspace.
+    auto* editorTarget = QApplication::focusWidget();
+    QTest::keyClick(editorTarget, Qt::Key_Colon);
+    QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
+                QApplication::focusWidget() != editorTarget);
+    auto* commandLine = QApplication::focusWidget();
+    QTest::keyClicks(commandLine, QStringLiteral("wq"));
+    QTest::keyClick(commandLine, Qt::Key_Return);
+
+    QTRY_VERIFY(status->text().contains(QStringLiteral("not available yet")));
+    QCOMPARE(std::distance(std::filesystem::directory_iterator(root),
+                           std::filesystem::directory_iterator{}),
+             std::ptrdiff_t{0});
+}
+
+void MainWindowTest::doesNotLetNormalModeWriteShortcutsReachTheEditorsWriter() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* editor = activeEditor(window);
+    QVERIFY(editor != nullptr);
+    editor->document()->setText(QStringLiteral("# Text\n"));
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+
+    // ZZ is Vim's write-and-quit. If KTextEditor implements it, it reaches its
+    // own writer without passing the command bar, so this pins the behaviour.
+    auto* target = QApplication::focusWidget();
+    QKeyEvent firstZ(QEvent::KeyPress, Qt::Key_Z, Qt::ShiftModifier, QStringLiteral("Z"));
+    QApplication::sendEvent(target, &firstZ);
+    QKeyEvent secondZ(QEvent::KeyPress, Qt::Key_Z, Qt::ShiftModifier, QStringLiteral("Z"));
+    QApplication::sendEvent(target, &secondZ);
+
+    QCOMPARE(std::distance(std::filesystem::directory_iterator(root),
+                           std::filesystem::directory_iterator{}),
+             std::ptrdiff_t{0});
+}
+
+void MainWindowTest::showsANewlySavedNoteInTheSidebar() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    std::filesystem::create_directory(root / "projects");
+    writeFile(root / "existing.md", "# Existing\n");
+
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* tree = window.findChild<QTreeView*>(QStringLiteral("fileTree"));
+    auto* editor = activeEditor(window);
+    QVERIFY(tree != nullptr);
+    QVERIFY(editor != nullptr);
+
+    auto* model = static_cast<omanotes::FileTreeModel*>(tree->model());
+    if (model->canFetchMore({})) {
+        model->fetchMore({});
+    }
+    QVERIFY(!findIndex(*model, QStringLiteral("fresh.md")).isValid());
+
+    editor->document()->setText(QStringLiteral("# Fresh\n"));
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    auto* editorTarget = QApplication::focusWidget();
+    QTest::keyClick(editorTarget, Qt::Key_Colon);
+    QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
+                QApplication::focusWidget() != editorTarget);
+    auto* commandLine = QApplication::focusWidget();
+    QTest::keyClicks(commandLine, QStringLiteral("w fresh.md"));
+    QTest::keyClick(commandLine, Qt::Key_Return);
+
+    // The note must appear in the sidebar straight away, in sorted position,
+    // without relaunching.
+    QTRY_VERIFY(findIndex(*model, QStringLiteral("fresh.md")).isValid());
+    QCOMPARE(model->rowCount({}), 3);
+    QCOMPARE(model->index(0, 0, {}).data().toString(), QStringLiteral("projects"));
+    QCOMPARE(model->index(1, 0, {}).data().toString(), QStringLiteral("existing.md"));
+    QCOMPARE(model->index(2, 0, {}).data().toString(), QStringLiteral("fresh.md"));
+
+    // Saving the same file again must not add it twice.
+    editor->document()->setText(QStringLiteral("# Fresh again\n"));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Colon);
+    QTRY_VERIFY(qobject_cast<QLineEdit*>(QApplication::focusWidget()) != nullptr);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("w"));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+    QTest::qWait(50);
+    QCOMPARE(model->rowCount({}), 3);
 }
 
 void MainWindowTest::editorReceivesInitialFocus() {

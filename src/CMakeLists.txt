@@ -11,6 +11,12 @@ add_executable(
     editor/editor_adapter.hpp
     editor/ktext_editor_adapter.cpp
     editor/ktext_editor_adapter.hpp
+    editor/save_command.cpp
+    editor/save_command.hpp
+    persistence/atomic_file_writer.cpp
+    persistence/atomic_file_writer.hpp
+    persistence/document_store.cpp
+    persistence/document_store.hpp
     ui/buffer_strip.cpp
     ui/buffer_strip.hpp
     ui/main_window.cpp
