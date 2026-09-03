@@ -285,10 +285,10 @@ resolveLaunchRequest(std::span<const std::string_view> arguments,
 
 **Blocks:**
 
-- [ ] **3.1.1** — Implement and test every approved launch-table case plus missing, unreadable, and traversal cases.
-- [ ] **3.1.2** — Add `--fresh` as a parsed restore-bypass flag without session deletion.
-- [ ] **3.1.3** — Pass the resolved request into the window title and workspace controller.
-- [ ] **3.1.4** — Verify: table-driven tests pass under temporary directories and symlink fixtures.
+- [x] **3.1.1** — Implement and test every approved launch-table case plus missing, unreadable, and traversal cases.
+- [x] **3.1.2** — Add `--fresh` as a parsed restore-bypass flag without session deletion.
+- [x] **3.1.3** — Pass the resolved request into the window title and workspace controller.
+- [x] **3.1.4** — Verify: table-driven tests pass under temporary directories and symlink fixtures.
 
 ### Task 3.2: Populate the Markdown-focused sidebar
 
@@ -311,17 +311,17 @@ public:
 
 **Blocks:**
 
-- [ ] **3.2.1** — Implement lazy, cycle-safe tree enumeration and filtering.
-- [ ] **3.2.2** — Add mouse and `j/k/h/l/Enter` sidebar navigation.
-- [ ] **3.2.3** — Connect file activation to read-only editor loading with clear error messages.
-- [ ] **3.2.4** — Verify: hidden, permission-denied, symlink-loop, non-UTF-8-name, and large-directory fixtures behave safely.
+- [x] **3.2.1** — Implement lazy, cycle-safe tree enumeration and filtering.
+- [x] **3.2.2** — Add mouse and `j/k/h/l/Enter` sidebar navigation.
+- [x] **3.2.3** — Connect file activation to read-only editor loading with clear error messages.
+- [x] **3.2.4** — Verify: hidden, permission-denied, symlink-loop, non-UTF-8-name, and large-directory fixtures behave safely.
 
 ### Phase 3 Checkpoint
 
-- [ ] Launch-contract and root-boundary tests pass under sanitizers.
-- [ ] Sidebar never escapes the root through `..` or symlinks.
-- [ ] The application remains runnable with an empty, missing-file, and populated workspace.
-- [ ] **Matt gate:** launch using every command form, navigate with keys and mouse, and approve root/sidebar behaviour.
+- [x] Launch-contract and root-boundary tests pass under sanitizers.
+- [x] Sidebar never escapes the root through `..` or symlinks.
+- [x] The application remains runnable with an empty, missing-file, and populated workspace.
+- [x] **Matt gate:** launch using every command form, navigate with keys and mouse, and approve root/sidebar behaviour.
 
 ## Phase 4: Buffers, Saving, and External Changes
 
@@ -811,3 +811,5 @@ Decision required: approve / request changes / stop and redesign
 - **2026-08-29:** Adopted a branch-and-pull-request workflow: agents may push approved work to review branches, but Matt reviews and controls merging into `main`.
 - **2026-08-29:** Selected Space as the application leader after the Phase 2 prototype; preserved `Ctrl+B` page-backward and renumbered the leader decision to ADR 0003 because ADR 0002 already exists.
 - **2026-08-29:** Phase 2 accepted after the real-session Vim feel and Space-leader smoke tests; fixed and regression-tested shifted `Space+?` routing before closing the phase.
+- **2026-09-02:** Phase 3 sidebar policy moved to two isolated sibling experiments from the accepted Phase 2 tip: Markdown-only first, then general-purpose within KTextEditor capabilities. No Neovim feature reimplementation is part of either experiment.
+- **2026-09-02:** Both Phase 3 sidebar experiments passed; continued development selected the Markdown-only branch for product focus, while retaining the general-purpose branch as a parked alternative.

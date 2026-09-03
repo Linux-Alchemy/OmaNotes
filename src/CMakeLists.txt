@@ -1,6 +1,8 @@
 add_executable(
     omanotes
     main.cpp
+    app/launch_request.cpp
+    app/launch_request.hpp
     app/prefix_router.cpp
     app/prefix_router.hpp
     editor/editor_adapter.hpp
@@ -8,6 +10,12 @@ add_executable(
     editor/ktext_editor_adapter.hpp
     ui/main_window.cpp
     ui/main_window.hpp
+    ui/sidebar.cpp
+    ui/sidebar.hpp
+    workspace/file_tree_model.cpp
+    workspace/file_tree_model.hpp
+    workspace/workspace_root.cpp
+    workspace/workspace_root.hpp
 )
 
 target_link_libraries(omanotes PRIVATE KF6::TextEditor Qt6::Widgets)

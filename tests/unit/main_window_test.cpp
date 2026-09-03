@@ -1,12 +1,46 @@
+#include "app/launch_request.hpp"
 #include "ui/main_window.hpp"
+#include "workspace/file_tree_model.hpp"
 
 #include <KTextEditor/Document>
 #include <KTextEditor/View>
 
+#include <QFile>
 #include <QLabel>
 #include <QSplitter>
 #include <QTabBar>
+#include <QTemporaryDir>
+#include <QTreeView>
 #include <QtTest>
+
+#include <filesystem>
+
+namespace {
+
+omanotes::LaunchRequest launchRequest() {
+    return {std::filesystem::canonical(std::filesystem::current_path()), std::nullopt, false};
+}
+
+std::filesystem::path pathFor(const QString& path) { return path.toStdString(); }
+
+void writeFile(const std::filesystem::path& path, const QByteArray& contents) {
+    QFile file(QString::fromStdString(path.string()));
+    QVERIFY2(file.open(QIODevice::WriteOnly), qPrintable(file.errorString()));
+    QCOMPARE(file.write(contents), contents.size());
+}
+
+QModelIndex findIndex(omanotes::FileTreeModel& model, const QString& name,
+                      const QModelIndex& parent = {}) {
+    for (int row = 0; row < model.rowCount(parent); ++row) {
+        const auto index = model.index(row, 0, parent);
+        if (index.data().toString() == name) {
+            return index;
+        }
+    }
+    return {};
+}
+
+} // namespace
 
 class MainWindowTest final : public QObject {
     Q_OBJECT
@@ -17,11 +51,14 @@ class MainWindowTest final : public QObject {
     void resizesWithoutLosingRegions();
     void statusTracksEditorState();
     void spacePrefixDoesNotSwallowInsertTextOrControlB();
+    void markdownSidebarFiltersAndLoadsWithoutWriting();
+    void supportsVimStyleSidebarAndPaneNavigation();
+    void rejectsExplicitNonMarkdownFileClearly();
     void closesCleanly();
 };
 
 void MainWindowTest::hasRequiredRegions() {
-    omanotes::MainWindow window;
+    omanotes::MainWindow window(launchRequest());
 
     QVERIFY(window.findChild<QSplitter*>(QStringLiteral("workspaceSplitter")) != nullptr);
     QVERIFY(window.findChild<QWidget*>(QStringLiteral("sidebar")) != nullptr);
@@ -31,7 +68,7 @@ void MainWindowTest::hasRequiredRegions() {
 }
 
 void MainWindowTest::statusTracksEditorState() {
-    omanotes::MainWindow window;
+    omanotes::MainWindow window(launchRequest());
     window.show();
     auto* editor = window.findChild<KTextEditor::View*>(QStringLiteral("editorPane"));
     auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
@@ -52,7 +89,7 @@ void MainWindowTest::statusTracksEditorState() {
 }
 
 void MainWindowTest::spacePrefixDoesNotSwallowInsertTextOrControlB() {
-    omanotes::MainWindow window;
+    omanotes::MainWindow window(launchRequest());
     window.show();
     auto* editor = window.findChild<KTextEditor::View*>(QStringLiteral("editorPane"));
     auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
@@ -93,8 +130,114 @@ void MainWindowTest::spacePrefixDoesNotSwallowInsertTextOrControlB() {
     QVERIFY(editor->cursorPosition().line() < 39);
 }
 
+void MainWindowTest::markdownSidebarFiltersAndLoadsWithoutWriting() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = pathFor(temporary.path());
+    std::filesystem::create_directory(root / "folder");
+    writeFile(root / "note.md", "# Original\n");
+    writeFile(root / "ignored.txt", "not a note\n");
+
+    omanotes::MainWindow window({std::filesystem::canonical(root), std::nullopt, false});
+    window.show();
+    auto* tree = window.findChild<QTreeView*>(QStringLiteral("fileTree"));
+    auto* editor = window.findChild<KTextEditor::View*>(QStringLiteral("editorPane"));
+    auto* buffers = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    QVERIFY(tree != nullptr);
+    QVERIFY(editor != nullptr);
+    QVERIFY(buffers != nullptr);
+
+    auto* model = static_cast<omanotes::FileTreeModel*>(tree->model());
+    if (model->canFetchMore({})) {
+        model->fetchMore({});
+    }
+    const auto note = findIndex(*model, QStringLiteral("note.md"));
+    QVERIFY(note.isValid());
+    QVERIFY(!findIndex(*model, QStringLiteral("ignored.txt")).isValid());
+
+    tree->scrollTo(note);
+    QTest::mouseClick(tree->viewport(), Qt::LeftButton, Qt::NoModifier,
+                      tree->visualRect(note).center());
+    QTRY_COMPARE(editor->document()->text(), QStringLiteral("# Original\n"));
+    QCOMPARE(buffers->tabText(0), QStringLiteral("note.md"));
+    QVERIFY(!editor->document()->isModified());
+
+    editor->document()->setText(QStringLiteral("changed in memory"));
+    QFile diskFile(QString::fromStdString((root / "note.md").string()));
+    QVERIFY(diskFile.open(QIODevice::ReadOnly));
+    QCOMPARE(diskFile.readAll(), QByteArray("# Original\n"));
+}
+
+void MainWindowTest::supportsVimStyleSidebarAndPaneNavigation() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = pathFor(temporary.path());
+    const auto folder = root / "folder";
+    std::filesystem::create_directory(folder);
+    writeFile(folder / "nested.md", "# Nested\n");
+    writeFile(root / "root.md", "# Root\n");
+
+    omanotes::MainWindow window({std::filesystem::canonical(root), std::nullopt, false});
+    window.show();
+    auto* tree = window.findChild<QTreeView*>(QStringLiteral("fileTree"));
+    auto* editor = window.findChild<KTextEditor::View*>(QStringLiteral("editorPane"));
+    QVERIFY(tree != nullptr);
+    QVERIFY(editor != nullptr);
+    QTRY_VERIFY(editor->hasFocus());
+
+    auto* editorTarget = QApplication::focusWidget();
+    QVERIFY(editorTarget != nullptr);
+    QTest::keyClick(editorTarget, Qt::Key_H, Qt::ControlModifier);
+    QTRY_VERIFY(tree->hasFocus());
+
+    auto* model = static_cast<omanotes::FileTreeModel*>(tree->model());
+    if (model->canFetchMore({})) {
+        model->fetchMore({});
+    }
+    const auto folderIndex = findIndex(*model, QStringLiteral("folder"));
+    QVERIFY(folderIndex.isValid());
+    tree->setCurrentIndex(folderIndex);
+
+    QTest::keyClick(tree, Qt::Key_L);
+    QTRY_VERIFY(tree->isExpanded(folderIndex));
+    QTest::keyClick(tree, Qt::Key_L);
+    QTRY_COMPARE(tree->currentIndex().data().toString(), QStringLiteral("nested.md"));
+    QTest::keyClick(tree, Qt::Key_Return);
+    QTRY_COMPARE(editor->document()->text(), QStringLiteral("# Nested\n"));
+
+    QTest::keyClick(tree, Qt::Key_H);
+    QCOMPARE(tree->currentIndex(), folderIndex);
+    QTest::keyClick(tree, Qt::Key_H);
+    QVERIFY(!tree->isExpanded(folderIndex));
+    QTest::keyClick(tree, Qt::Key_J);
+    QCOMPARE(tree->currentIndex().data().toString(), QStringLiteral("root.md"));
+    QTest::keyClick(tree, Qt::Key_K);
+    QCOMPARE(tree->currentIndex(), folderIndex);
+
+    QTest::keyClick(tree, Qt::Key_L, Qt::ControlModifier);
+    QTRY_VERIFY(editor->hasFocus());
+}
+
+void MainWindowTest::rejectsExplicitNonMarkdownFileClearly() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = pathFor(temporary.path());
+    const auto textFile = root / "plain.txt";
+    writeFile(textFile, "plain text\n");
+
+    omanotes::MainWindow window(
+        {std::filesystem::canonical(root), std::filesystem::canonical(textFile), false});
+    window.show();
+    auto* editor = window.findChild<KTextEditor::View*>(QStringLiteral("editorPane"));
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    QVERIFY(editor != nullptr);
+    QVERIFY(status != nullptr);
+    QCOMPARE(editor->document()->text(), QString{});
+    QCOMPARE(status->text(), QStringLiteral("Only Markdown (.md) files can be opened"));
+}
+
 void MainWindowTest::editorReceivesInitialFocus() {
-    omanotes::MainWindow window;
+    omanotes::MainWindow window(launchRequest());
     window.show();
 
     auto* editor = window.findChild<KTextEditor::View*>(QStringLiteral("editorPane"));
@@ -103,7 +246,7 @@ void MainWindowTest::editorReceivesInitialFocus() {
 }
 
 void MainWindowTest::resizesWithoutLosingRegions() {
-    omanotes::MainWindow window;
+    omanotes::MainWindow window(launchRequest());
     window.show();
     window.resize(800, 520);
     QCoreApplication::processEvents();
@@ -116,7 +259,7 @@ void MainWindowTest::resizesWithoutLosingRegions() {
 }
 
 void MainWindowTest::closesCleanly() {
-    omanotes::MainWindow window;
+    omanotes::MainWindow window(launchRequest());
     window.show();
     QVERIFY(window.close());
     QVERIFY(!window.isVisible());
