@@ -82,7 +82,20 @@ void DocumentStoreTest::refusesNonMarkdownTargets() {
 
     QVERIFY(!written.has_value());
     QCOMPARE(written.error().code, omanotes::SaveErrorCode::InvalidTarget);
+    // The refusal has to name the target that would have worked.
+    QCOMPARE(QString::fromStdString(written.error().message),
+             QStringLiteral("Only Markdown (.md) files can be saved; try notes.md"));
     QVERIFY(!std::filesystem::exists(root / "notes.txt"));
+
+    const auto bare = store.save("user_test_file", QStringLiteral("# Bare\n"));
+    QVERIFY(!bare.has_value());
+    QCOMPARE(QString::fromStdString(bare.error().message),
+             QStringLiteral("Only Markdown (.md) files can be saved; try user_test_file.md"));
+
+    const auto nested = store.save("projects/idea", QStringLiteral("# Nested\n"));
+    QVERIFY(!nested.has_value());
+    QCOMPARE(QString::fromStdString(nested.error().message),
+             QStringLiteral("Only Markdown (.md) files can be saved; try projects/idea.md"));
 
     // The check is on the extension, not its spelling.
     const auto shouting = store.save("LOUD.MD", QStringLiteral("# Loud\n"));

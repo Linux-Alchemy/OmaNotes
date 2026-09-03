@@ -32,8 +32,13 @@ DocumentStore::resolveTarget(const std::filesystem::path& requested) const {
     auto joined =
         (requested.is_absolute() ? requested : root_.path() / requested).lexically_normal();
     if (!isMarkdown(joined)) {
+        // Say what would have worked: a refusal the user has to guess their way
+        // out of is only a slower failure.
+        auto suggestion = requested;
+        suggestion.replace_extension(".md");
         return std::unexpected(
-            SaveError{SaveErrorCode::InvalidTarget, "Only Markdown (.md) files can be saved"});
+            SaveError{SaveErrorCode::InvalidTarget,
+                      "Only Markdown (.md) files can be saved; try " + suggestion.string()});
     }
 
     // Directories are never created implicitly: `:w notes/idea.md` fails in Vim
