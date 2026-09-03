@@ -2,18 +2,22 @@
 #define OMANOTES_UI_MAIN_WINDOW_HPP
 
 #include "app/launch_request.hpp"
+#include "core/buffer.hpp"
+#include "core/buffer_registry.hpp"
 
 #include <QMainWindow>
 
 #include <filesystem>
+#include <map>
 #include <memory>
-#include <optional>
 
+class QKeyEvent;
 class QLabel;
-class QTabBar;
+class QStackedWidget;
 
 namespace omanotes {
 
+class BufferStrip;
 class EditorAdapter;
 class PrefixRouter;
 class Sidebar;
@@ -29,14 +33,21 @@ class MainWindow final : public QMainWindow {
   private:
     void loadMarkdownFile(const std::filesystem::path& path);
     void refreshEditorStatus();
+    void syncBufferStrip();
+    void showBuffer(BufferId id);
+    void openScratchBuffer();
+    [[nodiscard]] EditorAdapter* activeEditor() const;
+    EditorAdapter& createEditorFor(BufferId id);
+    [[nodiscard]] bool handleBufferSwitch(const QKeyEvent& event);
 
     LaunchRequest launchRequest_;
-    std::unique_ptr<EditorAdapter> editor_;
+    BufferRegistry buffers_;
+    std::map<BufferId, std::unique_ptr<EditorAdapter>> editors_;
     std::unique_ptr<PrefixRouter> prefixRouter_;
     Sidebar* sidebar_ = nullptr;
-    QTabBar* bufferStrip_ = nullptr;
+    QStackedWidget* editorStack_ = nullptr;
+    BufferStrip* bufferStrip_ = nullptr;
     QLabel* statusArea_ = nullptr;
-    std::optional<std::filesystem::path> currentFile_;
 };
 
 } // namespace omanotes

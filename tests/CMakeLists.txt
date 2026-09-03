@@ -2,11 +2,16 @@ add_executable(
     omanotes_ui_tests
     unit/main_window_test.cpp
     "${CMAKE_SOURCE_DIR}/src/app/launch_request.hpp"
+    "${CMAKE_SOURCE_DIR}/src/core/buffer.hpp"
+    "${CMAKE_SOURCE_DIR}/src/core/buffer_registry.cpp"
+    "${CMAKE_SOURCE_DIR}/src/core/buffer_registry.hpp"
     "${CMAKE_SOURCE_DIR}/src/app/prefix_router.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/prefix_router.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/editor_adapter.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.cpp"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/buffer_strip.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/buffer_strip.hpp"
     "${CMAKE_SOURCE_DIR}/src/ui/main_window.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/main_window.hpp"
     "${CMAKE_SOURCE_DIR}/src/ui/sidebar.cpp"
@@ -25,6 +30,23 @@ omanotes_enable_hardening(omanotes_ui_tests)
 omanotes_enable_sanitizers(omanotes_ui_tests)
 
 add_test(NAME ui-structure COMMAND omanotes_ui_tests)
+
+add_executable(
+    omanotes_buffer_tests
+    unit/buffer_registry_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/core/buffer.hpp"
+    "${CMAKE_SOURCE_DIR}/src/core/buffer_registry.cpp"
+    "${CMAKE_SOURCE_DIR}/src/core/buffer_registry.hpp"
+)
+
+target_link_libraries(omanotes_buffer_tests PRIVATE Qt6::Test)
+target_include_directories(omanotes_buffer_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+
+omanotes_enable_warnings(omanotes_buffer_tests)
+omanotes_enable_hardening(omanotes_buffer_tests)
+omanotes_enable_sanitizers(omanotes_buffer_tests)
+
+add_test(NAME buffer-registry COMMAND omanotes_buffer_tests)
 
 add_executable(
     omanotes_editor_tests
@@ -140,7 +162,7 @@ set(
 )
 
 set_tests_properties(
-    editor-adapter file-tree-model launch-process launch-request prefix-router ui-structure
-    process-startup vim-behaviour
+    buffer-registry editor-adapter file-tree-model launch-process launch-request prefix-router
+    ui-structure process-startup vim-behaviour
     PROPERTIES ENVIRONMENT "${OMANOTES_TEST_ENVIRONMENT}"
 )
