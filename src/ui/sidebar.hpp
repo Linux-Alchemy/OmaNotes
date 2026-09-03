@@ -19,6 +19,7 @@ class Sidebar final : public QFrame {
     explicit Sidebar(const std::filesystem::path& root, QWidget* parent = nullptr);
 
     void focusTree();
+    void noteFileCreated(const std::filesystem::path& path);
 
   signals:
     void fileActivated(const std::filesystem::path& path);

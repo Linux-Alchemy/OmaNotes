@@ -198,13 +198,87 @@ std::vector<std::unique_ptr<FileTreeModel::Node>> FileTreeModel::enumerate(Node&
             std::make_unique<Node>(Node{canonical, &parentNode, directory, false, {}}));
     }
 
-    std::ranges::sort(children, [](const auto& left, const auto& right) {
-        if (left->directory != right->directory) {
-            return left->directory;
-        }
-        return QString::localeAwareCompare(displayName(left->path), displayName(right->path)) < 0;
-    });
+    std::ranges::sort(children, orderBefore);
     return children;
+}
+
+bool FileTreeModel::orderBefore(const std::unique_ptr<Node>& left,
+                                const std::unique_ptr<Node>& right) {
+    if (left->directory != right->directory) {
+        return left->directory;
+    }
+    return QString::localeAwareCompare(displayName(left->path), displayName(right->path)) < 0;
+}
+
+FileTreeModel::Node*
+FileTreeModel::findFetchedNode(const std::filesystem::path& path) const noexcept {
+    Node* current = root_.get();
+    if (!current->fetched) {
+        return nullptr;
+    }
+    if (current->path == path) {
+        return current;
+    }
+
+    const auto relative = path.lexically_relative(current->path);
+    if (relative.empty() || relative.begin()->string() == "..") {
+        return nullptr;
+    }
+
+    for (const auto& part : relative) {
+        const auto next = std::ranges::find_if(current->children, [&part](const auto& child) {
+            return child->path.filename() == part;
+        });
+        if (next == current->children.end() || !(*next)->fetched) {
+            return nullptr;
+        }
+        current = next->get();
+    }
+    return current;
+}
+
+QModelIndex FileTreeModel::indexForNode(Node* node) const {
+    if (node == nullptr || node == root_.get() || node->parent == nullptr) {
+        return {};
+    }
+    const auto& siblings = node->parent->children;
+    const auto found =
+        std::ranges::find_if(siblings, [node](const auto& child) { return child.get() == node; });
+    if (found == siblings.end()) {
+        return {};
+    }
+    return createIndex(static_cast<int>(std::distance(siblings.begin(), found)), 0, node);
+}
+
+void FileTreeModel::noteFileCreated(const std::filesystem::path& path) {
+    std::error_code error;
+    const auto canonical = std::filesystem::canonical(path, error);
+    if (error || !workspace_.contains(canonical) || isHidden(canonical)) {
+        return;
+    }
+    if (!showAllFiles_ && !isMarkdown(canonical)) {
+        return;
+    }
+
+    // An unopened directory has no children yet; it will list the file itself
+    // when the user expands it.
+    auto* parentNode = findFetchedNode(canonical.parent_path());
+    if (parentNode == nullptr) {
+        return;
+    }
+    const auto present = std::ranges::any_of(
+        parentNode->children, [&canonical](const auto& child) { return child->path == canonical; });
+    if (present) {
+        return;
+    }
+
+    auto node = std::make_unique<Node>(Node{canonical, parentNode, false, false, {}});
+    const auto where = std::ranges::lower_bound(parentNode->children, node, orderBefore);
+    const auto row = static_cast<int>(std::distance(parentNode->children.begin(), where));
+
+    beginInsertRows(indexForNode(parentNode), row, row);
+    parentNode->children.insert(where, std::move(node));
+    endInsertRows();
 }
 
 void FileTreeModel::resetTree() {

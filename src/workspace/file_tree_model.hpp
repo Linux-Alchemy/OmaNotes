@@ -17,6 +17,10 @@ class FileTreeModel final : public QAbstractItemModel {
     ~FileTreeModel() override;
 
     void setShowAllFiles(bool enabled);
+
+    /// Take account of a file the application itself has just created, so a
+    /// saved note appears without waiting for a relaunch.
+    void noteFileCreated(const std::filesystem::path& path);
     [[nodiscard]] std::filesystem::path pathForIndex(const QModelIndex& index) const;
     [[nodiscard]] bool isDirectory(const QModelIndex& index) const;
 
@@ -36,6 +40,10 @@ class FileTreeModel final : public QAbstractItemModel {
     struct Node;
 
     [[nodiscard]] Node* nodeForIndex(const QModelIndex& index) const noexcept;
+    [[nodiscard]] Node* findFetchedNode(const std::filesystem::path& path) const noexcept;
+    [[nodiscard]] QModelIndex indexForNode(Node* node) const;
+    [[nodiscard]] static bool orderBefore(const std::unique_ptr<Node>& left,
+                                          const std::unique_ptr<Node>& right);
     [[nodiscard]] std::vector<std::unique_ptr<Node>> enumerate(Node& parent) const;
     void resetTree();
 

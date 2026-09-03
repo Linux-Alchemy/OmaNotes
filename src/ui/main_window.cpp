@@ -488,6 +488,9 @@ QString MainWindow::saveTo(const std::filesystem::path& requested) {
     editor->markSaved();
     buffers_.setModified(activeId, false);
     syncBufferStrip();
+    // A note the user just wrote should be visible where they expect to find
+    // it, without relaunching.
+    sidebar_->noteFileCreated(*written);
     statusArea_->setText(QStringLiteral("Wrote %1").arg(displayName(*written)));
     return {};
 }

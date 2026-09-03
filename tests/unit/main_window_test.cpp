@@ -72,6 +72,7 @@ class MainWindowTest final : public QObject {
     void cancelsScratchNamingWithoutWriting();
     void savesThroughTheEditorWriteCommand();
     void savesWhenWriteIsTypedOnTheViCommandLine();
+    void showsANewlySavedNoteInTheSidebar();
     void refusesEditorWriteCommandsItDoesNotImplementYet();
     void doesNotLetNormalModeWriteShortcutsReachTheEditorsWriter();
     void closesCleanly();
@@ -628,6 +629,55 @@ void MainWindowTest::doesNotLetNormalModeWriteShortcutsReachTheEditorsWriter() {
     QCOMPARE(std::distance(std::filesystem::directory_iterator(root),
                            std::filesystem::directory_iterator{}),
              std::ptrdiff_t{0});
+}
+
+void MainWindowTest::showsANewlySavedNoteInTheSidebar() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    std::filesystem::create_directory(root / "projects");
+    writeFile(root / "existing.md", "# Existing\n");
+
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* tree = window.findChild<QTreeView*>(QStringLiteral("fileTree"));
+    auto* editor = activeEditor(window);
+    QVERIFY(tree != nullptr);
+    QVERIFY(editor != nullptr);
+
+    auto* model = static_cast<omanotes::FileTreeModel*>(tree->model());
+    if (model->canFetchMore({})) {
+        model->fetchMore({});
+    }
+    QVERIFY(!findIndex(*model, QStringLiteral("fresh.md")).isValid());
+
+    editor->document()->setText(QStringLiteral("# Fresh\n"));
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    auto* editorTarget = QApplication::focusWidget();
+    QTest::keyClick(editorTarget, Qt::Key_Colon);
+    QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
+                QApplication::focusWidget() != editorTarget);
+    auto* commandLine = QApplication::focusWidget();
+    QTest::keyClicks(commandLine, QStringLiteral("w fresh.md"));
+    QTest::keyClick(commandLine, Qt::Key_Return);
+
+    // The note must appear in the sidebar straight away, in sorted position,
+    // without relaunching.
+    QTRY_VERIFY(findIndex(*model, QStringLiteral("fresh.md")).isValid());
+    QCOMPARE(model->rowCount({}), 3);
+    QCOMPARE(model->index(0, 0, {}).data().toString(), QStringLiteral("projects"));
+    QCOMPARE(model->index(1, 0, {}).data().toString(), QStringLiteral("existing.md"));
+    QCOMPARE(model->index(2, 0, {}).data().toString(), QStringLiteral("fresh.md"));
+
+    // Saving the same file again must not add it twice.
+    editor->document()->setText(QStringLiteral("# Fresh again\n"));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Colon);
+    QTRY_VERIFY(qobject_cast<QLineEdit*>(QApplication::focusWidget()) != nullptr);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("w"));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+    QTest::qWait(50);
+    QCOMPARE(model->rowCount({}), 3);
 }
 
 void MainWindowTest::editorReceivesInitialFocus() {
