@@ -36,9 +36,14 @@ set(OMANOTES_FORMAT_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/app/prefix_router.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/app/launch_request.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/app/launch_request.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffer.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffer_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffer_registry.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/editor_adapter.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ktext_editor_adapter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/buffer_strip.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/buffer_strip.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/main_window.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/main_window.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/sidebar.cpp"
@@ -47,6 +52,7 @@ set(OMANOTES_FORMAT_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/file_tree_model.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/workspace_root.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/workspace_root.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/buffer_registry_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/launch_request_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/file_tree_model_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/main_window_test.cpp"
@@ -72,6 +78,7 @@ add_custom_target(
         -quiet
     DEPENDS
         omanotes
+        omanotes_buffer_tests
         omanotes_editor_tests
         omanotes_prefix_tests
         omanotes_process_tests

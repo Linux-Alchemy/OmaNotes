@@ -362,10 +362,10 @@ public:
 
 **Blocks:**
 
-- [ ] **4.1.1** — Implement scratch/file buffer identity, ordering, activation, and guarded close.
-- [ ] **4.1.2** — Bind the registry to tabs and editor documents without duplicating text ownership.
-- [ ] **4.1.3** — Implement approved keyboard and mouse buffer switching.
-- [ ] **4.1.4** — Verify: unit tests cover duplicate opens, modified close, missing active buffer, and final-buffer scratch fallback.
+- [x] **4.1.1** — Implement scratch/file buffer identity, ordering, activation, and guarded close.
+- [x] **4.1.2** — Bind the registry to tabs and editor documents without duplicating text ownership.
+- [x] **4.1.3** — Implement approved keyboard and mouse buffer switching.
+- [x] **4.1.4** — Verify: unit tests cover duplicate opens, modified close, missing active buffer, and final-buffer scratch fallback.
 
 ### Task 4.2: Implement atomic saves
 
@@ -817,3 +817,7 @@ Decision required: approve / request changes / stop and redesign
   `experiment/phase-3-general-purpose` and immutable tag `parked/phase-3-general-purpose-sidebar`;
   it had existed only as an unpushed local branch. Added a second development machine and
   re-validated the Phase 1-3 gates on it.
+- **2026-09-03:** Task 4.1 introduced the buffer registry, buffer strip, and per-buffer
+  editor documents. Buffer switching follows Matt's LazyVim habit (`Shift+H`/`Shift+L`) and is
+  recorded as ADR 0004 with its Vim deviation; buffer close bindings were deliberately left to
+  the Phase 5 command language.
