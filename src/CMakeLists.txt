@@ -1,11 +1,16 @@
 add_executable(
     omanotes
     main.cpp
+    app/prefix_router.cpp
+    app/prefix_router.hpp
+    editor/editor_adapter.hpp
+    editor/ktext_editor_adapter.cpp
+    editor/ktext_editor_adapter.hpp
     ui/main_window.cpp
     ui/main_window.hpp
 )
 
-target_link_libraries(omanotes PRIVATE Qt6::Widgets)
+target_link_libraries(omanotes PRIVATE KF6::TextEditor Qt6::Widgets)
 target_include_directories(omanotes PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 omanotes_enable_warnings(omanotes)

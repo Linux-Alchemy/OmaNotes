@@ -200,10 +200,10 @@ public:
 
 **Blocks:**
 
-- [ ] **2.1.1** — Host a KTextEditor document/view in Vi input mode through the adapter.
-- [ ] **2.1.2** — Configure Markdown highlighting, soft wrap, restrained chrome, and mode reporting.
-- [ ] **2.1.3** — Add lifetime, text round-trip, modified-state, and mode-transition tests.
-- [ ] **2.1.4** — Verify: sanitizer run reports no lifecycle errors while repeatedly creating and destroying the editor.
+- [x] **2.1.1** — Host a KTextEditor document/view in Vi input mode through the adapter.
+- [x] **2.1.2** — Configure Markdown highlighting, soft wrap, restrained chrome, and mode reporting.
+- [x] **2.1.3** — Add lifetime, text round-trip, modified-state, and mode-transition tests.
+- [x] **2.1.4** — Verify: sanitizer run reports no lifecycle errors while repeatedly creating and destroying the editor.
 
 ### Task 2.2: Define and run the Vim acceptance suite
 
@@ -215,14 +215,14 @@ public:
 
 **Blocks:**
 
-- [ ] **2.2.1** — Agree on the exact must-pass command matrix from Matt's daily Neovim habits.
-- [ ] **2.2.2** — Automate stable cases and document manual-only cases.
-- [ ] **2.2.3** — Record deviations as accept, configure around, or blocker; never quietly redefine Vim.
-- [ ] **2.2.4** — Verify: all mandatory automated cases pass and manual results are recorded.
+- [x] **2.2.1** — Agree on the exact must-pass command matrix from Matt's daily Neovim habits.
+- [x] **2.2.2** — Automate stable cases and document manual-only cases.
+- [x] **2.2.3** — Record deviations as accept, configure around, or blocker; never quietly redefine Vim.
+- [x] **2.2.4** — Verify: all mandatory automated cases pass and manual results are recorded.
 
 ### Task 2.3: Resolve the application leader
 
-**Files:** `docs/decisions/0002-application-leader.md`, `src/app/prefix_router.*`
+**Files:** `docs/decisions/0003-application-leader.md`, `src/app/prefix_router.*`
 
 **Skeleton:**
 
@@ -240,18 +240,18 @@ public:
 
 **Blocks:**
 
-- [ ] **2.3.1** — Prototype Space and `Ctrl+B` routing against the Vim acceptance suite.
-- [ ] **2.3.2** — Select the default with Matt; preserve `Ctrl+B` page-backward unless explicitly rejected.
-- [ ] **2.3.3** — Display pending prefix and invalid-sequence feedback in the status area.
-- [ ] **2.3.4** — Verify: typing, Insert mode, Normal mode, and mouse workflows show no swallowed input.
+- [x] **2.3.1** — Prototype Space and `Ctrl+B` routing against the Vim acceptance suite.
+- [x] **2.3.2** — Select the default with Matt; preserve `Ctrl+B` page-backward unless explicitly rejected.
+- [x] **2.3.3** — Display pending prefix and invalid-sequence feedback in the status area.
+- [x] **2.3.4** — Verify: typing, Insert mode, Normal mode, and mouse workflows show no swallowed input.
 
 ### Phase 2 Checkpoint
 
-- [ ] Full Phase 1 quality gates remain green.
-- [ ] Vim acceptance results contain no unexplained failures.
-- [ ] The leader decision is recorded, not merely encoded.
-- [ ] **Matt gate:** write and edit a substantial Markdown sample using real daily motions; approve the feel.
-- [ ] If the editor feels wrong, stop and reassess the engine before Phase 3.
+- [x] Full Phase 1 quality gates remain green.
+- [x] Vim acceptance results contain no unexplained failures.
+- [x] The leader decision is recorded, not merely encoded.
+- [x] **Matt gate:** write and edit a substantial Markdown sample using real daily motions; approve the feel.
+- [x] Editor feel accepted; no engine reassessment required before Phase 3.
 
 ## Phase 3: Workspace Roots and File Navigation
 
@@ -809,3 +809,5 @@ Decision required: approve / request changes / stop and redesign
 - **2026-08-29:** Native application distribution fixed as Arch/AUR/Omarchy Package Repository; `omarchyplugins.com` is reserved for an optional, separate QML companion plugin with meaningful shell integration.
 - **2026-08-29:** Phase 1 manually accepted after verifying typing, window resizing, and sidebar resizing; Phase 2 remains separately approval-gated.
 - **2026-08-29:** Adopted a branch-and-pull-request workflow: agents may push approved work to review branches, but Matt reviews and controls merging into `main`.
+- **2026-08-29:** Selected Space as the application leader after the Phase 2 prototype; preserved `Ctrl+B` page-backward and renumbered the leader decision to ADR 0003 because ADR 0002 already exists.
+- **2026-08-29:** Phase 2 accepted after the real-session Vim feel and Space-leader smoke tests; fixed and regression-tested shifted `Space+?` routing before closing the phase.

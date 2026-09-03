@@ -20,6 +20,7 @@ include(Warnings)
 include(Sanitizers)
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets Test)
+find_package(KF6TextEditor 6.9 REQUIRED)
 
 enable_testing()
 
@@ -31,9 +32,17 @@ find_program(RUN_CLANG_TIDY_EXECUTABLE NAMES run-clang-tidy REQUIRED)
 
 set(OMANOTES_FORMAT_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/prefix_router.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/prefix_router.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/editor_adapter.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ktext_editor_adapter.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/main_window.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/main_window.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/main_window_test.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/ktext_editor_adapter_test.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/prefix_router_test.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/vim_behaviour_test.cpp"
 )
 
 add_custom_target(
@@ -50,7 +59,7 @@ add_custom_target(
         -p "${CMAKE_BINARY_DIR}"
         "-source-filter=^${CMAKE_SOURCE_DIR}/(src|tests)/"
         -quiet
-    DEPENDS omanotes omanotes_ui_tests
+    DEPENDS omanotes omanotes_editor_tests omanotes_prefix_tests omanotes_ui_tests omanotes_vim_tests
     COMMENT "Running clang-tidy"
     VERBATIM
 )
