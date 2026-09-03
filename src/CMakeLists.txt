@@ -5,9 +5,14 @@ add_executable(
     app/launch_request.hpp
     app/prefix_router.cpp
     app/prefix_router.hpp
+    core/buffer.hpp
+    core/buffer_registry.cpp
+    core/buffer_registry.hpp
     editor/editor_adapter.hpp
     editor/ktext_editor_adapter.cpp
     editor/ktext_editor_adapter.hpp
+    ui/buffer_strip.cpp
+    ui/buffer_strip.hpp
     ui/main_window.cpp
     ui/main_window.hpp
     ui/sidebar.cpp

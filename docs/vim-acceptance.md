@@ -60,4 +60,5 @@ Record each deviation below before the Phase 2 checkpoint.
 
 | Behaviour | Observed difference | Classification | Decision |
 | --- | --- | --- | --- |
+| `H` and `L` are bound to previous/next buffer while two or more buffers are open | KTextEditor's Vi mode implements them as move-to-top-of-view and move-to-bottom-of-view | Accept | Deliberate Phase 4 application binding matching Matt's LazyVim habit; recorded in ADR 0004. With one buffer open the keys fall through and the Vim motions still work |
 | Explicit named yank does not also update the unnamed register | After `"ayy`, `"ap` uses the named contents while bare `p` retains the prior unnamed contents | Accept | Matt accepted on 2026-08-29; named, unnamed, and black-hole registers each work, and patching KTextEditor internals is out of scope |
