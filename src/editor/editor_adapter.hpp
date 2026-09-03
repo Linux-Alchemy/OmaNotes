@@ -24,6 +24,8 @@ class EditorAdapter : public QObject {
     virtual void setText(const QString& text) = 0;
     virtual void loadText(const QString& text) = 0;
     [[nodiscard]] virtual bool isModified() const noexcept = 0;
+    /// Record that the document now matches what is on disk.
+    virtual void markSaved() = 0;
     [[nodiscard]] virtual EditorMode mode() const noexcept = 0;
     [[nodiscard]] virtual QString modeName() const = 0;
 

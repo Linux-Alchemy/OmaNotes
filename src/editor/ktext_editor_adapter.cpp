@@ -71,6 +71,8 @@ void KTextEditorAdapter::loadText(const QString& text) {
 
 bool KTextEditorAdapter::isModified() const noexcept { return document_->isModified(); }
 
+void KTextEditorAdapter::markSaved() { document_->setModified(false); }
+
 EditorMode KTextEditorAdapter::mode() const noexcept {
     switch (view_->viewMode()) {
     case KTextEditor::View::ViModeNormal:

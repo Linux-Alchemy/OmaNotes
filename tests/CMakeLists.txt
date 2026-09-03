@@ -10,6 +10,12 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/editor/editor_adapter.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.cpp"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
+    "${CMAKE_SOURCE_DIR}/src/editor/save_command.cpp"
+    "${CMAKE_SOURCE_DIR}/src/editor/save_command.hpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.hpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/document_store.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/document_store.hpp"
     "${CMAKE_SOURCE_DIR}/src/ui/buffer_strip.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/buffer_strip.hpp"
     "${CMAKE_SOURCE_DIR}/src/ui/main_window.cpp"
@@ -47,6 +53,44 @@ omanotes_enable_hardening(omanotes_buffer_tests)
 omanotes_enable_sanitizers(omanotes_buffer_tests)
 
 add_test(NAME buffer-registry COMMAND omanotes_buffer_tests)
+
+add_executable(
+    omanotes_persistence_tests
+    integration/atomic_save_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.hpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.hpp"
+)
+
+target_link_libraries(omanotes_persistence_tests PRIVATE Qt6::Test)
+target_include_directories(omanotes_persistence_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+
+omanotes_enable_warnings(omanotes_persistence_tests)
+omanotes_enable_hardening(omanotes_persistence_tests)
+omanotes_enable_sanitizers(omanotes_persistence_tests)
+
+add_test(NAME atomic-save COMMAND omanotes_persistence_tests)
+
+add_executable(
+    omanotes_save_tests
+    unit/document_store_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.hpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/document_store.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/document_store.hpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.hpp"
+)
+
+target_link_libraries(omanotes_save_tests PRIVATE Qt6::Test)
+target_include_directories(omanotes_save_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+
+omanotes_enable_warnings(omanotes_save_tests)
+omanotes_enable_hardening(omanotes_save_tests)
+omanotes_enable_sanitizers(omanotes_save_tests)
+
+add_test(NAME document-store COMMAND omanotes_save_tests)
 
 add_executable(
     omanotes_editor_tests
@@ -162,7 +206,7 @@ set(
 )
 
 set_tests_properties(
-    buffer-registry editor-adapter file-tree-model launch-process launch-request prefix-router
-    ui-structure process-startup vim-behaviour
+    atomic-save buffer-registry document-store editor-adapter file-tree-model launch-process
+    launch-request prefix-router ui-structure process-startup vim-behaviour
     PROPERTIES ENVIRONMENT "${OMANOTES_TEST_ENVIRONMENT}"
 )

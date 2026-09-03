@@ -3,6 +3,8 @@
 #include "app/prefix_router.hpp"
 #include "editor/editor_adapter.hpp"
 #include "editor/ktext_editor_adapter.hpp"
+#include "editor/save_command.hpp"
+#include "persistence/document_store.hpp"
 #include "ui/buffer_strip.hpp"
 #include "ui/sidebar.hpp"
 #include "workspace/workspace_root.hpp"
@@ -12,6 +14,7 @@
 #include <QFile>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QLineEdit>
 #include <QShortcut>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -38,7 +41,7 @@ bool isMarkdown(const std::filesystem::path& path) {
 }
 
 QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip*& buffers,
-                          QLabel*& status) {
+                          QLabel*& status, QLineEdit*& namePrompt) {
     auto* writingArea = new QWidget(parent);
     writingArea->setObjectName(QStringLiteral("writingArea"));
 
@@ -57,8 +60,17 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
     status->setAccessibleName(QStringLiteral("Editor status"));
     status->setContentsMargins(10, 6, 10, 6);
 
+    namePrompt = new QLineEdit(writingArea);
+    namePrompt->setObjectName(QStringLiteral("namePrompt"));
+    namePrompt->setAccessibleName(QStringLiteral("Save as path"));
+    namePrompt->setPlaceholderText(QStringLiteral("path/inside/workspace.md"));
+    namePrompt->setFrame(false);
+    namePrompt->setContentsMargins(10, 6, 10, 6);
+    namePrompt->hide();
+
     layout->addWidget(buffers);
     layout->addWidget(editors, 1);
+    layout->addWidget(namePrompt);
     layout->addWidget(status);
     return writingArea;
 }
@@ -81,7 +93,8 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
     sidebar_ = new Sidebar(launchRequest_.root, splitter);
     splitter->addWidget(sidebar_);
     prefixRouter_ = std::make_unique<PrefixRouter>(LeaderKey::Space);
-    splitter->addWidget(buildWritingArea(splitter, editorStack_, bufferStrip_, statusArea_));
+    splitter->addWidget(
+        buildWritingArea(splitter, editorStack_, bufferStrip_, statusArea_, namePrompt_));
     splitter->setStretchFactor(0, 0);
     splitter->setStretchFactor(1, 1);
     splitter->setSizes({240, 860});
@@ -102,6 +115,22 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
             editor->widget()->setFocus(Qt::ShortcutFocusReason);
         }
     });
+    connect(namePrompt_, &QLineEdit::returnPressed, this, [this] { commitNaming(); });
+    auto* saveShortcut = new QShortcut(QKeySequence(QStringLiteral("Ctrl+S")), this);
+    saveShortcut->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(saveShortcut, &QShortcut::activated, this, [this] { saveActiveBuffer(); });
+    saveCommand_ = std::make_unique<SaveCommand>([this](const QString& argument) {
+        if (argument.isEmpty()) {
+            const auto active = buffers_.activeId();
+            const auto* state = active.has_value() ? buffers_.find(*active) : nullptr;
+            if (state == nullptr || !state->path.has_value()) {
+                return QStringLiteral("No file name; try :w path.md");
+            }
+            return saveTo({});
+        }
+        return saveTo(std::filesystem::path(argument.toStdString()));
+    });
+
     auto* focusSidebar = new QShortcut(QKeySequence(QStringLiteral("Ctrl+H")), this);
     focusSidebar->setContext(Qt::WidgetWithChildrenShortcut);
     connect(focusSidebar, &QShortcut::activated, this, [this] {
@@ -142,9 +171,25 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
     const auto* watchedWidget = qobject_cast<QWidget*>(watched);
     const auto insideWindow =
         watchedWidget != nullptr && (watchedWidget == this || isAncestorOf(watchedWidget));
+    // KTextEditor puts its own `:` command line and `/` search bar inside the
+    // view. Those are text inputs: routing application keys out of them would
+    // eat the space in `:w my note.md` and turn Shift+H into a buffer switch
+    // in the middle of a search. Application keys belong to the text area only.
+    const auto typingElsewhere = qobject_cast<const QLineEdit*>(watchedWidget) != nullptr;
     const auto insideEditor =
-        watchedWidget != nullptr && editorStack_ != nullptr &&
+        watchedWidget != nullptr && editorStack_ != nullptr && !typingElsewhere &&
         (watchedWidget == editorStack_ || editorStack_->isAncestorOf(watchedWidget));
+
+    if (watched == namePrompt_ && event->type() == QEvent::KeyPress &&
+        static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) {
+        cancelNaming();
+        return true;
+    }
+
+    if (event->type() == QEvent::KeyPress &&
+        interceptEditorWrite(watched, *static_cast<QKeyEvent*>(event))) {
+        return true;
+    }
 
     if (insideWindow && event->type() == QEvent::MouseButtonPress) {
         prefixRouter_->cancelPending();
@@ -188,6 +233,61 @@ bool MainWindow::handleBufferSwitch(const QKeyEvent& event) {
     }
     showBuffer(*target);
     return true;
+}
+
+bool MainWindow::interceptEditorWrite(QObject* watched, const QKeyEvent& event) {
+    if (event.key() != Qt::Key_Return && event.key() != Qt::Key_Enter) {
+        return false;
+    }
+    auto* commandLine = qobject_cast<QLineEdit*>(watched);
+    if (commandLine == nullptr || editorStack_ == nullptr ||
+        !editorStack_->isAncestorOf(commandLine)) {
+        return false;
+    }
+
+    const auto typed = commandLine->text().trimmed();
+    const auto verb = typed.section(QLatin1Char(' '), 0, 0);
+
+    // KTextEditor's Vi mode implements these itself and calls its own writer,
+    // which does not know about the workspace root and does not write
+    // atomically. Every one of them has to be taken away from it.
+    static const QStringList kWriteVerbs = {
+        QStringLiteral("w"),    QStringLiteral("w!"),     QStringLiteral("write"),
+        QStringLiteral("wq"),   QStringLiteral("wq!"),    QStringLiteral("wa"),
+        QStringLiteral("wall"), QStringLiteral("wqa"),    QStringLiteral("wqa!"),
+        QStringLiteral("x"),    QStringLiteral("x!"),     QStringLiteral("xa"),
+        QStringLiteral("xall"), QStringLiteral("exit"),   QStringLiteral("saveas"),
+        QStringLiteral("sav"),  QStringLiteral("update"), QStringLiteral("up")};
+    if (!kWriteVerbs.contains(verb)) {
+        return false;
+    }
+
+    // Dismiss the editor's command bar the way Escape would, then answer in the
+    // status area.
+    QKeyEvent dismiss(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+    QApplication::sendEvent(commandLine, &dismiss);
+
+    if (verb != QStringLiteral("w") && verb != QStringLiteral("write")) {
+        statusArea_->setText(QStringLiteral("%1 is not available yet; use :w [path]").arg(verb));
+        return true;
+    }
+
+    const auto argument = typed.section(QLatin1Char(' '), 1).trimmed();
+    const auto failure = argument.isEmpty() ? saveActiveBufferOrReport()
+                                            : saveTo(std::filesystem::path(argument.toStdString()));
+    if (!failure.isEmpty()) {
+        statusArea_->setText(failure);
+    }
+    return true;
+}
+
+QString MainWindow::saveActiveBufferOrReport() {
+    const auto active = buffers_.activeId();
+    const auto* state = active.has_value() ? buffers_.find(*active) : nullptr;
+    if (state == nullptr || !state->path.has_value()) {
+        return QStringLiteral("No file name; try :w path.md");
+    }
+    return saveTo({});
 }
 
 void MainWindow::openScratchBuffer() {
@@ -293,6 +393,103 @@ void MainWindow::loadMarkdownFile(const std::filesystem::path& path) {
 
     createEditorFor(*opened).loadText(text);
     showBuffer(*opened);
+}
+
+void MainWindow::saveActiveBuffer() {
+    const auto active = buffers_.activeId();
+    const auto* state = active.has_value() ? buffers_.find(*active) : nullptr;
+    if (state == nullptr) {
+        return;
+    }
+    if (!state->path.has_value()) {
+        beginNaming();
+        return;
+    }
+
+    if (const auto failure = saveTo({}); !failure.isEmpty()) {
+        statusArea_->setText(failure);
+    }
+}
+
+void MainWindow::beginNaming() {
+    namePrompt_->clear();
+    namePrompt_->show();
+    namePrompt_->setFocus(Qt::OtherFocusReason);
+    statusArea_->setText(QStringLiteral("Save as (Esc to cancel)"));
+}
+
+void MainWindow::cancelNaming() {
+    namePrompt_->clear();
+    namePrompt_->hide();
+    if (auto* editor = activeEditor(); editor != nullptr && editor->widget() != nullptr) {
+        editor->widget()->setFocus(Qt::OtherFocusReason);
+    }
+    refreshEditorStatus();
+}
+
+void MainWindow::commitNaming() {
+    const auto typed = namePrompt_->text().trimmed();
+    if (typed.isEmpty()) {
+        cancelNaming();
+        return;
+    }
+
+    const auto failure = saveTo(std::filesystem::path(typed.toStdString()));
+    if (!failure.isEmpty()) {
+        statusArea_->setText(failure);
+        return;
+    }
+
+    namePrompt_->clear();
+    namePrompt_->hide();
+    if (auto* editor = activeEditor(); editor != nullptr && editor->widget() != nullptr) {
+        editor->widget()->setFocus(Qt::OtherFocusReason);
+    }
+}
+
+QString MainWindow::saveTo(const std::filesystem::path& requested) {
+    auto* editor = activeEditor();
+    const auto active = buffers_.activeId();
+    if (editor == nullptr || !active.has_value()) {
+        return QStringLiteral("There is nothing to save");
+    }
+
+    const auto activeId = *active;
+    const auto* state = buffers_.find(activeId);
+    if (state == nullptr) {
+        return QStringLiteral("There is nothing to save");
+    }
+
+    const auto target =
+        requested.empty() ? state->path.value_or(std::filesystem::path{}) : requested;
+    if (target.empty()) {
+        return QStringLiteral("No file name; try :w path.md");
+    }
+
+    auto workspace = WorkspaceRoot::resolve(launchRequest_.root);
+    if (!workspace) {
+        return QString::fromStdString(workspace.error().message);
+    }
+
+    const DocumentStore store(*workspace);
+    const auto written = store.save(target, editor->text());
+    if (!written) {
+        return QString::fromStdString(written.error().message);
+    }
+
+    if (state->path != *written) {
+        if (const auto assigned = buffers_.assignPath(activeId, *written); !assigned) {
+            return QString::fromStdString(assigned.error().message);
+        }
+    }
+
+    // Clear the modified flag first: it emits, and the emission refreshes the
+    // status line that the confirmation below is written into.
+    editor->markSaved();
+    buffers_.setModified(activeId, false);
+    syncBufferStrip();
+    statusArea_->setText(QStringLiteral("Wrote %1").arg(displayName(*written)));
+    return {};
 }
 
 void MainWindow::refreshEditorStatus() {
