@@ -848,4 +848,5 @@ Decision required: approve / request changes / stop and redesign
   (unplanned; the outline had only listed visibility as Phase 7 session state) and added
   `Space Space` as LazyVim's second find-files route. The gate also found that moving focus
   from the sidebar to the editor leaves no visible sign of which pane is live; deferred to Task
-  6.2, where focus visibility is already a requirement.
+  6.2, where focus visibility is already a requirement. The sidebar now starts hidden, overriding
+  the outline's "visible on the left"; Phase 7's session restore will remember its state.

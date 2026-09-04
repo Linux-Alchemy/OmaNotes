@@ -70,6 +70,13 @@ repeats within a category. A test keeps it empty.
   way to move focus into an open sidebar, matching Neovim window navigation. A second Space is
   spelt `Space` in a sequence, because a bare space is the separator between keys.
 
+- The sidebar starts hidden, at Matt's gate. This overrides the outline's "sidebar visible on the
+  left": the text is the point of the application, and `Space e` or `Ctrl+H` brings the tree
+  when it is wanted. Phase 7's session restore remembers whichever way it was left, so this is
+  the first-launch default only. A launch from a directory with no file therefore opens on an
+  empty unnamed buffer with no tree showing; the help overlay (Task 5.3) is what tells a new user
+  the tree exists.
+
 ## Alternatives rejected
 
 - **Qt `QAction` as the registry.** Actions carry shortcuts, icons, and menu state, and they

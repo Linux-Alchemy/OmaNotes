@@ -740,8 +740,18 @@ void MainWindowTest::resizesWithoutLosingRegions() {
     QCoreApplication::processEvents();
 
     const auto* splitter = window.findChild<QSplitter*>(QStringLiteral("workspaceSplitter"));
+    auto* sidebar = window.findChild<QWidget*>(QStringLiteral("sidebar"));
     QVERIFY(splitter != nullptr);
+    QVERIFY(sidebar != nullptr);
     QCOMPARE(splitter->count(), 2);
+    // The sidebar starts hidden (ADR 0007), so the editor has the whole width.
+    QCOMPARE(splitter->sizes().at(0), 0);
+    QVERIFY(splitter->sizes().at(1) > 0);
+
+    // Once shown, both regions keep a width through a resize.
+    sidebar->show();
+    window.resize(720, 480);
+    QCoreApplication::processEvents();
     QVERIFY(splitter->sizes().at(0) > 0);
     QVERIFY(splitter->sizes().at(1) > 0);
 }
@@ -1056,12 +1066,21 @@ void MainWindowTest::leaderSequencesRunRegisteredCommands() {
     QTest::keyClicks(target, QStringLiteral("bn"));
     QTRY_COMPARE(strip->currentIndex(), 1);
 
-    // Space e hides the sidebar; Space e again shows it and moves focus there,
-    // as LazyVim's explorer toggle does. Hiding it from inside hands focus back.
+    // The sidebar starts hidden. Space e shows it and moves focus there;
+    // Space e again hides it and hands focus back, as LazyVim's explorer does.
     auto* sidebar = window.findChild<QWidget*>(QStringLiteral("sidebar"));
     QVERIFY(sidebar != nullptr);
-    QVERIFY(sidebar->isVisible());
+    QVERIFY(!sidebar->isVisible());
     second->setFocus();
+    QTRY_VERIFY(second->hasFocus());
+    target = QApplication::focusWidget();
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("e"));
+    QTRY_VERIFY(sidebar->isVisible());
+    QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
+                sidebar->isAncestorOf(QApplication::focusWidget()));
+    QVERIFY(QApplication::activeModalWidget() == nullptr);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_L, Qt::ControlModifier);
     QTRY_VERIFY(second->hasFocus());
     target = QApplication::focusWidget();
     QTest::keyClick(target, Qt::Key_Space);
@@ -1073,7 +1092,6 @@ void MainWindowTest::leaderSequencesRunRegisteredCommands() {
     QTRY_VERIFY(sidebar->isVisible());
     QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
                 sidebar->isAncestorOf(QApplication::focusWidget()));
-    QVERIFY(QApplication::activeModalWidget() == nullptr);
 
     // Ctrl+H reaches a hidden sidebar too: it shows it rather than doing nothing.
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_L, Qt::ControlModifier);
@@ -1211,6 +1229,9 @@ void MainWindowTest::clicksAndShortcutsRunTheSameCommands() {
     auto* sidebar = window.findChild<QWidget*>(QStringLiteral("sidebar"));
     auto* tree = window.findChild<QTreeView*>();
     QVERIFY(status != nullptr && strip != nullptr && sidebar != nullptr && tree != nullptr);
+    QVERIFY(!sidebar->isVisible());
+    sidebar->show();
+    QTRY_VERIFY(tree->isVisible());
 
     // Opening from the tree runs file.open.
     auto* model = tree->model();

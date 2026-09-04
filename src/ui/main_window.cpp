@@ -124,6 +124,10 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
     splitter->setChildrenCollapsible(false);
     sidebar_ = new Sidebar(launchRequest_.root, splitter);
     splitter->addWidget(sidebar_);
+    // Hidden at launch, at Matt's call (ADR 0007): the text is the point, and
+    // `Space e` or `Ctrl+H` brings the tree when it is wanted. Phase 7's
+    // session restore will remember whichever way it was left.
+    sidebar_->hide();
     prefixRouter_ = std::make_unique<PrefixRouter>(LeaderKey::Space);
     watcher_ = std::make_unique<FileWatcher>();
     connect(watcher_.get(), &FileWatcher::fileChanged, this,
