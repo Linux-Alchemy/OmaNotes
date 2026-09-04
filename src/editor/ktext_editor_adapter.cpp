@@ -9,6 +9,8 @@
 #include <QKeySequence>
 #include <QWidget>
 
+#include <algorithm>
+
 namespace omanotes {
 
 namespace {
@@ -65,8 +67,14 @@ QString KTextEditorAdapter::text() const { return document_->text(); }
 void KTextEditorAdapter::setText(const QString& text) { document_->setText(text); }
 
 void KTextEditorAdapter::loadText(const QString& text) {
+    // A reload from disk should not throw the cursor to the top of the note;
+    // keep it where it was, clamped to whatever the new text still has.
+    const auto previous = view_->cursorPosition();
     document_->setText(text);
     document_->setModified(false);
+    const auto line = std::min(previous.line(), std::max(document_->lines() - 1, 0));
+    const auto column = std::min(previous.column(), document_->lineLength(line));
+    view_->setCursorPosition(KTextEditor::Cursor(line, column));
 }
 
 bool KTextEditorAdapter::isModified() const noexcept { return document_->isModified(); }

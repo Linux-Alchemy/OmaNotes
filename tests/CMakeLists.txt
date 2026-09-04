@@ -14,6 +14,8 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/editor/save_command.hpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.hpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/conflict_detector.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/conflict_detector.hpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/document_store.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/document_store.hpp"
     "${CMAKE_SOURCE_DIR}/src/ui/buffer_strip.cpp"
@@ -24,6 +26,8 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/ui/sidebar.hpp"
     "${CMAKE_SOURCE_DIR}/src/workspace/file_tree_model.cpp"
     "${CMAKE_SOURCE_DIR}/src/workspace/file_tree_model.hpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/file_watcher.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/file_watcher.hpp"
     "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.cpp"
     "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.hpp"
 )
@@ -178,6 +182,38 @@ omanotes_enable_sanitizers(omanotes_vim_tests)
 
 add_test(NAME vim-behaviour COMMAND omanotes_vim_tests)
 
+add_executable(
+    omanotes_conflict_tests
+    unit/conflict_detector_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/persistence/conflict_detector.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/conflict_detector.hpp"
+)
+
+target_link_libraries(omanotes_conflict_tests PRIVATE Qt6::Test)
+target_include_directories(omanotes_conflict_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+
+omanotes_enable_warnings(omanotes_conflict_tests)
+omanotes_enable_hardening(omanotes_conflict_tests)
+omanotes_enable_sanitizers(omanotes_conflict_tests)
+
+add_test(NAME conflict-detector COMMAND omanotes_conflict_tests)
+
+add_executable(
+    omanotes_watcher_tests
+    unit/file_watcher_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/workspace/file_watcher.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/file_watcher.hpp"
+)
+
+target_link_libraries(omanotes_watcher_tests PRIVATE Qt6::Test)
+target_include_directories(omanotes_watcher_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+
+omanotes_enable_warnings(omanotes_watcher_tests)
+omanotes_enable_hardening(omanotes_watcher_tests)
+omanotes_enable_sanitizers(omanotes_watcher_tests)
+
+add_test(NAME file-watcher COMMAND omanotes_watcher_tests)
+
 add_test(NAME process-startup COMMAND omanotes --smoke-test)
 
 add_executable(omanotes_process_tests integration/launch_process_test.cpp)
@@ -206,7 +242,8 @@ set(
 )
 
 set_tests_properties(
-    atomic-save buffer-registry document-store editor-adapter file-tree-model launch-process
-    launch-request prefix-router ui-structure process-startup vim-behaviour
+    atomic-save buffer-registry conflict-detector document-store editor-adapter file-tree-model
+    file-watcher launch-process launch-request prefix-router ui-structure process-startup
+    vim-behaviour
     PROPERTIES ENVIRONMENT "${OMANOTES_TEST_ENVIRONMENT}"
 )
