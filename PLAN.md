@@ -841,4 +841,6 @@ Decision required: approve / request changes / stop and redesign
   `Space f n`, ...), recorded as ADR 0007. Buffer close gained its binding, deferred from ADR
   0004. Later features are registered disabled with a hint naming their block. The Vi command
   line's `:w`/`:e` remain intercepted verbs rather than registry commands; the descriptor gained
-  `disabledHint` beyond the plan's skeleton.
+  `disabledHint` beyond the plan's skeleton. Matt's gate turned `Space e` into a sidebar toggle
+  (unplanned; the outline had only listed visibility as Phase 7 session state) and added
+  `Space Space` as LazyVim's second find-files route.

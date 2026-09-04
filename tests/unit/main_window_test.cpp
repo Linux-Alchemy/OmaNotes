@@ -1014,7 +1014,7 @@ void MainWindowTest::everyCommandHasOneImplementationAndARoute() {
           "search.files", "search.text", "help.show", "view.reading"}) {
         QVERIFY2(commands.find(QString::fromLatin1(id)) != nullptr, id);
     }
-    QCOMPARE(commands.commands().size(), std::size_t{14});
+    QCOMPARE(commands.commands().size(), std::size_t{15});
 }
 
 void MainWindowTest::leaderSequencesRunRegisteredCommands() {
@@ -1056,17 +1056,36 @@ void MainWindowTest::leaderSequencesRunRegisteredCommands() {
     QTest::keyClicks(target, QStringLiteral("bn"));
     QTRY_COMPARE(strip->currentIndex(), 1);
 
-    // Space e moves to the sidebar, exactly as Ctrl+H does.
+    // Space e hides the sidebar; Space e again shows it and moves focus there,
+    // as LazyVim's explorer toggle does. Hiding it from inside hands focus back.
+    auto* sidebar = window.findChild<QWidget*>(QStringLiteral("sidebar"));
+    QVERIFY(sidebar != nullptr);
+    QVERIFY(sidebar->isVisible());
     second->setFocus();
     QTRY_VERIFY(second->hasFocus());
     target = QApplication::focusWidget();
     QTest::keyClick(target, Qt::Key_Space);
     QTest::keyClicks(target, QStringLiteral("e"));
-    auto* sidebar = window.findChild<QWidget*>(QStringLiteral("sidebar"));
-    QVERIFY(sidebar != nullptr);
+    QTRY_VERIFY(!sidebar->isVisible());
+    QVERIFY(second->hasFocus());
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("e"));
+    QTRY_VERIFY(sidebar->isVisible());
     QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
                 sidebar->isAncestorOf(QApplication::focusWidget()));
     QVERIFY(QApplication::activeModalWidget() == nullptr);
+
+    // Ctrl+H reaches a hidden sidebar too: it shows it rather than doing nothing.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_L, Qt::ControlModifier);
+    QTRY_VERIFY(second->hasFocus());
+    target = QApplication::focusWidget();
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("e"));
+    QTRY_VERIFY(!sidebar->isVisible());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_H, Qt::ControlModifier);
+    QTRY_VERIFY(sidebar->isVisible());
+    QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
+                sidebar->isAncestorOf(QApplication::focusWidget()));
 }
 
 void MainWindowTest::closesBuffersFromTheLeaderAndGuardsUnsavedWork() {
@@ -1152,6 +1171,10 @@ void MainWindowTest::refusesDisabledCommandsWithAReason() {
     QTRY_COMPARE(status->text(), QStringLiteral("Only one buffer is open"));
 
     // Features from later blocks are registered, discoverable, and honest.
+    // A second Space is LazyVim's find-files key and spells itself out.
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClick(target, Qt::Key_Space);
+    QTRY_COMPARE(status->text(), QStringLiteral("Find files is not available yet (Task 5.2)"));
     for (const auto& [keys, message] :
          {std::pair{QStringLiteral("ff"),
                     QStringLiteral("Find files is not available yet (Task 5.2)")},

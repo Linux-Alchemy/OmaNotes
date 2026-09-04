@@ -294,8 +294,8 @@ void MainWindow::addCommand(CommandDescriptor descriptor,
 
 void MainWindow::registerCommands() {
     // Leader sequences follow Matt's LazyVim vocabulary where one exists:
-    // `e` for the explorer, `b d` / `b D` for buffer delete, `f f` and `f n`
-    // for find and new file, `/` for text search. `?` and `m` come from the
+    // `e` toggles the explorer, `b d` / `b D` delete a buffer, `f f` and a
+    // second Space find files, `f n` is a new file, `/` is text search. `?` and `m` come from the
     // plan. Reached by other routes too: Ctrl+S, Ctrl+H, Shift+H/L, tab and
     // tree clicks; those routes name the command ids in routedOutsideLeader_.
     const auto always = [](const AppContext&) { return true; };
@@ -385,11 +385,30 @@ void MainWindow::registerCommands() {
                 QStringLiteral("pane"), inNormalMode,
                 [this](AppContext&) {
                     prefixRouter_->cancelPending();
+                    sidebar_->show();
                     sidebar_->focusTree();
                 },
-                QStringLiteral("Leave Insert mode to move to the sidebar")},
-               {QStringLiteral("e")});
+                QStringLiteral("Leave Insert mode to move to the sidebar")});
     routedOutsideLeader_.push_back(QStringLiteral("pane.sidebar"));
+    addCommand({QStringLiteral("pane.sidebar.toggle"),
+                QStringLiteral("Show or hide sidebar"),
+                QStringLiteral("pane"),
+                always,
+                [this](AppContext& context) {
+                    // LazyVim's explorer toggle: opening also moves focus
+                    // there; closing hands focus back to the text.
+                    if (sidebar_->isVisible()) {
+                        sidebar_->hide();
+                        if (context.focus == FocusContext::Sidebar) {
+                            runCommand(QStringLiteral("pane.editor"));
+                        }
+                        return;
+                    }
+                    sidebar_->show();
+                    sidebar_->focusTree();
+                },
+                {}},
+               {QStringLiteral("e")});
     addCommand({QStringLiteral("pane.editor"),
                 QStringLiteral("Focus editor"),
                 QStringLiteral("pane"),
@@ -406,7 +425,7 @@ void MainWindow::registerCommands() {
     addCommand({QStringLiteral("search.files"), QStringLiteral("Find files"),
                 QStringLiteral("search"), notYet, [](AppContext&) {},
                 QStringLiteral("Find files is not available yet (Task 5.2)")},
-               {QStringLiteral("f f")});
+               {QStringLiteral("f f"), QStringLiteral("Space")});
     addCommand({QStringLiteral("search.text"), QStringLiteral("Search text"),
                 QStringLiteral("search"), notYet, [](AppContext&) {},
                 QStringLiteral("Search text is not available yet (Task 5.2)")},

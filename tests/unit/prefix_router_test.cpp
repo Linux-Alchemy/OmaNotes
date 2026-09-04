@@ -51,6 +51,7 @@ class PrefixRouterTest final : public QObject {
     void multiKeySequenceReportsEachStep();
     void unknownContinuationCancelsWithTheWholeSequence();
     void withoutAResolverEveryKeyIsUnknown();
+    void secondSpaceIsAKeyInItsOwnRight();
 };
 
 void PrefixRouterTest::spaceCandidateRoutesKnownSequence() {
@@ -190,6 +191,28 @@ void PrefixRouterTest::withoutAResolverEveryKeyIsUnknown() {
     QCOMPARE(acceptedSpy.count(), 0);
     QCOMPARE(feedbackSpy.last().first().toString(),
              QStringLiteral("Unknown application command: Space+?"));
+}
+
+void PrefixRouterTest::secondSpaceIsAKeyInItsOwnRight() {
+    omanotes::CommandRegistry registry;
+    omanotes::CommandDescriptor descriptor;
+    descriptor.id = QStringLiteral("search.files");
+    descriptor.label = descriptor.id;
+    descriptor.category = QStringLiteral("test");
+    descriptor.execute = [](omanotes::AppContext&) {};
+    std::ignore = registry.add(descriptor);
+    std::ignore = registry.bind(omanotes::LeaderSequence{QStringLiteral("Space")}, descriptor.id);
+    omanotes::PrefixRouter router(omanotes::LeaderKey::Space);
+    resolveAgainst(router, registry);
+    QSignalSpy acceptedSpy(&router, &omanotes::PrefixRouter::sequenceAccepted);
+    auto space = keyEvent(Qt::Key_Space, QStringLiteral(" "));
+
+    QVERIFY(router.route(space, omanotes::EditorMode::Normal));
+    QVERIFY(router.route(space, omanotes::EditorMode::Normal));
+    QVERIFY(!router.isPending());
+    QCOMPARE(acceptedSpy.count(), 1);
+    QCOMPARE(acceptedSpy.first().at(0).toString(), QStringLiteral("search.files"));
+    QCOMPARE(acceptedSpy.first().at(1).toString(), QStringLiteral("Space+Space"));
 }
 
 QTEST_MAIN(PrefixRouterTest)

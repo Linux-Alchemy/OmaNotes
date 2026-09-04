@@ -55,7 +55,10 @@ bool PrefixRouter::route(QKeyEvent& event, EditorMode mode) {
         return false;
     }
 
-    const auto key = event.text();
+    // A second press of the space bar is a key in its own right (LazyVim's
+    // `<leader><space>`); it is spelt out because a bare space would vanish
+    // into the separator between keys.
+    const auto key = event.key() == Qt::Key_Space ? QStringLiteral("Space") : event.text();
     if (key.isEmpty() || key.trimmed().isEmpty()) {
         cancel(QStringLiteral("Unknown application command: %1+<key>").arg(displaySequence()));
         return true;

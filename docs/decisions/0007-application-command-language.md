@@ -13,8 +13,8 @@ nothing to render, the keymap (Task 5.3) had nothing to rebind, and a second rou
 could quietly grow a second implementation.
 
 Matt's LazyVim configuration is the reference vocabulary, as ADR 0004 established for buffer
-switching. LazyVim binds `<leader>e` to the explorer, `<leader>bd` and `<leader>bD` to buffer
-delete and force delete, `<leader>ff` to find files, `<leader>fn` to a new file, and `<leader>/`
+switching. LazyVim binds `<leader>e` to toggle the explorer, `<leader>bd` and `<leader>bD` to buffer
+delete and force delete, `<leader>ff` and `<leader><space>` to find files, `<leader>fn` to a new file, and `<leader>/`
 to grep. The plan assigns `Leader+?` to help and `Leader+m` to the reading view.
 
 ## Decision
@@ -30,12 +30,13 @@ because such a sequence could never be typed. The vocabulary:
 
 | Sequence | Command | Also reached by |
 | --- | --- | --- |
-| `Space e` | Focus sidebar | `Ctrl+H` in Normal mode |
+| `Space e` | Show or hide the sidebar; showing it moves focus there | |
+| | Focus sidebar, showing it first if hidden | `Ctrl+H` in Normal mode |
 | `Space b d` | Close buffer, refusing unsaved work | |
 | `Space b D` | Close buffer, discarding changes | |
 | `Space b n` / `Space b p` | Next / previous buffer | `Shift+L` / `Shift+H` |
 | `Space f n` | New buffer | |
-| `Space f f` | Find files | not available until Task 5.2 |
+| `Space f f`, `Space Space` | Find files | not available until Task 5.2 |
 | `Space /` | Search text | not available until Task 5.2 |
 | `Space ?` | Help | not available until Task 5.3 |
 | `Space m` | Reading view | not available until Phase 6 |
@@ -63,6 +64,11 @@ repeats within a category. A test keeps it empty.
   it is KTextEditor's backspace.
 - `CommandDescriptor` carries a `disabledHint` beyond the plan's skeleton, so a refusal can say
   why rather than only that.
+
+- `Space e` toggles rather than focuses, at Matt's gate: the plan never gave sidebar visibility a
+  key, though the outline lists it as session state for Phase 7 to restore. `Ctrl+H` remains the
+  way to move focus into an open sidebar, matching Neovim window navigation. A second Space is
+  spelt `Space` in a sequence, because a bare space is the separator between keys.
 
 ## Alternatives rejected
 
