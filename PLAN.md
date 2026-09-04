@@ -415,10 +415,10 @@ enum class ExternalChangeAction { ReloadClean, PromptConflict, FileRemoved };
 
 **Blocks:**
 
-- [ ] **4.3.1** — Implement revision tracking and watcher event coalescing.
-- [ ] **4.3.2** — Add non-destructive reload/conflict/removed-file flows.
-- [ ] **4.3.3** — Test agent-like rapid writes, rename-replace saves, and simultaneous local edits.
-- [ ] **4.3.4** — Verify: no conflict path silently overwrites editor or disk content.
+- [x] **4.3.1** — Implement revision tracking and watcher event coalescing.
+- [x] **4.3.2** — Add non-destructive reload/conflict/removed-file flows.
+- [x] **4.3.3** — Test agent-like rapid writes, rename-replace saves, and simultaneous local edits.
+- [x] **4.3.4** — Verify: no conflict path silently overwrites editor or disk content.
 
 ### Phase 4 Checkpoint
 
@@ -825,3 +825,11 @@ Decision required: approve / request changes / stop and redesign
   (ADR 0005). Found and closed two input-routing defects: the Space leader was eating spaces typed
   in KTextEditor's own command line and search bar, and KTextEditor's Vi mode implements `:w`
   internally through its own writer, which bypassed the workspace root and the atomic replace.
+- **2026-09-04:** Task 4.3 added external-change detection: a directory-and-file watcher with
+  event coalescing, content-hash revision tracking, and Vim-shaped conflict handling (`:w!`,
+  `:e`, `:e!`, `File exists`), recorded as ADR 0006. The save itself checks the disk, so the
+  guarantee does not depend on the watcher. Hashes replace timestamps entirely, and the
+  classifier gained an `Unchanged` outcome beyond the plan's skeleton.
+  Matt's gate found the `:w` interception missing a route: a bare `:w` keeps the command bar's
+  completion popup open and the Return lands there, reaching KTextEditor's own Save As dialog.
+  Closed with a regression test that presses Return on the popup.

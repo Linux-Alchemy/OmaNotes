@@ -38,6 +38,36 @@ KTextEditor::View* activeEditor(omanotes::MainWindow& window) {
     return stack == nullptr ? nullptr : qobject_cast<KTextEditor::View*>(stack->currentWidget());
 }
 
+QByteArray readFile(const std::filesystem::path& path) {
+    QFile file(QString::fromStdString(path.string()));
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    return file.readAll();
+}
+
+/// Save the way Neovim does by default: write a sibling, rename it over.
+void replaceFileByRename(const std::filesystem::path& path, const QByteArray& contents) {
+    auto staging = path;
+    staging += ".staging";
+    writeFile(staging, contents);
+    std::filesystem::rename(staging, path);
+}
+
+/// Type `:command<Return>` on the editor's own Vi command line.
+void typeViCommand(KTextEditor::View& editor, const QString& command) {
+    editor.setFocus();
+    QTRY_VERIFY(editor.hasFocus());
+    auto* editorTarget = QApplication::focusWidget();
+    QVERIFY(editorTarget != nullptr);
+    QTest::keyClick(editorTarget, Qt::Key_Colon);
+    QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
+                QApplication::focusWidget() != editorTarget);
+    auto* commandLine = QApplication::focusWidget();
+    QTest::keyClicks(commandLine, command);
+    QTest::keyClick(commandLine, Qt::Key_Return);
+}
+
 QModelIndex findIndex(omanotes::FileTreeModel& model, const QString& name,
                       const QModelIndex& parent = {}) {
     for (int row = 0; row < model.rowCount(parent); ++row) {
@@ -75,6 +105,14 @@ class MainWindowTest final : public QObject {
     void showsANewlySavedNoteInTheSidebar();
     void refusesEditorWriteCommandsItDoesNotImplementYet();
     void doesNotLetNormalModeWriteShortcutsReachTheEditorsWriter();
+    void reloadsACleanBufferWhenItsFileChangesOnDisk();
+    void keepsEditsAndRefusesPlainWriteWhenFileChangedUnderneath();
+    void refusesToOverwriteExternalChangesEvenBeforeTheWatcherNotices();
+    void reloadsOverUnsavedEditsOnlyWithBang();
+    void reportsADeletedFileAndWritesItAgainOnSave();
+    void refusesToOverwriteAnotherExistingFileWithoutBang();
+    void leavesTheWroteConfirmationStandingAfterItsOwnSave();
+    void interceptsWriteWhenTheCommandCompletionPopupHasFocus();
     void closesCleanly();
 };
 
@@ -700,6 +738,258 @@ void MainWindowTest::resizesWithoutLosingRegions() {
     QCOMPARE(splitter->count(), 2);
     QVERIFY(splitter->sizes().at(0) > 0);
     QVERIFY(splitter->sizes().at(1) > 0);
+}
+
+void MainWindowTest::reloadsACleanBufferWhenItsFileChangesOnDisk() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "# Original\n");
+
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr);
+    QVERIFY(editor != nullptr);
+    QCOMPARE(editor->document()->text(), QStringLiteral("# Original\n"));
+
+    // An agent rewrites the note a few times in quick succession, the last
+    // time by rename-replace.
+    writeFile(note, "# Draft 1\n");
+    writeFile(note, "# Draft 2\n");
+    replaceFileByRename(note, "# Final from outside\n");
+
+    QTRY_COMPARE(editor->document()->text(), QStringLiteral("# Final from outside\n"));
+    QVERIFY(!editor->document()->isModified());
+    QVERIFY2(status->text().contains(QStringLiteral("Reloaded note.md")),
+             qPrintable(status->text()));
+}
+
+void MainWindowTest::keepsEditsAndRefusesPlainWriteWhenFileChangedUnderneath() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "# Original\n");
+
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* buffers = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr);
+    QVERIFY(buffers != nullptr);
+    QVERIFY(editor != nullptr);
+
+    editor->document()->setText(QStringLiteral("# Mine, unsaved\n"));
+    QTRY_VERIFY(editor->document()->isModified());
+    replaceFileByRename(note, "# Theirs\n");
+
+    QTRY_VERIFY2(status->text().contains(QStringLiteral("changed on disk")),
+                 qPrintable(status->text()));
+    // Both versions survive: the buffer keeps the edits, the disk keeps theirs.
+    QCOMPARE(editor->document()->text(), QStringLiteral("# Mine, unsaved\n"));
+    QCOMPARE(readFile(note), QByteArray("# Theirs\n"));
+
+    // A plain save is refused with directions, and the disk is untouched.
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_S, Qt::ControlModifier);
+    QVERIFY2(status->text().contains(QStringLiteral(":w! overwrites")), qPrintable(status->text()));
+    QCOMPARE(readFile(note), QByteArray("# Theirs\n"));
+    QVERIFY(editor->document()->isModified());
+
+    // The status line keeps saying so after the message has been replaced.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("i"));
+    QTRY_VERIFY(status->text().contains(QStringLiteral("INSERT"), Qt::CaseInsensitive));
+    QVERIFY2(status->text().contains(QStringLiteral("[changed on disk]")),
+             qPrintable(status->text()));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+
+    // An explicit :w! is the deliberate overwrite.
+    typeViCommand(*editor, QStringLiteral("w!"));
+    QTRY_COMPARE(readFile(note), QByteArray("# Mine, unsaved\n"));
+    QTRY_COMPARE(buffers->tabText(0), QStringLiteral("note.md"));
+    QVERIFY(!status->text().contains(QStringLiteral("changed on disk")));
+}
+
+void MainWindowTest::refusesToOverwriteExternalChangesEvenBeforeTheWatcherNotices() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "# Original\n");
+
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr);
+    QVERIFY(editor != nullptr);
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+
+    // Change the disk and save in the same breath, before the event loop can
+    // deliver a watcher report: the save itself must notice.
+    editor->document()->setText(QStringLiteral("# Mine\n"));
+    writeFile(note, "# Theirs, seconds ago\n");
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_S, Qt::ControlModifier);
+
+    QVERIFY2(status->text().contains(QStringLiteral("changed on disk since it was read")),
+             qPrintable(status->text()));
+    QCOMPARE(readFile(note), QByteArray("# Theirs, seconds ago\n"));
+}
+
+void MainWindowTest::reloadsOverUnsavedEditsOnlyWithBang() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "# Original\n");
+
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr);
+    QVERIFY(editor != nullptr);
+
+    editor->document()->setText(QStringLiteral("# Unsaved\n"));
+    QTRY_VERIFY(editor->document()->isModified());
+
+    typeViCommand(*editor, QStringLiteral("e"));
+    QTRY_VERIFY2(status->text().contains(QStringLiteral("No write since last change")),
+                 qPrintable(status->text()));
+    QCOMPARE(editor->document()->text(), QStringLiteral("# Unsaved\n"));
+
+    typeViCommand(*editor, QStringLiteral("e!"));
+    QTRY_COMPARE(editor->document()->text(), QStringLiteral("# Original\n"));
+    QVERIFY(!editor->document()->isModified());
+    QVERIFY2(status->text().contains(QStringLiteral("Reloaded note.md")),
+             qPrintable(status->text()));
+}
+
+void MainWindowTest::reportsADeletedFileAndWritesItAgainOnSave() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "# Only copy\n");
+
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr);
+    QVERIFY(editor != nullptr);
+
+    QVERIFY(std::filesystem::remove(note));
+    QTRY_VERIFY2(status->text().contains(QStringLiteral("deleted on disk")),
+                 qPrintable(status->text()));
+    QCOMPARE(editor->document()->text(), QStringLiteral("# Only copy\n"));
+
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("i"));
+    QTRY_VERIFY2(status->text().contains(QStringLiteral("[deleted on disk]")),
+                 qPrintable(status->text()));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_S, Qt::ControlModifier);
+    QVERIFY2(status->text().contains(QStringLiteral("Wrote note.md")), qPrintable(status->text()));
+    QCOMPARE(readFile(note), QByteArray("# Only copy\n"));
+    QTRY_VERIFY(!status->text().contains(QStringLiteral("deleted")));
+}
+
+void MainWindowTest::refusesToOverwriteAnotherExistingFileWithoutBang() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto existing = root / "existing.md";
+    writeFile(existing, "# Do not clobber\n");
+
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr);
+    QVERIFY(editor != nullptr);
+    editor->document()->setText(QStringLiteral("# Scratch\n"));
+
+    typeViCommand(*editor, QStringLiteral("w existing.md"));
+    QTRY_VERIFY2(status->text().contains(QStringLiteral("File exists")),
+                 qPrintable(status->text()));
+    QCOMPARE(readFile(existing), QByteArray("# Do not clobber\n"));
+
+    typeViCommand(*editor, QStringLiteral("w! existing.md"));
+    QTRY_COMPARE(readFile(existing), QByteArray("# Scratch\n"));
+}
+
+void MainWindowTest::leavesTheWroteConfirmationStandingAfterItsOwnSave() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "# Original\n");
+
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr);
+    QVERIFY(editor != nullptr);
+
+    editor->document()->setText(QStringLiteral("# Edited\n"));
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_S, Qt::ControlModifier);
+    QVERIFY(status->text().contains(QStringLiteral("Wrote note.md")));
+
+    // The watcher sees our own write; that must not read as an external
+    // change, reload anything, or replace the confirmation.
+    QTest::qWait(400);
+    QVERIFY2(status->text().contains(QStringLiteral("Wrote note.md")), qPrintable(status->text()));
+    QCOMPARE(editor->document()->text(), QStringLiteral("# Edited\n"));
+    QVERIFY(!editor->document()->isModified());
+}
+
+void MainWindowTest::interceptsWriteWhenTheCommandCompletionPopupHasFocus() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "test_note_2.md";
+    writeFile(note, "one\ntwo\n");
+
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr);
+    QVERIFY(editor != nullptr);
+    editor->document()->setText(QStringLiteral("one\ntwo\nthree\n"));
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+
+    // A bare `:w` leaves the command bar's completion popup open (w, wa, wq,
+    // ...), and on a real keyboard the Return lands on that popup, not on the
+    // line edit. That is the route a Save As dialog escaped through.
+    auto* editorTarget = QApplication::focusWidget();
+    QTest::keyClick(editorTarget, Qt::Key_Colon);
+    QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
+                QApplication::focusWidget() != editorTarget);
+    auto* commandLine = QApplication::focusWidget();
+    QTest::keyClicks(commandLine, QStringLiteral("w"));
+    QTRY_VERIFY(QApplication::activePopupWidget() != nullptr);
+    auto* popup = QApplication::activePopupWidget();
+    QTest::keyClick(popup, Qt::Key_Return);
+
+    QTRY_COMPARE(readFile(note), QByteArray("one\ntwo\nthree\n"));
+    QVERIFY2(status->text().contains(QStringLiteral("Wrote test_note_2.md")),
+             qPrintable(status->text()));
+    QVERIFY(QApplication::activeModalWidget() == nullptr);
 }
 
 void MainWindowTest::closesCleanly() {
