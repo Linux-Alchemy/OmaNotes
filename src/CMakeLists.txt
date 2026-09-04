@@ -8,6 +8,9 @@ add_executable(
     core/buffer.hpp
     core/buffer_registry.cpp
     core/buffer_registry.hpp
+    core/command.hpp
+    core/command_registry.cpp
+    core/command_registry.hpp
     editor/editor_adapter.hpp
     editor/ktext_editor_adapter.cpp
     editor/ktext_editor_adapter.hpp

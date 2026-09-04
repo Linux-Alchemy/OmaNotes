@@ -457,10 +457,10 @@ struct CommandDescriptor {
 
 **Blocks:**
 
-- [ ] **5.1.1** — Register tree, buffer, pane, view, file, and help commands.
-- [ ] **5.1.2** — Route leader sequences and clickable controls to the same descriptors.
-- [ ] **5.1.3** — Test every focus context, cancellation path, and disabled command.
-- [ ] **5.1.4** — Verify: a command audit reports no duplicate action implementations.
+- [x] **5.1.1** — Register tree, buffer, pane, view, file, and help commands.
+- [x] **5.1.2** — Route leader sequences and clickable controls to the same descriptors.
+- [x] **5.1.3** — Test every focus context, cancellation path, and disabled command.
+- [x] **5.1.4** — Verify: a command audit reports no duplicate action implementations.
 
 ### Task 5.2: Add fuzzy file and text search
 
@@ -836,3 +836,9 @@ Decision required: approve / request changes / stop and redesign
 - **2026-09-04:** Phase 4 accepted after Matt's gate on the rebuilt tip: `:w` in Normal mode and
   `Ctrl+S` in Insert mode both write through the atomic path with no dialog. `Ctrl+S` has been
   the application save shortcut since Task 4.2; it stays hardcoded until Task 5.3's keymap.
+- **2026-09-04:** Task 5.1 centralised application commands in a registry with multi-key leader
+  sequences following Matt's LazyVim vocabulary (`Space e`, `Space b d`, `Space b D`,
+  `Space f n`, ...), recorded as ADR 0007. Buffer close gained its binding, deferred from ADR
+  0004. Later features are registered disabled with a hint naming their block. The Vi command
+  line's `:w`/`:e` remain intercepted verbs rather than registry commands; the descriptor gained
+  `disabledHint` beyond the plan's skeleton.

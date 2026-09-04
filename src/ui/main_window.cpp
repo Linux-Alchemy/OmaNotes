@@ -20,12 +20,14 @@
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStringDecoder>
+#include <QStringView>
 #include <QVBoxLayout>
 #include <QWidget>
 
 #include <expected>
 #include <fstream>
 #include <iterator>
+#include <optional>
 #include <system_error>
 #include <utility>
 
@@ -134,24 +136,30 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
 
     setCentralWidget(splitter);
 
+    registerCommands();
+    prefixRouter_->setResolver(
+        [this](const QString& sequence) { return commands_.lookup(sequence); });
     connect(prefixRouter_.get(), &PrefixRouter::feedbackChanged, statusArea_,
             [this](const QString& message) { statusArea_->setText(message); });
+    connect(prefixRouter_.get(), &PrefixRouter::sequenceAccepted, this,
+            [this](const QString& commandId, const QString&) { runCommand(commandId); });
     connect(bufferStrip_, &BufferStrip::bufferSelected, this, [this](BufferId id) {
-        if (buffers_.activate(id)) {
-            showBuffer(id);
-        }
+        auto context = currentContext();
+        context.targetBuffer = id;
+        runCommand(QStringLiteral("buffer.show"), std::move(context));
     });
-    connect(sidebar_, &Sidebar::fileActivated, this,
-            [this](const std::filesystem::path& path) { loadMarkdownFile(path); });
-    connect(sidebar_, &Sidebar::editorFocusRequested, this, [this] {
-        if (auto* editor = activeEditor(); editor != nullptr && editor->widget() != nullptr) {
-            editor->widget()->setFocus(Qt::ShortcutFocusReason);
-        }
+    connect(sidebar_, &Sidebar::fileActivated, this, [this](const std::filesystem::path& path) {
+        auto context = currentContext();
+        context.targetPath = path;
+        runCommand(QStringLiteral("file.open"), std::move(context));
     });
+    connect(sidebar_, &Sidebar::editorFocusRequested, this,
+            [this] { runCommand(QStringLiteral("pane.editor")); });
     connect(namePrompt_, &QLineEdit::returnPressed, this, [this] { commitNaming(); });
     auto* saveShortcut = new QShortcut(QKeySequence(QStringLiteral("Ctrl+S")), this);
     saveShortcut->setContext(Qt::WidgetWithChildrenShortcut);
-    connect(saveShortcut, &QShortcut::activated, this, [this] { saveActiveBuffer(); });
+    connect(saveShortcut, &QShortcut::activated, this,
+            [this] { runCommand(QStringLiteral("file.save")); });
     saveCommand_ = std::make_unique<SaveCommand>([this](const QString& argument) {
         if (argument.isEmpty()) {
             const auto active = buffers_.activeId();
@@ -167,10 +175,10 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
     auto* focusSidebar = new QShortcut(QKeySequence(QStringLiteral("Ctrl+H")), this);
     focusSidebar->setContext(Qt::WidgetWithChildrenShortcut);
     connect(focusSidebar, &QShortcut::activated, this, [this] {
-        auto* editor = activeEditor();
-        if (editor != nullptr && editor->mode() == EditorMode::Normal) {
-            prefixRouter_->cancelPending();
-            sidebar_->focusTree();
+        // Ctrl+H is a silent no-op outside Normal mode: in Insert mode it is
+        // KTextEditor's backspace and must not be reported as a refusal.
+        if (currentContext().normalMode) {
+            runCommand(QStringLiteral("pane.sidebar"));
         }
     });
 
@@ -254,18 +262,238 @@ bool MainWindow::handleBufferSwitch(const QKeyEvent& event) {
         return false;
     }
 
-    std::optional<BufferId> target;
     if (event.key() == Qt::Key_L) {
-        target = buffers_.activateNext();
-    } else if (event.key() == Qt::Key_H) {
-        target = buffers_.activatePrevious();
+        runCommand(QStringLiteral("buffer.next"));
+        return true;
+    }
+    if (event.key() == Qt::Key_H) {
+        runCommand(QStringLiteral("buffer.previous"));
+        return true;
+    }
+    return false;
+}
+
+const CommandRegistry& MainWindow::commands() const noexcept { return commands_; }
+
+std::vector<AuditFinding> MainWindow::auditCommands() const {
+    return commands_.audit(routedOutsideLeader_);
+}
+
+void MainWindow::addCommand(CommandDescriptor descriptor,
+                            std::initializer_list<QString> sequences) {
+    const auto id = descriptor.id;
+    if (const auto added = commands_.add(std::move(descriptor)); !added) {
+        qFatal("Command registration failed: %s", qPrintable(added.error().message));
+    }
+    for (const auto& sequence : sequences) {
+        if (const auto bound = commands_.bind(LeaderSequence{sequence}, id); !bound) {
+            qFatal("Command binding failed: %s", qPrintable(bound.error().message));
+        }
+    }
+}
+
+void MainWindow::registerCommands() {
+    // Leader sequences follow Matt's LazyVim vocabulary where one exists:
+    // `e` for the explorer, `b d` / `b D` for buffer delete, `f f` and `f n`
+    // for find and new file, `/` for text search. `?` and `m` come from the
+    // plan. Reached by other routes too: Ctrl+S, Ctrl+H, Shift+H/L, tab and
+    // tree clicks; those routes name the command ids in routedOutsideLeader_.
+    const auto always = [](const AppContext&) { return true; };
+    const auto notYet = [](const AppContext&) { return false; };
+    const auto severalBuffers = [](const AppContext& context) { return context.bufferCount > 1; };
+    const auto inNormalMode = [](const AppContext& context) { return context.normalMode; };
+
+    addCommand({QStringLiteral("file.save"),
+                QStringLiteral("Save"),
+                QStringLiteral("file"),
+                always,
+                [this](AppContext&) { saveActiveBuffer(); },
+                {}});
+    routedOutsideLeader_.push_back(QStringLiteral("file.save"));
+
+    addCommand({QStringLiteral("file.open"), QStringLiteral("Open file"), QStringLiteral("file"),
+                [](const AppContext& context) { return context.targetPath.has_value(); },
+                [this](AppContext& context) { loadMarkdownFile(*context.targetPath); },
+                QStringLiteral("Choose a file in the sidebar to open it")});
+    routedOutsideLeader_.push_back(QStringLiteral("file.open"));
+
+    addCommand({QStringLiteral("buffer.new"),
+                QStringLiteral("New buffer"),
+                QStringLiteral("buffer"),
+                always,
+                [this](AppContext&) { openScratchBuffer(); },
+                {}},
+               {QStringLiteral("f n")});
+    addCommand({QStringLiteral("buffer.close"),
+                QStringLiteral("Close buffer"),
+                QStringLiteral("buffer"),
+                always,
+                [this](AppContext& context) {
+                    const auto id = context.targetBuffer.has_value() ? context.targetBuffer
+                                                                     : buffers_.activeId();
+                    if (id.has_value()) {
+                        closeBuffer(*id, false);
+                    }
+                },
+                {}},
+               {QStringLiteral("b d")});
+    addCommand({QStringLiteral("buffer.close.discard"),
+                QStringLiteral("Close buffer, discarding changes"),
+                QStringLiteral("buffer"),
+                always,
+                [this](AppContext& context) {
+                    const auto id = context.targetBuffer.has_value() ? context.targetBuffer
+                                                                     : buffers_.activeId();
+                    if (id.has_value()) {
+                        closeBuffer(*id, true);
+                    }
+                },
+                {}},
+               {QStringLiteral("b D")});
+    addCommand({QStringLiteral("buffer.next"), QStringLiteral("Next buffer"),
+                QStringLiteral("buffer"), severalBuffers,
+                [this](AppContext&) {
+                    if (const auto target = buffers_.activateNext(); target.has_value()) {
+                        showBuffer(*target);
+                    }
+                },
+                QStringLiteral("Only one buffer is open")},
+               {QStringLiteral("b n")});
+    addCommand({QStringLiteral("buffer.previous"), QStringLiteral("Previous buffer"),
+                QStringLiteral("buffer"), severalBuffers,
+                [this](AppContext&) {
+                    if (const auto target = buffers_.activatePrevious(); target.has_value()) {
+                        showBuffer(*target);
+                    }
+                },
+                QStringLiteral("Only one buffer is open")},
+               {QStringLiteral("b p")});
+    routedOutsideLeader_.push_back(QStringLiteral("buffer.next"));
+    routedOutsideLeader_.push_back(QStringLiteral("buffer.previous"));
+    addCommand({QStringLiteral("buffer.show"), QStringLiteral("Show buffer"),
+                QStringLiteral("buffer"),
+                [](const AppContext& context) { return context.targetBuffer.has_value(); },
+                [this](AppContext& context) {
+                    if (buffers_.activate(*context.targetBuffer)) {
+                        showBuffer(*context.targetBuffer);
+                    }
+                },
+                QStringLiteral("Choose a buffer tab to show it")});
+    routedOutsideLeader_.push_back(QStringLiteral("buffer.show"));
+
+    addCommand({QStringLiteral("pane.sidebar"), QStringLiteral("Focus sidebar"),
+                QStringLiteral("pane"), inNormalMode,
+                [this](AppContext&) {
+                    prefixRouter_->cancelPending();
+                    sidebar_->focusTree();
+                },
+                QStringLiteral("Leave Insert mode to move to the sidebar")},
+               {QStringLiteral("e")});
+    routedOutsideLeader_.push_back(QStringLiteral("pane.sidebar"));
+    addCommand({QStringLiteral("pane.editor"),
+                QStringLiteral("Focus editor"),
+                QStringLiteral("pane"),
+                always,
+                [this](AppContext&) {
+                    if (auto* editor = activeEditor();
+                        editor != nullptr && editor->widget() != nullptr) {
+                        editor->widget()->setFocus(Qt::ShortcutFocusReason);
+                    }
+                },
+                {}});
+    routedOutsideLeader_.push_back(QStringLiteral("pane.editor"));
+
+    addCommand({QStringLiteral("search.files"), QStringLiteral("Find files"),
+                QStringLiteral("search"), notYet, [](AppContext&) {},
+                QStringLiteral("Find files is not available yet (Task 5.2)")},
+               {QStringLiteral("f f")});
+    addCommand({QStringLiteral("search.text"), QStringLiteral("Search text"),
+                QStringLiteral("search"), notYet, [](AppContext&) {},
+                QStringLiteral("Search text is not available yet (Task 5.2)")},
+               {QStringLiteral("/")});
+    addCommand({QStringLiteral("help.show"), QStringLiteral("Help"), QStringLiteral("help"), notYet,
+                [](AppContext&) {}, QStringLiteral("Help is not available yet (Task 5.3)")},
+               {QStringLiteral("?")});
+    addCommand({QStringLiteral("view.reading"), QStringLiteral("Reading view"),
+                QStringLiteral("view"), notYet, [](AppContext&) {},
+                QStringLiteral("Reading view is not available yet (Phase 6)")},
+               {QStringLiteral("m")});
+}
+
+AppContext MainWindow::currentContext() const {
+    AppContext context;
+    const auto* focus = QApplication::focusWidget();
+    const auto* editor = activeEditor();
+    if (focus != nullptr && focus == namePrompt_) {
+        context.focus = FocusContext::Prompt;
+    } else if (focus != nullptr && sidebar_ != nullptr &&
+               (focus == sidebar_ || sidebar_->isAncestorOf(focus))) {
+        context.focus = FocusContext::Sidebar;
+    } else if (focus != nullptr && editorStack_ != nullptr &&
+               (focus == editorStack_ || editorStack_->isAncestorOf(focus))) {
+        context.focus = FocusContext::Editor;
+    }
+    context.normalMode = editor != nullptr && editor->mode() == EditorMode::Normal;
+    context.bufferCount = buffers_.count();
+    const auto active = buffers_.activeId();
+    const auto* state = active.has_value() ? buffers_.find(*active) : nullptr;
+    context.activeBufferHasPath = state != nullptr && state->path.has_value();
+    context.activeBufferModified = state != nullptr && state->modified;
+    return context;
+}
+
+void MainWindow::runCommand(QStringView id) { runCommand(id, currentContext()); }
+
+void MainWindow::runCommand(QStringView id, AppContext context) {
+    if (const auto result = commands_.execute(id, context); !result) {
+        statusArea_->setText(result.error().message);
+    }
+}
+
+void MainWindow::closeBuffer(BufferId id, bool discardChanges) {
+    const auto* state = buffers_.find(id);
+    if (state == nullptr) {
+        statusArea_->setText(QStringLiteral("That buffer is not open"));
+        return;
+    }
+    const auto name = state->displayName;
+    const auto path = state->path;
+    const auto closed = discardChanges ? buffers_.closeDiscardingChanges(id) : buffers_.close(id);
+    if (!closed) {
+        if (closed.error().code == BufferErrorCode::Modified) {
+            statusArea_->setText(
+                QStringLiteral(
+                    "No write since last change for %1; :w saves it, Space+b+D discards it")
+                    .arg(name));
+        } else {
+            statusArea_->setText(QString::fromStdString(closed.error().message));
+        }
+        return;
     }
 
-    if (!target.has_value()) {
-        return false;
+    if (const auto editor = editors_.find(id); editor != editors_.end()) {
+        if (auto* widget = editor->second->widget(); widget != nullptr) {
+            editorStack_->removeWidget(widget);
+        }
+        editors_.erase(editor);
     }
-    showBuffer(*target);
-    return true;
+    tracked_.erase(id);
+    if (path.has_value()) {
+        watcher_->unwatch(*path);
+    }
+
+    // The registry keeps one unnamed buffer alive when the last one closes,
+    // exactly as Vim does; it needs an editor like any other.
+    for (const auto& buffer : buffers_.buffers()) {
+        if (!editors_.contains(buffer.id)) {
+            createEditorFor(buffer.id);
+        }
+    }
+    if (const auto active = buffers_.activeId(); active.has_value()) {
+        showBuffer(*active);
+    }
+    statusArea_->setText(discardChanges ? QStringLiteral("Closed %1, discarding changes").arg(name)
+                                        : QStringLiteral("Closed %1").arg(name));
 }
 
 bool MainWindow::interceptEditorFileCommand(QObject* watched, const QKeyEvent& event) {

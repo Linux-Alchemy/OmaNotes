@@ -18,6 +18,7 @@
 #include <QtTest>
 
 #include <filesystem>
+#include <utility>
 
 namespace {
 
@@ -113,6 +114,11 @@ class MainWindowTest final : public QObject {
     void refusesToOverwriteAnotherExistingFileWithoutBang();
     void leavesTheWroteConfirmationStandingAfterItsOwnSave();
     void interceptsWriteWhenTheCommandCompletionPopupHasFocus();
+    void everyCommandHasOneImplementationAndARoute();
+    void leaderSequencesRunRegisteredCommands();
+    void closesBuffersFromTheLeaderAndGuardsUnsavedWork();
+    void refusesDisabledCommandsWithAReason();
+    void clicksAndShortcutsRunTheSameCommands();
     void closesCleanly();
 };
 
@@ -177,7 +183,7 @@ void MainWindowTest::spacePrefixDoesNotSwallowInsertTextOrControlB() {
     QKeyEvent questionPress(QEvent::KeyPress, Qt::Key_Question, Qt::ShiftModifier,
                             QStringLiteral("?"));
     QApplication::sendEvent(eventTarget, &questionPress);
-    QTRY_COMPARE(status->text(), QStringLiteral("Space+? command is not available yet"));
+    QTRY_COMPARE(status->text(), QStringLiteral("Help is not available yet (Task 5.3)"));
     QCOMPARE(editor->document()->text(), QStringLiteral("alpha"));
 
     QTest::keyClicks(eventTarget, QStringLiteral("ihello world"));
@@ -990,6 +996,237 @@ void MainWindowTest::interceptsWriteWhenTheCommandCompletionPopupHasFocus() {
     QVERIFY2(status->text().contains(QStringLiteral("Wrote test_note_2.md")),
              qPrintable(status->text()));
     QVERIFY(QApplication::activeModalWidget() == nullptr);
+}
+
+void MainWindowTest::everyCommandHasOneImplementationAndARoute() {
+    omanotes::MainWindow window(launchRequest());
+    const auto findings = window.auditCommands();
+    QString report;
+    for (const auto& finding : findings) {
+        report += finding.commandId + QStringLiteral(": ") + finding.detail + QLatin1Char('\n');
+    }
+    QVERIFY2(findings.empty(), qPrintable(report));
+
+    const auto& commands = window.commands();
+    for (const auto* id :
+         {"file.save", "file.open", "buffer.new", "buffer.close", "buffer.close.discard",
+          "buffer.next", "buffer.previous", "buffer.show", "pane.sidebar", "pane.editor",
+          "search.files", "search.text", "help.show", "view.reading"}) {
+        QVERIFY2(commands.find(QString::fromLatin1(id)) != nullptr, id);
+    }
+    QCOMPARE(commands.commands().size(), std::size_t{14});
+}
+
+void MainWindowTest::leaderSequencesRunRegisteredCommands() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* strip = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr);
+    QVERIFY(strip != nullptr);
+    QVERIFY(editor != nullptr);
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    auto* target = QApplication::focusWidget();
+
+    // Space f n: a new scratch buffer, with the half-typed sequence reported.
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("f"));
+    QTRY_COMPARE(status->text(), QStringLiteral("Space+f …"));
+    QTest::keyClicks(target, QStringLiteral("n"));
+    QTRY_COMPARE(strip->count(), 2);
+
+    // Space b p / Space b n cycle, as Shift+H / Shift+L do.
+    auto* second = activeEditor(window);
+    QVERIFY(second != nullptr && second != editor);
+    second->setFocus();
+    QTRY_VERIFY(second->hasFocus());
+    target = QApplication::focusWidget();
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("bp"));
+    QTRY_COMPARE(strip->currentIndex(), 0);
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    target = QApplication::focusWidget();
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("bn"));
+    QTRY_COMPARE(strip->currentIndex(), 1);
+
+    // Space e moves to the sidebar, exactly as Ctrl+H does.
+    second->setFocus();
+    QTRY_VERIFY(second->hasFocus());
+    target = QApplication::focusWidget();
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("e"));
+    auto* sidebar = window.findChild<QWidget*>(QStringLiteral("sidebar"));
+    QVERIFY(sidebar != nullptr);
+    QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
+                sidebar->isAncestorOf(QApplication::focusWidget()));
+    QVERIFY(QApplication::activeModalWidget() == nullptr);
+}
+
+void MainWindowTest::closesBuffersFromTheLeaderAndGuardsUnsavedWork() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "closing.md";
+    writeFile(note, "keep me\n");
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* strip = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    auto* stack = window.findChild<QStackedWidget*>(QStringLiteral("editorStack"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr && strip != nullptr && stack != nullptr && editor != nullptr);
+    QCOMPARE(strip->count(), 1);
+    QCOMPARE(stack->count(), 1);
+
+    editor->document()->setText(QStringLiteral("keep me\nand this\n"));
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    auto* target = QApplication::focusWidget();
+
+    // Dirty: Space b d refuses and names the way out.
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("bd"));
+    QTRY_VERIFY2(
+        status->text().contains(QStringLiteral("No write since last change for closing.md")),
+        qPrintable(status->text()));
+    QVERIFY(status->text().contains(QStringLiteral("Space+b+D")));
+    QCOMPARE(strip->count(), 1);
+    QCOMPARE(strip->tabText(0), QStringLiteral("closing.md [+]"));
+
+    // Space b D discards. The last buffer closing leaves a scratch buffer to
+    // type in, with its own editor, and nothing reaches the disk.
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("bD"));
+    QTRY_COMPARE(status->text(), QStringLiteral("Closed closing.md, discarding changes"));
+    QCOMPARE(strip->count(), 1);
+    QCOMPARE(strip->tabText(0), QStringLiteral("[No Name]"));
+    QCOMPARE(stack->count(), 1);
+    QCOMPARE(readFile(note), QByteArray("keep me\n"));
+    auto* scratch = activeEditor(window);
+    QVERIFY(scratch != nullptr && scratch != editor);
+    QVERIFY(scratch->document()->text().isEmpty());
+
+    // Clean: Space b d closes outright. With two buffers, the neighbour shows.
+    scratch->document()->setText(QStringLiteral("scratch"));
+    scratch->setFocus();
+    QTRY_VERIFY(scratch->hasFocus());
+    target = QApplication::focusWidget();
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("fn"));
+    QTRY_COMPARE(strip->count(), 2);
+    auto* third = activeEditor(window);
+    QVERIFY(third != nullptr);
+    third->setFocus();
+    QTRY_VERIFY(third->hasFocus());
+    target = QApplication::focusWidget();
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("bd"));
+    QTRY_COMPARE(status->text(), QStringLiteral("Closed [No Name]"));
+    QCOMPARE(strip->count(), 1);
+    QCOMPARE(stack->count(), 1);
+    QCOMPARE(activeEditor(window), scratch);
+    QCOMPARE(scratch->document()->text(), QStringLiteral("scratch"));
+    QVERIFY(scratch->hasFocus());
+}
+
+void MainWindowTest::refusesDisabledCommandsWithAReason() {
+    omanotes::MainWindow window(launchRequest());
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr && editor != nullptr);
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    auto* target = QApplication::focusWidget();
+
+    // One buffer: cycling has nowhere to go, and says so rather than nothing.
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("bn"));
+    QTRY_COMPARE(status->text(), QStringLiteral("Only one buffer is open"));
+
+    // Features from later blocks are registered, discoverable, and honest.
+    for (const auto& [keys, message] :
+         {std::pair{QStringLiteral("ff"),
+                    QStringLiteral("Find files is not available yet (Task 5.2)")},
+          std::pair{QStringLiteral("/"),
+                    QStringLiteral("Search text is not available yet (Task 5.2)")},
+          std::pair{QStringLiteral("m"),
+                    QStringLiteral("Reading view is not available yet (Phase 6)")}}) {
+        QTest::keyClick(target, Qt::Key_Space);
+        QTest::keyClicks(target, keys);
+        QTRY_COMPARE(status->text(), message);
+    }
+    QCOMPARE(editor->document()->text(), QString{});
+
+    // A pending prefix in Insert mode is cancelled, never executed.
+    QTest::keyClicks(target, QStringLiteral("i"));
+    QTRY_VERIFY(status->text().contains(QStringLiteral("INSERT"), Qt::CaseInsensitive));
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("bD"));
+    QCOMPARE(editor->document()->text(), QStringLiteral(" bD"));
+}
+
+void MainWindowTest::clicksAndShortcutsRunTheSameCommands() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto first = root / "first.md";
+    const auto second = root / "second.md";
+    writeFile(first, "first\n");
+    writeFile(second, "second\n");
+    omanotes::MainWindow window({root, first, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* strip = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    auto* sidebar = window.findChild<QWidget*>(QStringLiteral("sidebar"));
+    auto* tree = window.findChild<QTreeView*>();
+    QVERIFY(status != nullptr && strip != nullptr && sidebar != nullptr && tree != nullptr);
+
+    // Opening from the tree runs file.open.
+    auto* model = tree->model();
+    QVERIFY(model != nullptr);
+    QTRY_VERIFY(model->rowCount() >= 2);
+    QModelIndex secondIndex;
+    for (int row = 0; row < model->rowCount(); ++row) {
+        const auto index = model->index(row, 0);
+        if (index.data().toString() == QStringLiteral("second.md")) {
+            secondIndex = index;
+        }
+    }
+    QVERIFY(secondIndex.isValid());
+    tree->setCurrentIndex(secondIndex);
+    const auto point = tree->visualRect(secondIndex).center();
+    QTest::mouseClick(tree->viewport(), Qt::LeftButton, Qt::NoModifier, point);
+    QTRY_COMPARE(strip->count(), 2);
+    QCOMPARE(strip->currentIndex(), 1);
+
+    // Clicking a tab runs buffer.show.
+    QTest::mouseClick(strip, Qt::LeftButton, Qt::NoModifier, strip->tabRect(0).center());
+    QTRY_COMPARE(strip->currentIndex(), 0);
+    QCOMPARE(activeEditor(window)->document()->text(), QStringLiteral("first\n"));
+
+    // Shift+L and Shift+H run buffer.next and buffer.previous.
+    auto* editor = activeEditor(window);
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_L, Qt::ShiftModifier);
+    QTRY_COMPARE(strip->currentIndex(), 1);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_H, Qt::ShiftModifier);
+    QTRY_COMPARE(strip->currentIndex(), 0);
+
+    // Ctrl+H runs pane.sidebar; Ctrl+L in the tree runs pane.editor.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_H, Qt::ControlModifier);
+    QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
+                sidebar->isAncestorOf(QApplication::focusWidget()));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_L, Qt::ControlModifier);
+    QTRY_VERIFY(activeEditor(window)->hasFocus());
 }
 
 void MainWindowTest::closesCleanly() {

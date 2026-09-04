@@ -2,6 +2,8 @@
 
 #include <QKeyEvent>
 
+#include <utility>
+
 namespace omanotes {
 
 namespace {
@@ -23,6 +25,8 @@ bool isModifierKey(const QKeyEvent& event) noexcept {
 
 PrefixRouter::PrefixRouter(LeaderKey leader, QObject* parent) : QObject(parent), leader_(leader) {}
 
+void PrefixRouter::setResolver(Resolver resolver) { resolver_ = std::move(resolver); }
+
 bool PrefixRouter::route(QKeyEvent& event, EditorMode mode) {
     if (mode != EditorMode::Normal) {
         if (pending_) {
@@ -37,6 +41,7 @@ bool PrefixRouter::route(QKeyEvent& event, EditorMode mode) {
         }
 
         pending_ = true;
+        keys_.clear();
         emit feedbackChanged(QStringLiteral("%1 …").arg(leaderName()));
         return true;
     }
@@ -51,16 +56,30 @@ bool PrefixRouter::route(QKeyEvent& event, EditorMode mode) {
     }
 
     const auto key = event.text();
-    if (key == QStringLiteral("?") || key == QStringLiteral("m")) {
-        const auto sequence = QStringLiteral("%1+%2").arg(leaderName(), key);
-        pending_ = false;
-        emit sequenceAccepted(sequence);
-        emit feedbackChanged(QStringLiteral("%1 command is not available yet").arg(sequence));
+    if (key.isEmpty() || key.trimmed().isEmpty()) {
+        cancel(QStringLiteral("Unknown application command: %1+<key>").arg(displaySequence()));
         return true;
     }
+    keys_.push_back(key);
 
-    const auto displayKey = key.isEmpty() ? QStringLiteral("<key>") : key;
-    cancel(QStringLiteral("Unknown application command: %1+%2").arg(leaderName(), displayKey));
+    const auto lookup = resolver_ ? resolver_(keys_.join(QLatin1Char(' ')))
+                                  : SequenceLookup{SequenceMatch::None, {}};
+    switch (lookup.match) {
+    case SequenceMatch::Exact: {
+        const auto sequence = displaySequence();
+        pending_ = false;
+        keys_.clear();
+        emit sequenceAccepted(lookup.commandId, sequence);
+        return true;
+    }
+    case SequenceMatch::Prefix:
+        emit feedbackChanged(QStringLiteral("%1 …").arg(displaySequence()));
+        return true;
+    case SequenceMatch::None:
+        break;
+    }
+
+    cancel(QStringLiteral("Unknown application command: %1").arg(displaySequence()));
     return true;
 }
 
@@ -86,8 +105,17 @@ QString PrefixRouter::leaderName() const {
     return leader_ == LeaderKey::Space ? QStringLiteral("Space") : QStringLiteral("Ctrl+B");
 }
 
+QString PrefixRouter::displaySequence() const {
+    auto sequence = leaderName();
+    for (const auto& key : keys_) {
+        sequence += QLatin1Char('+') + key;
+    }
+    return sequence;
+}
+
 void PrefixRouter::cancel(const QString& feedback) {
     pending_ = false;
+    keys_.clear();
     emit feedbackChanged(feedback);
 }
 
