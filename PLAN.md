@@ -422,10 +422,10 @@ enum class ExternalChangeAction { ReloadClean, PromptConflict, FileRemoved };
 
 ### Phase 4 Checkpoint
 
-- [ ] All save and conflict tests pass with failure injection and sanitizers.
-- [ ] Scratch buffers are never created on disk without an explicit save target.
-- [ ] An external agent edit appears safely in a clean buffer and prompts against a dirty one.
-- [ ] **Matt gate:** edit several notes, switch buffers, save, provoke external changes, and approve the safety/flow.
+- [x] All save and conflict tests pass with failure injection and sanitizers.
+- [x] Scratch buffers are never created on disk without an explicit save target.
+- [x] An external agent edit appears safely in a clean buffer and prompts against a dirty one.
+- [x] **Matt gate:** edit several notes, switch buffers, save, provoke external changes, and approve the safety/flow.
 
 ## Phase 5: Application Command Language, Find, and Help
 
@@ -457,10 +457,10 @@ struct CommandDescriptor {
 
 **Blocks:**
 
-- [ ] **5.1.1** — Register tree, buffer, pane, view, file, and help commands.
-- [ ] **5.1.2** — Route leader sequences and clickable controls to the same descriptors.
-- [ ] **5.1.3** — Test every focus context, cancellation path, and disabled command.
-- [ ] **5.1.4** — Verify: a command audit reports no duplicate action implementations.
+- [x] **5.1.1** — Register tree, buffer, pane, view, file, and help commands.
+- [x] **5.1.2** — Route leader sequences and clickable controls to the same descriptors.
+- [x] **5.1.3** — Test every focus context, cancellation path, and disabled command.
+- [x] **5.1.4** — Verify: a command audit reports no duplicate action implementations.
 
 ### Task 5.2: Add fuzzy file and text search
 
@@ -577,6 +577,9 @@ signals:
 
 - [ ] **6.2.1** — Document supported current-theme and text-scale inputs on Quattro.
 - [ ] **6.2.2** — Apply semantic colours consistently to window, editor, sidebar, status, and reading view.
+  The focused pane must be unmistakable: after `Ctrl+L` from the tree, the sidebar's current-row
+  highlight stays as strong as when the tree had focus, and nothing says the editor is live
+  (found at Matt's Task 5.1 gate, 2026-09-04). Dim the inactive selection and mark the active pane.
 - [ ] **6.2.3** — Handle live theme/text-scale changes or document the minimal restart boundary.
 - [ ] **6.2.4** — Verify: representative dark/light themes retain contrast, focus visibility, and readable selection colours.
 
@@ -833,3 +836,17 @@ Decision required: approve / request changes / stop and redesign
   Matt's gate found the `:w` interception missing a route: a bare `:w` keeps the command bar's
   completion popup open and the Return lands there, reaching KTextEditor's own Save As dialog.
   Closed with a regression test that presses Return on the popup.
+- **2026-09-04:** Phase 4 accepted after Matt's gate on the rebuilt tip: `:w` in Normal mode and
+  `Ctrl+S` in Insert mode both write through the atomic path with no dialog. `Ctrl+S` has been
+  the application save shortcut since Task 4.2; it stays hardcoded until Task 5.3's keymap.
+- **2026-09-04:** Task 5.1 centralised application commands in a registry with multi-key leader
+  sequences following Matt's LazyVim vocabulary (`Space e`, `Space b d`, `Space b D`,
+  `Space f n`, ...), recorded as ADR 0007. Buffer close gained its binding, deferred from ADR
+  0004. Later features are registered disabled with a hint naming their block. The Vi command
+  line's `:w`/`:e` remain intercepted verbs rather than registry commands; the descriptor gained
+  `disabledHint` beyond the plan's skeleton. Matt's gate turned `Space e` into a sidebar toggle
+  (unplanned; the outline had only listed visibility as Phase 7 session state) and added
+  `Space Space` as LazyVim's second find-files route. The gate also found that moving focus
+  from the sidebar to the editor leaves no visible sign of which pane is live; deferred to Task
+  6.2, where focus visibility is already a requirement. The sidebar now starts hidden, overriding
+  the outline's "visible on the left"; Phase 7's session restore will remember its state.

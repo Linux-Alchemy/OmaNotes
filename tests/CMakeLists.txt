@@ -5,6 +5,9 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/core/buffer.hpp"
     "${CMAKE_SOURCE_DIR}/src/core/buffer_registry.cpp"
     "${CMAKE_SOURCE_DIR}/src/core/buffer_registry.hpp"
+    "${CMAKE_SOURCE_DIR}/src/core/command.hpp"
+    "${CMAKE_SOURCE_DIR}/src/core/command_registry.cpp"
+    "${CMAKE_SOURCE_DIR}/src/core/command_registry.hpp"
     "${CMAKE_SOURCE_DIR}/src/app/prefix_router.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/prefix_router.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/editor_adapter.hpp"
@@ -118,6 +121,8 @@ add_executable(
     unit/prefix_router_test.cpp
     "${CMAKE_SOURCE_DIR}/src/app/prefix_router.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/prefix_router.hpp"
+    "${CMAKE_SOURCE_DIR}/src/core/command_registry.cpp"
+    "${CMAKE_SOURCE_DIR}/src/core/command_registry.hpp"
 )
 
 target_link_libraries(omanotes_prefix_tests PRIVATE Qt6::Test Qt6::Widgets)
@@ -128,6 +133,23 @@ omanotes_enable_hardening(omanotes_prefix_tests)
 omanotes_enable_sanitizers(omanotes_prefix_tests)
 
 add_test(NAME prefix-router COMMAND omanotes_prefix_tests)
+
+add_executable(
+    omanotes_command_tests
+    unit/command_registry_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/core/command.hpp"
+    "${CMAKE_SOURCE_DIR}/src/core/command_registry.cpp"
+    "${CMAKE_SOURCE_DIR}/src/core/command_registry.hpp"
+)
+
+target_link_libraries(omanotes_command_tests PRIVATE Qt6::Test)
+target_include_directories(omanotes_command_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+
+omanotes_enable_warnings(omanotes_command_tests)
+omanotes_enable_hardening(omanotes_command_tests)
+omanotes_enable_sanitizers(omanotes_command_tests)
+
+add_test(NAME command-registry COMMAND omanotes_command_tests)
 
 add_executable(
     omanotes_launch_tests
@@ -242,7 +264,7 @@ set(
 )
 
 set_tests_properties(
-    atomic-save buffer-registry conflict-detector document-store editor-adapter file-tree-model
+    atomic-save buffer-registry command-registry conflict-detector document-store editor-adapter file-tree-model
     file-watcher launch-process launch-request prefix-router ui-structure process-startup
     vim-behaviour
     PROPERTIES ENVIRONMENT "${OMANOTES_TEST_ENVIRONMENT}"
