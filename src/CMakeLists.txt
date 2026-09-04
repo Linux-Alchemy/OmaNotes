@@ -15,6 +15,8 @@ add_executable(
     editor/save_command.hpp
     persistence/atomic_file_writer.cpp
     persistence/atomic_file_writer.hpp
+    persistence/conflict_detector.cpp
+    persistence/conflict_detector.hpp
     persistence/document_store.cpp
     persistence/document_store.hpp
     ui/buffer_strip.cpp
@@ -25,6 +27,8 @@ add_executable(
     ui/sidebar.hpp
     workspace/file_tree_model.cpp
     workspace/file_tree_model.hpp
+    workspace/file_watcher.cpp
+    workspace/file_watcher.hpp
     workspace/workspace_root.cpp
     workspace/workspace_root.hpp
 )
