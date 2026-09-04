@@ -577,6 +577,9 @@ signals:
 
 - [ ] **6.2.1** — Document supported current-theme and text-scale inputs on Quattro.
 - [ ] **6.2.2** — Apply semantic colours consistently to window, editor, sidebar, status, and reading view.
+  The focused pane must be unmistakable: after `Ctrl+L` from the tree, the sidebar's current-row
+  highlight stays as strong as when the tree had focus, and nothing says the editor is live
+  (found at Matt's Task 5.1 gate, 2026-09-04). Dim the inactive selection and mark the active pane.
 - [ ] **6.2.3** — Handle live theme/text-scale changes or document the minimal restart boundary.
 - [ ] **6.2.4** — Verify: representative dark/light themes retain contrast, focus visibility, and readable selection colours.
 
@@ -843,4 +846,6 @@ Decision required: approve / request changes / stop and redesign
   line's `:w`/`:e` remain intercepted verbs rather than registry commands; the descriptor gained
   `disabledHint` beyond the plan's skeleton. Matt's gate turned `Space e` into a sidebar toggle
   (unplanned; the outline had only listed visibility as Phase 7 session state) and added
-  `Space Space` as LazyVim's second find-files route.
+  `Space Space` as LazyVim's second find-files route. The gate also found that moving focus
+  from the sidebar to the editor leaves no visible sign of which pane is live; deferred to Task
+  6.2, where focus visibility is already a requirement.
