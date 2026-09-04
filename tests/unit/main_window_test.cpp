@@ -112,6 +112,7 @@ class MainWindowTest final : public QObject {
     void reportsADeletedFileAndWritesItAgainOnSave();
     void refusesToOverwriteAnotherExistingFileWithoutBang();
     void leavesTheWroteConfirmationStandingAfterItsOwnSave();
+    void interceptsWriteWhenTheCommandCompletionPopupHasFocus();
     void closesCleanly();
 };
 
@@ -953,6 +954,42 @@ void MainWindowTest::leavesTheWroteConfirmationStandingAfterItsOwnSave() {
     QVERIFY2(status->text().contains(QStringLiteral("Wrote note.md")), qPrintable(status->text()));
     QCOMPARE(editor->document()->text(), QStringLiteral("# Edited\n"));
     QVERIFY(!editor->document()->isModified());
+}
+
+void MainWindowTest::interceptsWriteWhenTheCommandCompletionPopupHasFocus() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "test_note_2.md";
+    writeFile(note, "one\ntwo\n");
+
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr);
+    QVERIFY(editor != nullptr);
+    editor->document()->setText(QStringLiteral("one\ntwo\nthree\n"));
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+
+    // A bare `:w` leaves the command bar's completion popup open (w, wa, wq,
+    // ...), and on a real keyboard the Return lands on that popup, not on the
+    // line edit. That is the route a Save As dialog escaped through.
+    auto* editorTarget = QApplication::focusWidget();
+    QTest::keyClick(editorTarget, Qt::Key_Colon);
+    QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
+                QApplication::focusWidget() != editorTarget);
+    auto* commandLine = QApplication::focusWidget();
+    QTest::keyClicks(commandLine, QStringLiteral("w"));
+    QTRY_VERIFY(QApplication::activePopupWidget() != nullptr);
+    auto* popup = QApplication::activePopupWidget();
+    QTest::keyClick(popup, Qt::Key_Return);
+
+    QTRY_COMPARE(readFile(note), QByteArray("one\ntwo\nthree\n"));
+    QVERIFY2(status->text().contains(QStringLiteral("Wrote test_note_2.md")),
+             qPrintable(status->text()));
+    QVERIFY(QApplication::activeModalWidget() == nullptr);
 }
 
 void MainWindowTest::closesCleanly() {

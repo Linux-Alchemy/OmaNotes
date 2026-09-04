@@ -830,3 +830,6 @@ Decision required: approve / request changes / stop and redesign
   `:e`, `:e!`, `File exists`), recorded as ADR 0006. The save itself checks the disk, so the
   guarantee does not depend on the watcher. Hashes replace timestamps entirely, and the
   classifier gained an `Unchanged` outcome beyond the plan's skeleton.
+  Matt's gate found the `:w` interception missing a route: a bare `:w` keeps the command bar's
+  completion popup open and the Return lands there, reaching KTextEditor's own Save As dialog.
+  Closed with a regression test that presses Return on the popup.

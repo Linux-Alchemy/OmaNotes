@@ -272,9 +272,33 @@ bool MainWindow::interceptEditorFileCommand(QObject* watched, const QKeyEvent& e
     if (event.key() != Qt::Key_Return && event.key() != Qt::Key_Enter) {
         return false;
     }
+    if (editorStack_ == nullptr) {
+        return false;
+    }
+    // A bare `:w` leaves the command bar's completion popup open, and the
+    // Return then lands on that popup rather than on the line edit. The popup
+    // is a separate top-level window whose focus proxy is the line edit; on
+    // older toolkits without the proxy, the only visible line edit inside the
+    // editor is the command bar.
     auto* commandLine = qobject_cast<QLineEdit*>(watched);
-    if (commandLine == nullptr || editorStack_ == nullptr ||
-        !editorStack_->isAncestorOf(commandLine)) {
+    QWidget* popup = nullptr;
+    if (commandLine == nullptr) {
+        auto* widget = qobject_cast<QWidget*>(watched);
+        if (widget == nullptr || widget->windowType() != Qt::Popup) {
+            return false;
+        }
+        popup = widget;
+        commandLine = qobject_cast<QLineEdit*>(widget->focusProxy());
+        if (commandLine == nullptr) {
+            for (auto* candidate : editorStack_->findChildren<QLineEdit*>()) {
+                if (candidate->isVisible()) {
+                    commandLine = candidate;
+                    break;
+                }
+            }
+        }
+    }
+    if (commandLine == nullptr || !editorStack_->isAncestorOf(commandLine)) {
         return false;
     }
 
@@ -305,6 +329,9 @@ bool MainWindow::interceptEditorFileCommand(QObject* watched, const QKeyEvent& e
 
     // Dismiss the editor's command bar the way Escape would, then answer in the
     // status area.
+    if (popup != nullptr) {
+        popup->hide();
+    }
     QKeyEvent dismiss(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
     QApplication::sendEvent(commandLine, &dismiss);
 
