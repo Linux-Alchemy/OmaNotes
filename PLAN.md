@@ -422,10 +422,10 @@ enum class ExternalChangeAction { ReloadClean, PromptConflict, FileRemoved };
 
 ### Phase 4 Checkpoint
 
-- [ ] All save and conflict tests pass with failure injection and sanitizers.
-- [ ] Scratch buffers are never created on disk without an explicit save target.
-- [ ] An external agent edit appears safely in a clean buffer and prompts against a dirty one.
-- [ ] **Matt gate:** edit several notes, switch buffers, save, provoke external changes, and approve the safety/flow.
+- [x] All save and conflict tests pass with failure injection and sanitizers.
+- [x] Scratch buffers are never created on disk without an explicit save target.
+- [x] An external agent edit appears safely in a clean buffer and prompts against a dirty one.
+- [x] **Matt gate:** edit several notes, switch buffers, save, provoke external changes, and approve the safety/flow.
 
 ## Phase 5: Application Command Language, Find, and Help
 
@@ -833,3 +833,6 @@ Decision required: approve / request changes / stop and redesign
   Matt's gate found the `:w` interception missing a route: a bare `:w` keeps the command bar's
   completion popup open and the Return lands there, reaching KTextEditor's own Save As dialog.
   Closed with a regression test that presses Return on the popup.
+- **2026-09-04:** Phase 4 accepted after Matt's gate on the rebuilt tip: `:w` in Normal mode and
+  `Ctrl+S` in Insert mode both write through the atomic path with no dialog. `Ctrl+S` has been
+  the application save shortcut since Task 4.2; it stays hardcoded until Task 5.3's keymap.
