@@ -518,7 +518,7 @@ public:
 - [x] Every core workflow has a tested keyboard path and a mouse path where visible.
 - [x] Search remains responsive and root-scoped under stress fixtures.
 - [x] Configuration cannot invoke arbitrary programs.
-- [ ] **Matt gate:** operate for one session without the mouse, then repeat key actions with the mouse and assess the help overlay.
+- [x] **Matt gate:** operate for one session without the mouse, then repeat key actions with the mouse and assess the help overlay.
 
 Engineering evidence and the remaining hands-on checklist are in
 `docs/phase-5-keymap-review.md`. Matt's first gate session passed the keyboard
@@ -875,6 +875,15 @@ Decision required: approve / request changes / stop and redesign
   commands. The keymap already lets a user add one today via `shortcuts` in
   `keymap.json` without losing the leader route, so the open question is only about
   defaults.
+
+- **2026-09-07:** Phase 5 accepted. Matt's gate ran the keyboard-only session, the mouse
+  repeat, and the help overlay; the mouse gaps and sidebar squeeze found along the way
+  were fixed and merged as PR #12, and the full hand-inspection list passed on the
+  rebuilt tip. One observation stays on watch rather than in a fix: a session showed a
+  highlight block on every space while typing, which vanished on restart and matched
+  KTextEditor vi-mode search highlighting (session-scoped, like nvim's hlsearch) rather
+  than any Omanotes configuration. If it recurs: `/zzqx` then `:noh` in Normal mode
+  before restarting, which also answers whether the vi emulation honours `:noh`.
 
 - **2026-09-07:** Block 6.1.1: Matt set the reading-view direction (minimal deps, Obsidian
   restraint, vault-model resources, clickable links) and accepted the security amendments,
