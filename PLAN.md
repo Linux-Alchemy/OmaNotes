@@ -900,9 +900,15 @@ Decision required: approve / request changes / stop and redesign
   clipboard in stock Vi (LazyVim's `clipboard=unnamedplus` is why it does in Neovim). Matt
   chose mode-sensitive routing: a new `edit.paste` command defaults to Ctrl+V and acts in
   Insert mode only, pasting via the editor's own paste action; Normal and Visual keep
-  visual block, and `"+p`/`"+y` remain the Vim-correct registers. Super+C already worked —
-  Ctrl+C was never released to Vi. Deviation recorded in `docs/vim-acceptance.md`; the
-  2.2 matrix gap (no system-clipboard interop cases) is thereby closed.
+  visual block, and `"+p`/`"+y` remain the Vim-correct registers. Matt's retest found the
+  Super chords still dead: Hyprland's `sendshortcut` injects Ctrl+key while the physical
+  Super is held, so the app receives Ctrl+Meta+key, which no widget or keymap shortcut
+  matched (the initial claim that Super+C "already worked" was wrong — untested optimism,
+  withdrawn). Fixed by ignoring the Meta modifier in application shortcut matching and
+  adding `edit.copy` (default Ctrl+C, fires only over a selection, via the editor's own
+  copy action; without a selection Ctrl+C stays Vi's abort). Deviations recorded in
+  `docs/vim-acceptance.md`; the 2.2 matrix gap (no system-clipboard interop cases) is
+  thereby closed.
   The 15-suite engineering gate passes with ASan/UBSan, formatting, clang-tidy and hardening.
   Tasks 5.3.2–5.3.4 await the configuration-format decision in `docs/keymap-proposal.md`;
   the Phase 5 hands-on gate remains open. The working baseline is merged upstream `b5260c8`,

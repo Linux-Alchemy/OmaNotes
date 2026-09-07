@@ -49,6 +49,7 @@ New combinations use `Ctrl+Alt+letter/digit` or
 | --- | --- | --- |
 | `file.save` | `Ctrl+S` | `Ctrl+Shift+S` |
 | `edit.paste` | `Ctrl+V` (acts in Insert mode only) | — |
+| `edit.copy` | `Ctrl+C` (acts only over a selection) | — |
 | `pane.sidebar` | `Ctrl+H` | — |
 | `pane.editor` | `Ctrl+L` in the sidebar | — |
 | `buffer.next` | `Shift+L` | `Shift+H` |

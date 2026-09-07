@@ -79,6 +79,9 @@ class MainWindow final : public QMainWindow {
     /// Insert the system clipboard at the cursor, via the editor's own
     /// paste action so undo and encoding behave exactly as the editor's.
     void pasteFromClipboard();
+    /// Copy the editor's current selection to the system clipboard via the
+    /// editor's own copy action.
+    void copySelectionToClipboard();
     void beginNaming();
     void cancelNaming();
     void commitNaming();

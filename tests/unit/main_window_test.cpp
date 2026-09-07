@@ -163,6 +163,7 @@ class MainWindowTest final : public QObject {
     void clicksAndShortcutsRunTheSameCommands();
     void mouseCreatesAndClosesBuffers();
     void insertModePasteRoutesTheClipboard();
+    void superChordsRouteUniversalCopyAndPaste();
     void searchOpensMatchesAndHelpRunsCommands();
     void helpIsReachableFromSidebar();
     void configuredKeysRouteAndAppearInHelp();
@@ -1073,10 +1074,10 @@ void MainWindowTest::everyCommandHasOneImplementationAndARoute() {
     for (const auto* id :
          {"file.save", "file.open", "buffer.new", "buffer.close", "buffer.close.discard",
           "buffer.next", "buffer.previous", "buffer.show", "pane.sidebar", "pane.editor",
-          "search.files", "search.text", "help.show", "view.reading", "edit.paste"}) {
+          "search.files", "search.text", "help.show", "view.reading", "edit.paste", "edit.copy"}) {
         QVERIFY2(commands.find(QString::fromLatin1(id)) != nullptr, id);
     }
-    QCOMPARE(commands.commands().size(), std::size_t{16});
+    QCOMPARE(commands.commands().size(), std::size_t{17});
 }
 
 void MainWindowTest::leaderSequencesRunRegisteredCommands() {
@@ -1416,6 +1417,38 @@ void MainWindowTest::insertModePasteRoutesTheClipboard() {
     QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("x"));
     QTRY_VERIFY2(editor->document()->text().contains(QStringLiteral("PASTEDx")),
                  qPrintable(editor->document()->text()));
+}
+
+void MainWindowTest::superChordsRouteUniversalCopyAndPaste() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "stack overflow\n");
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* editor = activeEditor(window);
+    QVERIFY(editor != nullptr);
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QApplication::clipboard()->setText(QStringLiteral("seed"));
+
+    // Omarchy's Super+C arrives as Ctrl+Meta+C. Over a Visual selection it
+    // copies; the held Super must not defeat the shortcut match.
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("vllll"));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_C, Qt::ControlModifier | Qt::MetaModifier);
+    QTRY_COMPARE(QApplication::clipboard()->text(), QStringLiteral("stack"));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+
+    // Without a selection the same chord stays Vi's abort: no copy.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_C, Qt::ControlModifier | Qt::MetaModifier);
+    QTest::qWait(50);
+    QCOMPARE(QApplication::clipboard()->text(), QStringLiteral("stack"));
+
+    // Super+V (Ctrl+Meta+V) pastes what was copied, in Insert mode.
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("A"));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_V, Qt::ControlModifier | Qt::MetaModifier);
+    QTRY_COMPARE(editor->document()->text(), QStringLiteral("stack overflowstack\n"));
 }
 
 void MainWindowTest::closesCleanly() {

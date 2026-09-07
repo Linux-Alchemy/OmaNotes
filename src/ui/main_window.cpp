@@ -353,7 +353,13 @@ QString MainWindow::shortcutCommand(const QKeyEvent& event, const QWidget* targe
         qobject_cast<const QLineEdit*>(target) != nullptr) {
         return {};
     }
-    auto id = keymap_.commandFor(QKeySequence(event.keyCombination()));
+    // Omarchy's universal clipboard chords are compositor-injected Ctrl
+    // events delivered while the physical Super key is still held, so they
+    // arrive as Ctrl+Meta combinations. Super belongs to the desktop, never
+    // to an application shortcut: ignore it when matching.
+    const auto combination = event.keyCombination();
+    auto id = keymap_.commandFor(QKeySequence(
+        QKeyCombination(combination.keyboardModifiers() & ~Qt::MetaModifier, combination.key())));
     if (id.isEmpty()) {
         return {};
     }
@@ -368,17 +374,27 @@ QString MainWindow::shortcutCommand(const QKeyEvent& event, const QWidget* targe
         return {};
     }
     // Paste-from-clipboard runs only while inserting text: that is when
-    // Omarchy's Super+V (a literal Ctrl+V) means paste. Everywhere else the
-    // key falls through to Vi, where Ctrl+V is visual block.
+    // Omarchy's Super+V means paste. Everywhere else the key falls through
+    // to Vi, where Ctrl+V is visual block.
     if (id == QStringLiteral("edit.paste") &&
         (!inEditor || editor == nullptr || editor->mode() != EditorMode::Insert)) {
         return {};
     }
-    // Only Save and Insert-mode paste are application shortcuts while editing
-    // Insert/Visual text. Plain typing, command bars, search fields and
-    // dialog controls keep their keys.
+    // Copy runs only over a selection; without one, Ctrl+C stays Vi's abort.
+    if (id == QStringLiteral("edit.copy")) {
+        auto* adapter = activeEditor();
+        const auto* view = adapter != nullptr && adapter->widget() != nullptr
+                               ? qobject_cast<const KTextEditor::View*>(adapter->widget())
+                               : nullptr;
+        if (!inEditor || view == nullptr || !view->selection()) {
+            return {};
+        }
+    }
+    // Only Save and the clipboard routes are application shortcuts while
+    // editing Insert/Visual text. Plain typing, command bars, search fields
+    // and dialog controls keep their keys.
     if (inEditor && !normal && id != QStringLiteral("file.save") &&
-        id != QStringLiteral("edit.paste")) {
+        id != QStringLiteral("edit.paste") && id != QStringLiteral("edit.copy")) {
         return {};
     }
     return id;
@@ -433,6 +449,13 @@ void MainWindow::registerCommands() {
                 [this](AppContext&) { pasteFromClipboard(); },
                 {}});
     routedOutsideLeader_.push_back(QStringLiteral("edit.paste"));
+    addCommand({QStringLiteral("edit.copy"),
+                QStringLiteral("Copy selection"),
+                QStringLiteral("edit"),
+                always,
+                [this](AppContext&) { copySelectionToClipboard(); },
+                {}});
+    routedOutsideLeader_.push_back(QStringLiteral("edit.copy"));
 
     addCommand({QStringLiteral("file.open"), QStringLiteral("Open file"), QStringLiteral("file"),
                 [](const AppContext& context) { return context.targetPath.has_value(); },
@@ -1007,6 +1030,22 @@ void MainWindow::pasteFromClipboard() {
         }
     }
     statusArea_->setText(QStringLiteral("Nothing to paste into"));
+}
+
+void MainWindow::copySelectionToClipboard() {
+    auto* editor = activeEditor();
+    if (editor == nullptr || editor->widget() == nullptr) {
+        return;
+    }
+    if (auto* view = qobject_cast<KTextEditor::View*>(editor->widget());
+        view != nullptr && view->selection()) {
+        if (auto* copy = view->actionCollection()->action(QStringLiteral("edit_copy"));
+            copy != nullptr) {
+            copy->trigger();
+            return;
+        }
+    }
+    statusArea_->setText(QStringLiteral("Nothing is selected to copy"));
 }
 
 void MainWindow::saveActiveBuffer() {
