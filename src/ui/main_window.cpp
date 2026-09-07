@@ -6,13 +6,18 @@
 #include "editor/save_command.hpp"
 #include "persistence/document_store.hpp"
 #include "ui/buffer_strip.hpp"
+#include "ui/help_overlay.hpp"
+#include "ui/search_palette.hpp"
 #include "ui/sidebar.hpp"
+
 #include "workspace/file_watcher.hpp"
 #include "workspace/workspace_root.hpp"
+#include <KTextEditor/View>
 
 #include <QApplication>
 #include <QByteArray>
 #include <QFile>
+#include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -21,6 +26,7 @@
 #include <QStackedWidget>
 #include <QStringDecoder>
 #include <QStringView>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -140,6 +146,34 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
 
     setCentralWidget(splitter);
 
+    searchPalette_ = new SearchPalette(launchRequest_.root, this);
+    connect(searchPalette_, &SearchPalette::matchChosen, this,
+            [this](const std::filesystem::path& path, int line, int column) {
+                auto context = currentContext();
+                context.targetPath = path;
+                runCommand(QStringLiteral("file.open"), std::move(context));
+                const auto opened = buffers_.findByPath(path);
+                if (line >= 0 && opened.has_value() && opened == buffers_.activeId()) {
+                    if (auto* view = qobject_cast<KTextEditor::View*>(activeEditor()->widget())) {
+                        view->setCursorPosition(KTextEditor::Cursor(line, column));
+                    }
+                }
+            });
+    helpOverlay_ = new HelpOverlay(this);
+    connect(helpOverlay_, &HelpOverlay::commandChosen, this,
+            [this](const QString& id) { runCommand(id, helpContext_); });
+    auto* helpButton = new QToolButton(statusArea_->parentWidget());
+    helpButton->setText(QStringLiteral("?"));
+    helpButton->setObjectName(QStringLiteral("helpButton"));
+    helpButton->setAccessibleName(QStringLiteral("Show commands"));
+    helpButton->setToolTip(QStringLiteral("Show commands (Space ?)"));
+    auto* statusLayout = new QHBoxLayout();
+    statusArea_->parentWidget()->layout()->removeWidget(statusArea_);
+    statusLayout->addWidget(statusArea_, 1);
+    statusLayout->addWidget(helpButton);
+    qobject_cast<QVBoxLayout*>(statusArea_->parentWidget()->layout())->addLayout(statusLayout);
+    connect(helpButton, &QToolButton::clicked, this,
+            [this] { runCommand(QStringLiteral("help.show")); });
     registerCommands();
     prefixRouter_->setResolver(
         [this](const QString& sequence) { return commands_.lookup(sequence); });
@@ -225,6 +259,11 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
         watchedWidget != nullptr && editorStack_ != nullptr && !typingElsewhere &&
         (watchedWidget == editorStack_ || editorStack_->isAncestorOf(watchedWidget));
 
+    if (insideWindow &&
+        (event->type() == QEvent::FocusOut || event->type() == QEvent::WindowDeactivate)) {
+        prefixRouter_->cancelPending();
+    }
+
     if (watched == namePrompt_ && event->type() == QEvent::KeyPress &&
         static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape) {
         cancelNaming();
@@ -238,6 +277,11 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
 
     if (insideWindow && event->type() == QEvent::MouseButtonPress) {
         prefixRouter_->cancelPending();
+    } else if (insideWindow && sidebar_->isAncestorOf(watchedWidget) &&
+               event->type() == QEvent::KeyPress) {
+        if (prefixRouter_->route(*static_cast<QKeyEvent*>(event), EditorMode::Normal)) {
+            return true;
+        }
     } else if (insideEditor && event->type() == QEvent::KeyPress) {
         auto& keyEvent = *static_cast<QKeyEvent*>(event);
         auto* editor = activeEditor();
@@ -426,16 +470,35 @@ void MainWindow::registerCommands() {
                 {}});
     routedOutsideLeader_.push_back(QStringLiteral("pane.editor"));
 
-    addCommand({QStringLiteral("search.files"), QStringLiteral("Find files"),
-                QStringLiteral("search"), notYet, [](AppContext&) {},
-                QStringLiteral("Find files is not available yet (Task 5.2)")},
+    addCommand({QStringLiteral("search.files"),
+                QStringLiteral("Find files"),
+                QStringLiteral("search"),
+                always,
+                [this](AppContext&) { searchPalette_->begin(SearchKind::Files); },
+                {}},
                {QStringLiteral("f f"), QStringLiteral("Space")});
-    addCommand({QStringLiteral("search.text"), QStringLiteral("Search text"),
-                QStringLiteral("search"), notYet, [](AppContext&) {},
-                QStringLiteral("Search text is not available yet (Task 5.2)")},
+    addCommand({QStringLiteral("search.text"),
+                QStringLiteral("Search text"),
+                QStringLiteral("search"),
+                always,
+                [this](AppContext&) { searchPalette_->begin(SearchKind::Text); },
+                {}},
                {QStringLiteral("/")});
-    addCommand({QStringLiteral("help.show"), QStringLiteral("Help"), QStringLiteral("help"), notYet,
-                [](AppContext&) {}, QStringLiteral("Help is not available yet (Task 5.3)")},
+    addCommand({QStringLiteral("help.show"),
+                QStringLiteral("Help"),
+                QStringLiteral("help"),
+                always,
+                [this](AppContext& context) {
+                    helpContext_ = context;
+                    helpOverlay_->showCommands(
+                        commands_, context,
+                        {{QStringLiteral("file.save"), QStringLiteral("Ctrl+S")},
+                         {QStringLiteral("pane.sidebar"), QStringLiteral("Ctrl+H")},
+                         {QStringLiteral("pane.editor"), QStringLiteral("Ctrl+L (sidebar)")},
+                         {QStringLiteral("buffer.next"), QStringLiteral("Shift+L")},
+                         {QStringLiteral("buffer.previous"), QStringLiteral("Shift+H")}});
+                },
+                {}},
                {QStringLiteral("?")});
     addCommand({QStringLiteral("view.reading"), QStringLiteral("Reading view"),
                 QStringLiteral("view"), notYet, [](AppContext&) {},

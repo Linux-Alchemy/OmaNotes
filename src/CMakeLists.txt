@@ -25,6 +25,14 @@ add_executable(
     ui/buffer_strip.cpp
     ui/buffer_strip.hpp
     ui/main_window.cpp
+    ui/help_overlay.cpp
+    ui/help_overlay.hpp
+    workspace/file_index.cpp
+    workspace/file_index.hpp
+    workspace/text_search.cpp
+    workspace/text_search.hpp
+    ui/search_palette.cpp
+    ui/search_palette.hpp
     ui/main_window.hpp
     ui/sidebar.cpp
     ui/sidebar.hpp

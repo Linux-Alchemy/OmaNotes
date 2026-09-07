@@ -31,6 +31,8 @@ class FileWatcher;
 class PrefixRouter;
 class SaveCommand;
 class Sidebar;
+class SearchPalette;
+class HelpOverlay;
 
 class MainWindow final : public QMainWindow {
   public:
@@ -105,6 +107,9 @@ class MainWindow final : public QMainWindow {
     std::map<BufferId, std::unique_ptr<EditorAdapter>> editors_;
     std::unique_ptr<PrefixRouter> prefixRouter_;
     std::unique_ptr<SaveCommand> saveCommand_;
+    HelpOverlay* helpOverlay_ = nullptr;
+    AppContext helpContext_;
+    SearchPalette* searchPalette_ = nullptr;
     Sidebar* sidebar_ = nullptr;
     QLineEdit* namePrompt_ = nullptr;
     QStackedWidget* editorStack_ = nullptr;
