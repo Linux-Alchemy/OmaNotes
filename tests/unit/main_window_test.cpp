@@ -1449,6 +1449,19 @@ void MainWindowTest::superChordsRouteUniversalCopyAndPaste() {
     QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("A"));
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_V, Qt::ControlModifier | Qt::MetaModifier);
     QTRY_COMPARE(editor->document()->text(), QStringLiteral("stack overflowstack\n"));
+
+    // Super+V pastes in Normal mode too — the universal promise — while a
+    // bare Ctrl+V there remains Vi's visual block and inserts nothing.
+    // Vi's Escape steps the cursor back onto the final 'k', so the paste
+    // lands before it: deterministic, if not pretty.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_V, Qt::ControlModifier | Qt::MetaModifier);
+    QTRY_COMPARE(editor->document()->text(), QStringLiteral("stack overflowstacstackk\n"));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_V, Qt::ControlModifier);
+    QTest::qWait(50);
+    QCOMPARE(editor->document()->text(), QStringLiteral("stack overflowstacstackk\n"));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
 }
 
 void MainWindowTest::closesCleanly() {

@@ -373,11 +373,15 @@ QString MainWindow::shortcutCommand(const QKeyEvent& event, const QWidget* targe
     if (event.modifiers() == Qt::ShiftModifier && (!inEditor || !normal || buffers_.count() < 2)) {
         return {};
     }
-    // Paste-from-clipboard runs only while inserting text: that is when
-    // Omarchy's Super+V means paste. Everywhere else the key falls through
-    // to Vi, where Ctrl+V is visual block.
+    // The Meta modifier marks a compositor-injected chord: the physical
+    // Super is still held. Super+V therefore pastes in ANY mode — the same
+    // promise terminals keep, where Omarchy hands Neovim pasted text rather
+    // than a keystroke and vim.paste works regardless of mode. A bare
+    // Ctrl+V pastes only while inserting; everywhere else it falls through
+    // to Vi, where it is visual block (Matt's call, 2026-09-07).
+    const auto superChord = combination.keyboardModifiers().testFlag(Qt::MetaModifier);
     if (id == QStringLiteral("edit.paste") &&
-        (!inEditor || editor == nullptr || editor->mode() != EditorMode::Insert)) {
+        (!inEditor || editor == nullptr || (!superChord && editor->mode() != EditorMode::Insert))) {
         return {};
     }
     // Copy runs only over a selection; without one, Ctrl+C stays Vi's abort.

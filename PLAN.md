@@ -906,7 +906,11 @@ Decision required: approve / request changes / stop and redesign
   matched (the initial claim that Super+C "already worked" was wrong — untested optimism,
   withdrawn). Fixed by ignoring the Meta modifier in application shortcut matching and
   adding `edit.copy` (default Ctrl+C, fires only over a selection, via the editor's own
-  copy action; without a selection Ctrl+C stays Vi's abort). Deviations recorded in
+  copy action; without a selection Ctrl+C stays Vi's abort). Matt then set the product
+  rule — Omarchy users expect Super+C/V to work everywhere, always — so the Meta
+  modifier became the discriminator instead of noise: the Super-injected chord pastes in
+  any mode (mirroring what terminals give Neovim via bracketed paste), while a bare
+  Ctrl+V pastes in Insert only and stays visual block elsewhere. Deviations recorded in
   `docs/vim-acceptance.md`; the 2.2 matrix gap (no system-clipboard interop cases) is
   thereby closed.
   The 15-suite engineering gate passes with ASan/UBSan, formatting, clang-tidy and hardening.

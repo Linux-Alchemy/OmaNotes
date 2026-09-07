@@ -48,7 +48,7 @@ New combinations use `Ctrl+Alt+letter/digit` or
 | Command | Default | Other supported exception |
 | --- | --- | --- |
 | `file.save` | `Ctrl+S` | `Ctrl+Shift+S` |
-| `edit.paste` | `Ctrl+V` (acts in Insert mode only) | — |
+| `edit.paste` | `Ctrl+V` (Insert mode; Omarchy's Super+V pastes in any mode) | — |
 | `edit.copy` | `Ctrl+C` (acts only over a selection) | — |
 | `pane.sidebar` | `Ctrl+H` | — |
 | `pane.editor` | `Ctrl+L` in the sidebar | — |
