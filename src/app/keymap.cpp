@@ -69,6 +69,7 @@ Keymap Keymap::defaults(const CommandRegistry& commands) {
     result.leaderBindings_ = commands.bindings();
     result.shortcuts_ = {
         {QStringLiteral("file.save"), QKeySequence(QStringLiteral("Ctrl+S"))},
+        {QStringLiteral("edit.paste"), QKeySequence(QStringLiteral("Ctrl+V"))},
         {QStringLiteral("pane.sidebar"), QKeySequence(QStringLiteral("Ctrl+H"))},
         {QStringLiteral("pane.editor"), QKeySequence(QStringLiteral("Ctrl+L"))},
         {QStringLiteral("buffer.next"), QKeySequence(QStringLiteral("Shift+L"))},

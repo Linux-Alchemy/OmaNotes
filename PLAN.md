@@ -893,6 +893,16 @@ Decision required: approve / request changes / stop and redesign
   hover target reveal. The malicious fixture set encoding the policy lives in
   `tests/fixtures/markdown/`; block 6.1.4 verifies against it. Threat model note: agents
   write into the workspace by design, so every note is untrusted input.
+
+- **2026-09-07:** Matt's gate on the Phase 6 build found Omarchy's universal paste broken:
+  Super+V delivers a literal Ctrl+V (per `default/hypr/bindings/clipboard.lua`), which the
+  Phase 2 matrix had released to Vi as visual block, and bare `p` never reads the system
+  clipboard in stock Vi (LazyVim's `clipboard=unnamedplus` is why it does in Neovim). Matt
+  chose mode-sensitive routing: a new `edit.paste` command defaults to Ctrl+V and acts in
+  Insert mode only, pasting via the editor's own paste action; Normal and Visual keep
+  visual block, and `"+p`/`"+y` remain the Vim-correct registers. Super+C already worked —
+  Ctrl+C was never released to Vi. Deviation recorded in `docs/vim-acceptance.md`; the
+  2.2 matrix gap (no system-clipboard interop cases) is thereby closed.
   The 15-suite engineering gate passes with ASan/UBSan, formatting, clang-tidy and hardening.
   Tasks 5.3.2–5.3.4 await the configuration-format decision in `docs/keymap-proposal.md`;
   the Phase 5 hands-on gate remains open. The working baseline is merged upstream `b5260c8`,

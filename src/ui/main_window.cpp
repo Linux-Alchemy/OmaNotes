@@ -367,9 +367,18 @@ QString MainWindow::shortcutCommand(const QKeyEvent& event, const QWidget* targe
     if (event.modifiers() == Qt::ShiftModifier && (!inEditor || !normal || buffers_.count() < 2)) {
         return {};
     }
-    // Only Save is an application shortcut while editing Insert/Visual text.
-    // Plain typing, command bars, search fields and dialog controls keep keys.
-    if (inEditor && !normal && id != QStringLiteral("file.save")) {
+    // Paste-from-clipboard runs only while inserting text: that is when
+    // Omarchy's Super+V (a literal Ctrl+V) means paste. Everywhere else the
+    // key falls through to Vi, where Ctrl+V is visual block.
+    if (id == QStringLiteral("edit.paste") &&
+        (!inEditor || editor == nullptr || editor->mode() != EditorMode::Insert)) {
+        return {};
+    }
+    // Only Save and Insert-mode paste are application shortcuts while editing
+    // Insert/Visual text. Plain typing, command bars, search fields and
+    // dialog controls keep their keys.
+    if (inEditor && !normal && id != QStringLiteral("file.save") &&
+        id != QStringLiteral("edit.paste")) {
         return {};
     }
     return id;
@@ -413,6 +422,17 @@ void MainWindow::registerCommands() {
                 [this](AppContext&) { saveActiveBuffer(); },
                 {}});
     routedOutsideLeader_.push_back(QStringLiteral("file.save"));
+
+    // Omarchy's Super+V arrives as a literal Ctrl+V (universal paste). It
+    // pastes while typing; Normal and Visual keep Ctrl+V as Vi's visual
+    // block, per Matt's call of 2026-09-07.
+    addCommand({QStringLiteral("edit.paste"),
+                QStringLiteral("Paste from clipboard"),
+                QStringLiteral("edit"),
+                always,
+                [this](AppContext&) { pasteFromClipboard(); },
+                {}});
+    routedOutsideLeader_.push_back(QStringLiteral("edit.paste"));
 
     addCommand({QStringLiteral("file.open"), QStringLiteral("Open file"), QStringLiteral("file"),
                 [](const AppContext& context) { return context.targetPath.has_value(); },
@@ -972,6 +992,21 @@ void MainWindow::loadMarkdownFile(const std::filesystem::path& path) {
     createEditorFor(*opened).loadText(*text);
     trackFile(*opened, *resolved, QByteArrayView(*bytes));
     showBuffer(*opened);
+}
+
+void MainWindow::pasteFromClipboard() {
+    auto* editor = activeEditor();
+    if (editor == nullptr || editor->widget() == nullptr) {
+        return;
+    }
+    if (auto* view = qobject_cast<KTextEditor::View*>(editor->widget())) {
+        if (auto* paste = view->actionCollection()->action(QStringLiteral("edit_paste"));
+            paste != nullptr) {
+            paste->trigger();
+            return;
+        }
+    }
+    statusArea_->setText(QStringLiteral("Nothing to paste into"));
 }
 
 void MainWindow::saveActiveBuffer() {

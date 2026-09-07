@@ -76,6 +76,9 @@ class MainWindow final : public QMainWindow {
     void showBuffer(BufferId id);
     void openScratchBuffer();
     void saveActiveBuffer();
+    /// Insert the system clipboard at the cursor, via the editor's own
+    /// paste action so undo and encoding behave exactly as the editor's.
+    void pasteFromClipboard();
     void beginNaming();
     void cancelNaming();
     void commitNaming();

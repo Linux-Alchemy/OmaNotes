@@ -8,6 +8,7 @@
 #include <KTextEditor/View>
 
 #include <QAbstractButton>
+#include <QClipboard>
 #include <QDialog>
 #include <QDir>
 #include <QFile>
@@ -161,6 +162,7 @@ class MainWindowTest final : public QObject {
     void refusesDisabledCommandsWithAReason();
     void clicksAndShortcutsRunTheSameCommands();
     void mouseCreatesAndClosesBuffers();
+    void insertModePasteRoutesTheClipboard();
     void searchOpensMatchesAndHelpRunsCommands();
     void helpIsReachableFromSidebar();
     void configuredKeysRouteAndAppearInHelp();
@@ -1071,10 +1073,10 @@ void MainWindowTest::everyCommandHasOneImplementationAndARoute() {
     for (const auto* id :
          {"file.save", "file.open", "buffer.new", "buffer.close", "buffer.close.discard",
           "buffer.next", "buffer.previous", "buffer.show", "pane.sidebar", "pane.editor",
-          "search.files", "search.text", "help.show", "view.reading"}) {
+          "search.files", "search.text", "help.show", "view.reading", "edit.paste"}) {
         QVERIFY2(commands.find(QString::fromLatin1(id)) != nullptr, id);
     }
-    QCOMPARE(commands.commands().size(), std::size_t{15});
+    QCOMPARE(commands.commands().size(), std::size_t{16});
 }
 
 void MainWindowTest::leaderSequencesRunRegisteredCommands() {
@@ -1384,6 +1386,36 @@ void MainWindowTest::mouseCreatesAndClosesBuffers() {
     QTRY_COMPARE(strip->count(), 1);
     QVERIFY(!prompt->isVisible());
     QCOMPARE(activeEditor(window)->document()->text(), QStringLiteral("second"));
+}
+
+void MainWindowTest::insertModePasteRoutesTheClipboard() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "start\n");
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* editor = activeEditor(window);
+    QVERIFY(editor != nullptr);
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QApplication::clipboard()->setText(QStringLiteral("PASTED"));
+
+    // Normal mode: Ctrl+V remains Vi's visual block; nothing is inserted.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_V, Qt::ControlModifier);
+    QCOMPARE(editor->document()->text(), QStringLiteral("start\n"));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+
+    // Insert mode: Ctrl+V is Omarchy's universal paste (Super+V arrives as
+    // a literal Ctrl+V) and typing continues normally afterwards.
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("i"));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_V, Qt::ControlModifier);
+    QTRY_VERIFY2(editor->document()->text().contains(QStringLiteral("PASTED")),
+                 qPrintable(editor->document()->text()));
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("x"));
+    QTRY_VERIFY2(editor->document()->text().contains(QStringLiteral("PASTEDx")),
+                 qPrintable(editor->document()->text()));
 }
 
 void MainWindowTest::closesCleanly() {

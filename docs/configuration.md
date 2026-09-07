@@ -48,6 +48,7 @@ New combinations use `Ctrl+Alt+letter/digit` or
 | Command | Default | Other supported exception |
 | --- | --- | --- |
 | `file.save` | `Ctrl+S` | `Ctrl+Shift+S` |
+| `edit.paste` | `Ctrl+V` (acts in Insert mode only) | — |
 | `pane.sidebar` | `Ctrl+H` | — |
 | `pane.editor` | `Ctrl+L` in the sidebar | — |
 | `buffer.next` | `Shift+L` | `Shift+H` |
