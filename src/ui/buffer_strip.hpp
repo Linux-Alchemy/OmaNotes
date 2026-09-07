@@ -24,6 +24,7 @@ class BufferStrip final : public QTabBar {
 
   signals:
     void bufferSelected(BufferId id);
+    void bufferCloseRequested(BufferId id);
 
   private:
     bool synchronising_ = false;

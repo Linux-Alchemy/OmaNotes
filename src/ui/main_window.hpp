@@ -17,11 +17,13 @@
 #include <initializer_list>
 #include <map>
 #include <memory>
+#include <optional>
 #include <vector>
 
 class QKeyEvent;
 class QLabel;
 class QLineEdit;
+class QMessageBox;
 class QStackedWidget;
 
 namespace omanotes {
@@ -64,6 +66,10 @@ class MainWindow final : public QMainWindow {
     void runCommand(QStringView id);
     void runCommand(QStringView id, AppContext context);
     void closeBuffer(BufferId id, bool discardChanges);
+    /// The mouse close affordance: a clean buffer closes outright; a dirty
+    /// one comes to the front and asks Save / Discard / Cancel. Saving a
+    /// scratch buffer routes through the save-as prompt and closes once named.
+    void confirmCloseBuffer(BufferId id);
     void loadMarkdownFile(const std::filesystem::path& path);
     void refreshEditorStatus();
     void syncBufferStrip();
@@ -118,6 +124,9 @@ class MainWindow final : public QMainWindow {
     QStackedWidget* editorStack_ = nullptr;
     BufferStrip* bufferStrip_ = nullptr;
     QLabel* statusArea_ = nullptr;
+    QMessageBox* closePrompt_ = nullptr;
+    std::optional<BufferId> closePromptTarget_;
+    std::optional<BufferId> closeAfterNaming_;
 };
 
 } // namespace omanotes
