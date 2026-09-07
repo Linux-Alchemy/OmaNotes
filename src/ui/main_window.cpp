@@ -80,7 +80,7 @@ std::expected<QString, QString> decodeNote(const QByteArray& bytes,
 constexpr auto kAddBangToOverride = " (add ! to override)";
 
 QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip*& buffers,
-                          QLabel*& status, QLineEdit*& namePrompt) {
+                          QToolButton*& newBuffer, QLabel*& status, QLineEdit*& namePrompt) {
     auto* writingArea = new QWidget(parent);
     writingArea->setObjectName(QStringLiteral("writingArea"));
 
@@ -89,6 +89,14 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
     layout->setSpacing(0);
 
     buffers = new BufferStrip(writingArea);
+
+    newBuffer = new QToolButton(writingArea);
+    newBuffer->setText(QStringLiteral("+"));
+    newBuffer->setObjectName(QStringLiteral("newBufferButton"));
+    newBuffer->setAccessibleName(QStringLiteral("New buffer"));
+    newBuffer->setToolTip(QStringLiteral("New buffer"));
+    newBuffer->setAutoRaise(true);
+    newBuffer->setFocusPolicy(Qt::NoFocus);
 
     editors = new QStackedWidget(writingArea);
     editors->setObjectName(QStringLiteral("editorStack"));
@@ -107,7 +115,13 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
     namePrompt->setContentsMargins(10, 6, 10, 6);
     namePrompt->hide();
 
-    layout->addWidget(buffers);
+    auto* stripRow = new QHBoxLayout();
+    stripRow->setContentsMargins(0, 0, 0, 0);
+    stripRow->setSpacing(0);
+    stripRow->addWidget(buffers);
+    stripRow->addWidget(newBuffer);
+    stripRow->addStretch(1);
+    layout->addLayout(stripRow);
     layout->addWidget(editors, 1);
     layout->addWidget(namePrompt);
     layout->addWidget(status);
@@ -139,8 +153,9 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
     watcher_ = std::make_unique<FileWatcher>();
     connect(watcher_.get(), &FileWatcher::fileChanged, this,
             [this](const std::filesystem::path& path) { handleExternalChange(path); });
-    splitter->addWidget(
-        buildWritingArea(splitter, editorStack_, bufferStrip_, statusArea_, namePrompt_));
+    QToolButton* newBufferButton = nullptr;
+    splitter->addWidget(buildWritingArea(splitter, editorStack_, bufferStrip_, newBufferButton,
+                                         statusArea_, namePrompt_));
     splitter->setStretchFactor(0, 0);
     splitter->setStretchFactor(1, 1);
     splitter->setSizes({240, 860});
@@ -188,6 +203,13 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
         context.targetBuffer = id;
         runCommand(QStringLiteral("buffer.show"), std::move(context));
     });
+    connect(bufferStrip_, &BufferStrip::bufferCloseRequested, this, [this](BufferId id) {
+        auto context = currentContext();
+        context.targetBuffer = id;
+        runCommand(QStringLiteral("buffer.close"), std::move(context));
+    });
+    connect(newBufferButton, &QToolButton::clicked, this,
+            [this] { runCommand(QStringLiteral("buffer.new")); });
     connect(sidebar_, &Sidebar::fileActivated, this, [this](const std::filesystem::path& path) {
         auto context = currentContext();
         context.targetPath = path;
@@ -375,8 +397,9 @@ void MainWindow::registerCommands() {
     // Leader sequences follow Matt's LazyVim vocabulary where one exists:
     // `e` toggles the explorer, `b d` / `b D` delete a buffer, `f f` and a
     // second Space find files, `f n` is a new file, `/` is text search. `?` and `m` come from the
-    // plan. Reached by other routes too: Ctrl+S, Ctrl+H, Shift+H/L, tab and
-    // tree clicks; those routes name the command ids in routedOutsideLeader_.
+    // plan. Reached by other routes too: Ctrl+S, Ctrl+H, Shift+H/L, tab, tab
+    // close-button, + button and tree clicks; those routes name the command
+    // ids in routedOutsideLeader_.
     const auto always = [](const AppContext&) { return true; };
     const auto notYet = [](const AppContext&) { return false; };
     const auto severalBuffers = [](const AppContext& context) { return context.bufferCount > 1; };
@@ -403,6 +426,7 @@ void MainWindow::registerCommands() {
                 [this](AppContext&) { openScratchBuffer(); },
                 {}},
                {QStringLiteral("f n")});
+    routedOutsideLeader_.push_back(QStringLiteral("buffer.new"));
     addCommand({QStringLiteral("buffer.close"),
                 QStringLiteral("Close buffer"),
                 QStringLiteral("buffer"),
@@ -416,6 +440,7 @@ void MainWindow::registerCommands() {
                 },
                 {}},
                {QStringLiteral("b d")});
+    routedOutsideLeader_.push_back(QStringLiteral("buffer.close"));
     addCommand({QStringLiteral("buffer.close.discard"),
                 QStringLiteral("Close buffer, discarding changes"),
                 QStringLiteral("buffer"),

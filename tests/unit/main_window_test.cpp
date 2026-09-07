@@ -7,6 +7,7 @@
 #include <KTextEditor/Editor>
 #include <KTextEditor/View>
 
+#include <QAbstractButton>
 #include <QDialog>
 #include <QDir>
 #include <QFile>
@@ -63,6 +64,14 @@ void writeFile(const std::filesystem::path& path, const QByteArray& contents) {
     QFile file(QString::fromStdString(path.string()));
     QVERIFY2(file.open(QIODevice::WriteOnly), qPrintable(file.errorString()));
     QCOMPARE(file.write(contents), contents.size());
+}
+
+QAbstractButton* closeButtonFor(QTabBar& strip, int index) {
+    auto* button = strip.tabButton(index, QTabBar::RightSide);
+    if (button == nullptr) {
+        button = strip.tabButton(index, QTabBar::LeftSide);
+    }
+    return qobject_cast<QAbstractButton*>(button);
 }
 
 KTextEditor::View* activeEditor(omanotes::MainWindow& window) {
@@ -150,6 +159,7 @@ class MainWindowTest final : public QObject {
     void closesBuffersFromTheLeaderAndGuardsUnsavedWork();
     void refusesDisabledCommandsWithAReason();
     void clicksAndShortcutsRunTheSameCommands();
+    void mouseCreatesAndClosesBuffers();
     void searchOpensMatchesAndHelpRunsCommands();
     void helpIsReachableFromSidebar();
     void configuredKeysRouteAndAppearInHelp();
@@ -1298,6 +1308,49 @@ void MainWindowTest::clicksAndShortcutsRunTheSameCommands() {
                 sidebar->isAncestorOf(QApplication::focusWidget()));
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_L, Qt::ControlModifier);
     QTRY_VERIFY(activeEditor(window)->hasFocus());
+}
+
+void MainWindowTest::mouseCreatesAndClosesBuffers() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "note\n");
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* strip = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    auto* newBuffer = window.findChild<QToolButton*>(QStringLiteral("newBufferButton"));
+    QVERIFY(status != nullptr && strip != nullptr && newBuffer != nullptr);
+    QCOMPARE(strip->count(), 1);
+
+    // The + button runs buffer.new: a scratch buffer opens and takes over.
+    QTest::mouseClick(newBuffer, Qt::LeftButton);
+    QTRY_COMPARE(strip->count(), 2);
+    QCOMPARE(strip->currentIndex(), 1);
+    QCOMPARE(strip->tabText(1), QStringLiteral("[No Name]"));
+    QVERIFY(activeEditor(window)->document()->text().isEmpty());
+
+    // A tab close button on a dirty buffer refuses, exactly like Space b d.
+    activeEditor(window)->document()->setText(QStringLiteral("draft"));
+    QTRY_COMPARE(strip->tabText(1), QStringLiteral("[No Name] [+]"));
+    auto* scratchClose = closeButtonFor(*strip, 1);
+    QVERIFY(scratchClose != nullptr);
+    QTest::mouseClick(scratchClose, Qt::LeftButton);
+    QTRY_VERIFY2(
+        status->text().contains(QStringLiteral("No write since last change for [No Name]")),
+        qPrintable(status->text()));
+    QCOMPARE(strip->count(), 2);
+
+    // Closing acts on the clicked tab, not the active buffer, and nothing
+    // touches the disk.
+    auto* noteClose = closeButtonFor(*strip, 0);
+    QVERIFY(noteClose != nullptr);
+    QTest::mouseClick(noteClose, Qt::LeftButton);
+    QTRY_COMPARE(status->text(), QStringLiteral("Closed note.md"));
+    QCOMPARE(strip->count(), 1);
+    QCOMPARE(activeEditor(window)->document()->text(), QStringLiteral("draft"));
+    QCOMPARE(readFile(note), QByteArray("note\n"));
 }
 
 void MainWindowTest::closesCleanly() {

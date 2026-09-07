@@ -12,12 +12,18 @@ BufferStrip::BufferStrip(QWidget* parent) : QTabBar(parent) {
     setMovable(false);
     setDrawBase(false);
     setFocusPolicy(Qt::NoFocus);
+    setTabsClosable(true);
 
     connect(this, &QTabBar::currentChanged, this, [this](int index) {
         if (synchronising_ || index < 0) {
             return;
         }
         emit bufferSelected(tabData(index).toUuid());
+    });
+    connect(this, &QTabBar::tabCloseRequested, this, [this](int index) {
+        if (index >= 0) {
+            emit bufferCloseRequested(tabData(index).toUuid());
+        }
     });
 }
 
