@@ -509,16 +509,19 @@ public:
 **Blocks:**
 
 - [x] **5.3.1** — Render current-context commands from the command registry.
-- [ ] **5.3.2** — Add partial key overrides using the approved XDG config location.
-- [ ] **5.3.3** — Test duplicate, unreachable, invalid, and editor-conflicting mappings.
-- [ ] **5.3.4** — Verify: `Leader+?` remains reachable and the app starts safely with malformed config.
+- [x] **5.3.2** — Add partial key overrides using the approved XDG config location.
+- [x] **5.3.3** — Test duplicate, unreachable, invalid, and editor-conflicting mappings.
+- [x] **5.3.4** — Verify: `Leader+?` remains reachable and the app starts safely with malformed config.
 
 ### Phase 5 Checkpoint
 
-- [ ] Every core workflow has a tested keyboard path and a mouse path where visible.
+- [x] Every core workflow has a tested keyboard path and a mouse path where visible.
 - [x] Search remains responsive and root-scoped under stress fixtures.
-- [ ] Configuration cannot invoke arbitrary programs.
+- [x] Configuration cannot invoke arbitrary programs.
 - [ ] **Matt gate:** operate for one session without the mouse, then repeat key actions with the mouse and assess the help overlay.
+
+Engineering evidence and the remaining hands-on checklist are in
+`docs/phase-5-keymap-review.md`. P6 awaits this acceptance gate.
 
 ## Phase 6: Markdown Reading View and Omarchy Appearance
 
@@ -859,3 +862,11 @@ Decision required: approve / request changes / stop and redesign
   Tasks 5.3.2–5.3.4 await the configuration-format decision in `docs/keymap-proposal.md`;
   the Phase 5 hands-on gate remains open. The working baseline is merged upstream `b5260c8`,
   which already records P4 acceptance and completion of 5.1.
+
+- **2026-09-07:** Matt reviewed and merged PR #10, then requested cleanup and
+  continuation. Fast-forwarded to `eb2f5b2`, removed the merged search/help branch
+  and superseded local P4 prototype, and retained the parked general-purpose
+  experiment. Tasks 5.3.2–5.3.4 implement the reviewed JSON keymap proposal with
+  whole-candidate validation, safe direct shortcuts, effective help labels and
+  visible default fallback. ADR 0008 records the format and constraints.
+  Phase 5 engineering is complete; Matt's hands-on gate remains open before P6.

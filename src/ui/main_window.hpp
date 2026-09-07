@@ -1,6 +1,7 @@
 #ifndef OMANOTES_UI_MAIN_WINDOW_HPP
 #define OMANOTES_UI_MAIN_WINDOW_HPP
 
+#include "app/keymap.hpp"
 #include "app/launch_request.hpp"
 #include "core/buffer.hpp"
 #include "core/buffer_registry.hpp"
@@ -51,6 +52,8 @@ class MainWindow final : public QMainWindow {
 
   private:
     void registerCommands();
+    void loadKeymap();
+    [[nodiscard]] QString shortcutCommand(const QKeyEvent& event, const QWidget* target) const;
     /// Register `descriptor` and, when `sequences` is given, the leader keys
     /// that reach it. A registration failure is a programming error, so it
     /// aborts loudly rather than leaving an action silently unreachable.
@@ -82,7 +85,6 @@ class MainWindow final : public QMainWindow {
     void trackFile(BufferId id, const std::filesystem::path& path, QByteArrayView contents);
     [[nodiscard]] EditorAdapter* activeEditor() const;
     EditorAdapter& createEditorFor(BufferId id);
-    [[nodiscard]] bool handleBufferSwitch(const QKeyEvent& event);
     /// Intercept the editor's own file commands (`:w`, `:e`, and friends)
     /// before its Vi mode can run them, so nothing reaches the disk except
     /// through the atomic writer and nothing replaces a buffer unchecked.
@@ -99,6 +101,7 @@ class MainWindow final : public QMainWindow {
     LaunchRequest launchRequest_;
     BufferRegistry buffers_;
     CommandRegistry commands_;
+    Keymap keymap_;
     /// Command ids reached by a shortcut, click, or editor verb rather than a
     /// leader sequence; the audit counts these as routed.
     std::vector<QString> routedOutsideLeader_;

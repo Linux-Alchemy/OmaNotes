@@ -12,7 +12,9 @@
 
 #include "workspace/file_watcher.hpp"
 #include "workspace/workspace_root.hpp"
+#include <KActionCollection>
 #include <KTextEditor/View>
+#include <QAction>
 
 #include <QApplication>
 #include <QByteArray>
@@ -21,7 +23,6 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
-#include <QShortcut>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStringDecoder>
@@ -175,6 +176,7 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
     connect(helpButton, &QToolButton::clicked, this,
             [this] { runCommand(QStringLiteral("help.show")); });
     registerCommands();
+    keymap_ = Keymap::defaults(commands_);
     prefixRouter_->setResolver(
         [this](const QString& sequence) { return commands_.lookup(sequence); });
     connect(prefixRouter_.get(), &PrefixRouter::feedbackChanged, statusArea_,
@@ -194,10 +196,6 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
     connect(sidebar_, &Sidebar::editorFocusRequested, this,
             [this] { runCommand(QStringLiteral("pane.editor")); });
     connect(namePrompt_, &QLineEdit::returnPressed, this, [this] { commitNaming(); });
-    auto* saveShortcut = new QShortcut(QKeySequence(QStringLiteral("Ctrl+S")), this);
-    saveShortcut->setContext(Qt::WidgetWithChildrenShortcut);
-    connect(saveShortcut, &QShortcut::activated, this,
-            [this] { runCommand(QStringLiteral("file.save")); });
     saveCommand_ = std::make_unique<SaveCommand>([this](const QString& argument) {
         if (argument.isEmpty()) {
             const auto active = buffers_.activeId();
@@ -208,16 +206,6 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
             return saveTo({});
         }
         return saveTo(std::filesystem::path(argument.toStdString()));
-    });
-
-    auto* focusSidebar = new QShortcut(QKeySequence(QStringLiteral("Ctrl+H")), this);
-    focusSidebar->setContext(Qt::WidgetWithChildrenShortcut);
-    connect(focusSidebar, &QShortcut::activated, this, [this] {
-        // Ctrl+H is a silent no-op outside Normal mode: in Insert mode it is
-        // KTextEditor's backspace and must not be reported as a refusal.
-        if (currentContext().normalMode) {
-            runCommand(QStringLiteral("pane.sidebar"));
-        }
     });
 
     if (auto* application = QApplication::instance(); application != nullptr) {
@@ -238,6 +226,7 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
             statusArea_->setText(refusal);
         }
     }
+    loadKeymap();
 }
 
 MainWindow::~MainWindow() {
@@ -258,6 +247,19 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
     const auto insideEditor =
         watchedWidget != nullptr && editorStack_ != nullptr && !typingElsewhere &&
         (watchedWidget == editorStack_ || editorStack_->isAncestorOf(watchedWidget));
+
+    if (!prefixRouter_->isPending() &&
+        (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress)) {
+        const auto id = shortcutCommand(*static_cast<QKeyEvent*>(event), watchedWidget);
+        if (!id.isEmpty()) {
+            if (event->type() == QEvent::KeyPress) {
+                prefixRouter_->cancelPending();
+                runCommand(id);
+            }
+            event->accept();
+            return true;
+        }
+    }
 
     if (insideWindow &&
         (event->type() == QEvent::FocusOut || event->type() == QEvent::WindowDeactivate)) {
@@ -288,37 +290,66 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
         if (editor != nullptr && prefixRouter_->route(keyEvent, editor->mode())) {
             return true;
         }
-        if (handleBufferSwitch(keyEvent)) {
-            return true;
-        }
     }
 
     return QMainWindow::eventFilter(watched, event);
 }
 
-bool MainWindow::handleBufferSwitch(const QKeyEvent& event) {
-    const auto* editor = activeEditor();
-    if (editor == nullptr || editor->mode() != EditorMode::Normal) {
-        return false;
+void MainWindow::loadKeymap() {
+    std::vector<QKeySequence> reserved;
+    if (auto* editor = activeEditor(); editor != nullptr) {
+        if (auto* view = qobject_cast<KTextEditor::View*>(editor->widget())) {
+            for (const auto* action : view->actionCollection()->actions()) {
+                for (const auto& sequence : action->shortcuts()) {
+                    reserved.push_back(sequence);
+                }
+            }
+        }
     }
-    if (event.modifiers() != Qt::ShiftModifier) {
-        return false;
+    const auto configured = Keymap::load(Keymap::configurationPath(), commands_, reserved);
+    if (!configured) {
+        auto* warning = new QLabel(statusArea_->parentWidget());
+        warning->setObjectName(QStringLiteral("keymapWarning"));
+        warning->setAccessibleName(QStringLiteral("Keymap configuration error"));
+        warning->setTextFormat(Qt::PlainText);
+        warning->setWordWrap(true);
+        warning->setText(QStringLiteral("Default keys are active. %1: %2")
+                             .arg(configured.error().location, configured.error().message));
+        qobject_cast<QVBoxLayout*>(statusArea_->parentWidget()->layout())->addWidget(warning);
+        qWarning("%s", qPrintable(warning->text()));
+        return;
     }
-    if (buffers_.count() < 2) {
-        // Nothing to switch to; leave the key to the editor rather than
-        // swallowing it silently.
-        return false;
+    if (const auto applied = configured->applyTo(commands_); !applied) {
+        qFatal("Validated keymap could not be applied");
     }
+    keymap_ = *configured;
+}
 
-    if (event.key() == Qt::Key_L) {
-        runCommand(QStringLiteral("buffer.next"));
-        return true;
+QString MainWindow::shortcutCommand(const QKeyEvent& event, const QWidget* target) const {
+    if (target == nullptr || target->window() != this ||
+        qobject_cast<const QLineEdit*>(target) != nullptr) {
+        return {};
     }
-    if (event.key() == Qt::Key_H) {
-        runCommand(QStringLiteral("buffer.previous"));
-        return true;
+    auto id = keymap_.commandFor(QKeySequence(event.keyCombination()));
+    if (id.isEmpty()) {
+        return {};
     }
-    return false;
+    if (event.key() == Qt::Key_L && event.modifiers() == Qt::ControlModifier &&
+        !sidebar_->isAncestorOf(target)) {
+        return {};
+    }
+    const auto* editor = activeEditor();
+    const auto inEditor = editorStack_->isAncestorOf(target);
+    const auto normal = editor != nullptr && editor->mode() == EditorMode::Normal;
+    if (event.modifiers() == Qt::ShiftModifier && (!inEditor || !normal || buffers_.count() < 2)) {
+        return {};
+    }
+    // Only Save is an application shortcut while editing Insert/Visual text.
+    // Plain typing, command bars, search fields and dialog controls keep keys.
+    if (inEditor && !normal && id != QStringLiteral("file.save")) {
+        return {};
+    }
+    return id;
 }
 
 const CommandRegistry& MainWindow::commands() const noexcept { return commands_; }
@@ -490,13 +521,7 @@ void MainWindow::registerCommands() {
                 always,
                 [this](AppContext& context) {
                     helpContext_ = context;
-                    helpOverlay_->showCommands(
-                        commands_, context,
-                        {{QStringLiteral("file.save"), QStringLiteral("Ctrl+S")},
-                         {QStringLiteral("pane.sidebar"), QStringLiteral("Ctrl+H")},
-                         {QStringLiteral("pane.editor"), QStringLiteral("Ctrl+L (sidebar)")},
-                         {QStringLiteral("buffer.next"), QStringLiteral("Shift+L")},
-                         {QStringLiteral("buffer.previous"), QStringLiteral("Shift+H")}});
+                    helpOverlay_->showCommands(commands_, context, keymap_.shortcutLabels());
                 },
                 {}},
                {QStringLiteral("?")});

@@ -2,6 +2,8 @@ add_executable(
     omanotes
     main.cpp
     app/launch_request.cpp
+    app/keymap.cpp
+    app/keymap.hpp
     app/launch_request.hpp
     app/prefix_router.cpp
     app/prefix_router.hpp
