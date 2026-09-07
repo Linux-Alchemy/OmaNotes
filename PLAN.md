@@ -521,7 +521,10 @@ public:
 - [ ] **Matt gate:** operate for one session without the mouse, then repeat key actions with the mouse and assess the help overlay.
 
 Engineering evidence and the remaining hands-on checklist are in
-`docs/phase-5-keymap-review.md`. P6 awaits this acceptance gate.
+`docs/phase-5-keymap-review.md`. Matt's first gate session passed the keyboard
+paths and help overlay but found no mouse route for opening or closing a
+buffer; the fix and its evidence are in `docs/phase-5-mouse-review.md`.
+P6 awaits this acceptance gate.
 
 ## Phase 6: Markdown Reading View and Omarchy Appearance
 
@@ -858,6 +861,20 @@ Decision required: approve / request changes / stop and redesign
   worker, deterministic ordering, plain-text previews and keyboard/mouse result navigation.
   Task 5.3.1 added contextual command help from the existing registry and a mouse help button;
   leader routing also works from the sidebar. Search policy is documented in `docs/search.md`.
+
+- **2026-09-07:** Matt's Phase 5 gate session: keyboard paths and the help overlay passed,
+  but `buffer.new` and `buffer.close` had no mouse route, so the checkpoint's mouse-path
+  claim was premature. Fixed: tab close buttons and a `+` button beside the buffer strip.
+  On Matt's hands-on review of the fix, the mouse close of a dirty buffer became a
+  Save / Discard / Cancel prompt at his direction — Save on a scratch routes through the
+  save-as prompt and closes once named; Discard closes without saving; keyboard
+  `Space b d` keeps its status-line guard. His review also caught the sidebar shrinking
+  when a long status message appeared: the status label now wraps instead of raising the
+  pane's minimum width. Parked idea (unapproved, revisit after Phase 6): shipping
+  *default* direct-key bindings (`Ctrl+…`) alongside leader sequences for common
+  commands. The keymap already lets a user add one today via `shortcuts` in
+  `keymap.json` without losing the leader route, so the open question is only about
+  defaults.
   The 15-suite engineering gate passes with ASan/UBSan, formatting, clang-tidy and hardening.
   Tasks 5.3.2–5.3.4 await the configuration-format decision in `docs/keymap-proposal.md`;
   the Phase 5 hands-on gate remains open. The working baseline is merged upstream `b5260c8`,

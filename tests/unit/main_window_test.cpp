@@ -7,12 +7,14 @@
 #include <KTextEditor/Editor>
 #include <KTextEditor/View>
 
+#include <QAbstractButton>
 #include <QDialog>
 #include <QDir>
 #include <QFile>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMessageBox>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QTabBar>
@@ -63,6 +65,14 @@ void writeFile(const std::filesystem::path& path, const QByteArray& contents) {
     QFile file(QString::fromStdString(path.string()));
     QVERIFY2(file.open(QIODevice::WriteOnly), qPrintable(file.errorString()));
     QCOMPARE(file.write(contents), contents.size());
+}
+
+QAbstractButton* closeButtonFor(QTabBar& strip, int index) {
+    auto* button = strip.tabButton(index, QTabBar::RightSide);
+    if (button == nullptr) {
+        button = strip.tabButton(index, QTabBar::LeftSide);
+    }
+    return qobject_cast<QAbstractButton*>(button);
 }
 
 KTextEditor::View* activeEditor(omanotes::MainWindow& window) {
@@ -150,6 +160,7 @@ class MainWindowTest final : public QObject {
     void closesBuffersFromTheLeaderAndGuardsUnsavedWork();
     void refusesDisabledCommandsWithAReason();
     void clicksAndShortcutsRunTheSameCommands();
+    void mouseCreatesAndClosesBuffers();
     void searchOpensMatchesAndHelpRunsCommands();
     void helpIsReachableFromSidebar();
     void configuredKeysRouteAndAppearInHelp();
@@ -1298,6 +1309,81 @@ void MainWindowTest::clicksAndShortcutsRunTheSameCommands() {
                 sidebar->isAncestorOf(QApplication::focusWidget()));
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_L, Qt::ControlModifier);
     QTRY_VERIFY(activeEditor(window)->hasFocus());
+}
+
+void MainWindowTest::mouseCreatesAndClosesBuffers() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "note\n");
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* strip = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    auto* newBuffer = window.findChild<QToolButton*>(QStringLiteral("newBufferButton"));
+    QVERIFY(status != nullptr && strip != nullptr && newBuffer != nullptr);
+    QCOMPARE(strip->count(), 1);
+
+    // The + button runs buffer.new: a scratch buffer opens and takes over.
+    QTest::mouseClick(newBuffer, Qt::LeftButton);
+    QTRY_COMPARE(strip->count(), 2);
+    QCOMPARE(strip->currentIndex(), 1);
+    QCOMPARE(strip->tabText(1), QStringLiteral("[No Name]"));
+    QVERIFY(activeEditor(window)->document()->text().isEmpty());
+
+    // A dirty buffer's close button asks first; Cancel keeps everything.
+    activeEditor(window)->document()->setText(QStringLiteral("draft"));
+    QTRY_COMPARE(strip->tabText(1), QStringLiteral("[No Name] [+]"));
+    auto* scratchClose = closeButtonFor(*strip, 1);
+    QVERIFY(scratchClose != nullptr);
+    QTest::mouseClick(scratchClose, Qt::LeftButton);
+    auto* prompt = window.findChild<QMessageBox*>(QStringLiteral("closeBufferPrompt"));
+    QVERIFY(prompt != nullptr);
+    QTRY_VERIFY(prompt->isVisible());
+    QVERIFY(prompt->text().contains(QStringLiteral("[No Name]")));
+    QTest::mouseClick(prompt->button(QMessageBox::Cancel), Qt::LeftButton);
+    QTRY_VERIFY(!prompt->isVisible());
+    QCOMPARE(strip->count(), 2);
+    QCOMPARE(activeEditor(window)->document()->text(), QStringLiteral("draft"));
+
+    // Save routes a scratch through the save-as prompt, then finishes the close.
+    QTest::mouseClick(scratchClose, Qt::LeftButton);
+    QTRY_VERIFY(prompt->isVisible());
+    QTest::mouseClick(prompt->button(QMessageBox::Save), Qt::LeftButton);
+    auto* namePrompt = window.findChild<QLineEdit*>(QStringLiteral("namePrompt"));
+    QVERIFY(namePrompt != nullptr);
+    QTRY_VERIFY(namePrompt->isVisible());
+    QTest::keyClicks(namePrompt, QStringLiteral("kept.md"));
+    QTest::keyClick(namePrompt, Qt::Key_Return);
+    QTRY_COMPARE(strip->count(), 1);
+    QVERIFY(readFile(root / "kept.md").startsWith("draft"));
+    QCOMPARE(activeEditor(window)->document()->text(), QStringLiteral("note\n"));
+
+    // Discard closes without touching the disk; the last buffer leaves a scratch.
+    activeEditor(window)->document()->setText(QStringLiteral("note\nedited\n"));
+    QTRY_COMPARE(strip->tabText(0), QStringLiteral("note.md [+]"));
+    auto* noteClose = closeButtonFor(*strip, 0);
+    QVERIFY(noteClose != nullptr);
+    QTest::mouseClick(noteClose, Qt::LeftButton);
+    QTRY_VERIFY(prompt->isVisible());
+    QTest::mouseClick(prompt->button(QMessageBox::Discard), Qt::LeftButton);
+    QTRY_COMPARE(status->text(), QStringLiteral("Closed note.md, discarding changes"));
+    QCOMPARE(readFile(note), QByteArray("note\n"));
+    QCOMPARE(strip->count(), 1);
+    QCOMPARE(strip->tabText(0), QStringLiteral("[No Name]"));
+
+    // A clean close needs no prompt and acts on the clicked tab, not the
+    // active buffer.
+    QTest::mouseClick(newBuffer, Qt::LeftButton);
+    QTRY_COMPARE(strip->count(), 2);
+    activeEditor(window)->document()->setText(QStringLiteral("second"));
+    auto* firstClose = closeButtonFor(*strip, 0);
+    QVERIFY(firstClose != nullptr);
+    QTest::mouseClick(firstClose, Qt::LeftButton);
+    QTRY_COMPARE(strip->count(), 1);
+    QVERIFY(!prompt->isVisible());
+    QCOMPARE(activeEditor(window)->document()->text(), QStringLiteral("second"));
 }
 
 void MainWindowTest::closesCleanly() {
