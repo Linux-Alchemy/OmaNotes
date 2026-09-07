@@ -1,5 +1,9 @@
 # Search and help review — 2026-09-07
 
+Historical report for PR #10, subsequently reviewed and merged. The remaining
+keymap blocks and current Phase 5 gate are covered in
+[the keymap review](phase-5-keymap-review.md).
+
 Phase / blocks completed:
   5.2.1–5.2.4 and 5.3.1. Phase 5 remains incomplete: 5.3.2–5.3.4 await
   the keymap-format decision, followed by Matt's hands-on phase gate.

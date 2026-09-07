@@ -31,11 +31,14 @@ find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format REQUIRED)
 find_program(RUN_CLANG_TIDY_EXECUTABLE NAMES run-clang-tidy REQUIRED)
 
 set(OMANOTES_FORMAT_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/keymap_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/workspace_search_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/app/prefix_router.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/app/prefix_router.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/app/launch_request.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/keymap.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/keymap.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/app/launch_request.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffer.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffer_registry.cpp"
@@ -95,6 +98,7 @@ add_custom_target(
         -quiet
     DEPENDS
         omanotes
+        omanotes_keymap_tests
         omanotes_search_tests
         omanotes_buffer_tests
         omanotes_editor_tests

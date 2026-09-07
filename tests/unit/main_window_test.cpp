@@ -8,6 +8,7 @@
 #include <KTextEditor/View>
 
 #include <QDialog>
+#include <QDir>
 #include <QFile>
 #include <QLabel>
 #include <QLineEdit>
@@ -25,6 +26,32 @@
 #include <utility>
 
 namespace {
+
+class ScopedKeymap final {
+  public:
+    explicit ScopedKeymap(const QByteArray& json)
+        : previous_(qgetenv("XDG_CONFIG_HOME")),
+          hadPrevious_(qEnvironmentVariableIsSet("XDG_CONFIG_HOME")) {
+        qputenv("XDG_CONFIG_HOME", directory_.path().toUtf8());
+        QDir().mkpath(directory_.path() + QStringLiteral("/omanotes"));
+        QFile file(directory_.path() + QStringLiteral("/omanotes/keymap.json"));
+        if (file.open(QIODevice::WriteOnly)) {
+            file.write(json);
+        }
+    }
+    ~ScopedKeymap() {
+        if (hadPrevious_) {
+            qputenv("XDG_CONFIG_HOME", previous_);
+        } else {
+            qunsetenv("XDG_CONFIG_HOME");
+        }
+    }
+
+  private:
+    QTemporaryDir directory_;
+    QByteArray previous_;
+    bool hadPrevious_;
+};
 
 omanotes::LaunchRequest launchRequest() {
     return {std::filesystem::canonical(std::filesystem::current_path()), std::nullopt, false};
@@ -125,6 +152,10 @@ class MainWindowTest final : public QObject {
     void clicksAndShortcutsRunTheSameCommands();
     void searchOpensMatchesAndHelpRunsCommands();
     void helpIsReachableFromSidebar();
+    void configuredKeysRouteAndAppearInHelp();
+    void malformedKeymapKeepsDefaultsAndShowsLocation();
+    void remappedPaneKeyReplacesTheOldRoute();
+    void leaderOverridesWinOverDirectShiftKeys();
     void closesCleanly();
 };
 
@@ -1332,6 +1363,116 @@ void MainWindowTest::helpIsReachableFromSidebar() {
     QTRY_VERIFY(help->isVisible());
     QTest::keyClick(help, Qt::Key_Escape);
     QTRY_VERIFY(!help->isVisible());
+}
+
+void MainWindowTest::configuredKeysRouteAndAppearInHelp() {
+    ScopedKeymap configuration(
+        R"({"leaderBindings":{"buffer.new":["n"]},"shortcuts":{"file.save":"Ctrl+Alt+Shift+S"}})");
+    QTemporaryDir workspace;
+    const auto root = pathFor(workspace.path());
+    writeFile(root / "note.md", "original");
+    omanotes::MainWindow window({root, root / "note.md", false});
+    window.show();
+    QVERIFY(window.findChild<QLabel*>(QStringLiteral("keymapWarning")) == nullptr);
+    auto* editor = activeEditor(window);
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    auto* target = QApplication::focusWidget();
+    QTest::keyClicks(target, QStringLiteral("ilocal "));
+    QVERIFY(editor->document()->isModified());
+    QTest::keyClick(target, Qt::Key_S, Qt::ControlModifier);
+    QCOMPARE(readFile(root / "note.md"), QByteArray("original"));
+    QTest::keyClick(target, Qt::Key_S, Qt::ControlModifier | Qt::AltModifier | Qt::ShiftModifier);
+    QTRY_COMPARE(readFile(root / "note.md"), QByteArray("local original"));
+    QVERIFY(!editor->document()->isModified());
+    QTest::keyClick(target, Qt::Key_Escape);
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("n"));
+    QCOMPARE(window.findChild<QTabBar*>(QStringLiteral("bufferStrip"))->count(), 2);
+    target = QApplication::focusWidget();
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("?"));
+    auto* help = window.findChild<QDialog*>(QStringLiteral("helpOverlay"));
+    QTRY_VERIFY(help->isVisible());
+    auto* commands = help->findChild<QTreeWidget*>(QStringLiteral("helpCommands"));
+    bool sawSave = false;
+    bool sawNew = false;
+    for (int row = 0; row < commands->topLevelItemCount(); ++row) {
+        const auto* item = commands->topLevelItem(row);
+        const auto id = item->data(0, Qt::UserRole).toString();
+        if (id == QStringLiteral("file.save")) {
+            sawSave = true;
+            QCOMPARE(item->text(2), QKeySequence(QStringLiteral("Ctrl+Alt+Shift+S"))
+                                        .toString(QKeySequence::NativeText));
+        }
+        if (id == QStringLiteral("buffer.new")) {
+            sawNew = true;
+            QCOMPARE(item->text(2), QStringLiteral("Space n"));
+        }
+    }
+    QVERIFY(sawSave && sawNew);
+    help->reject();
+}
+
+void MainWindowTest::malformedKeymapKeepsDefaultsAndShowsLocation() {
+    for (const auto& json :
+         {QByteArray("{ broken"),
+          QByteArray(
+              R"({"leaderBindings":{"buffer.new":["n"]},"shortcuts":{"file.save":"Ctrl+B"}})")}) {
+        ScopedKeymap configuration(json);
+        omanotes::MainWindow window(launchRequest());
+        window.show();
+        auto* warning = window.findChild<QLabel*>(QStringLiteral("keymapWarning"));
+        QVERIFY(warning != nullptr);
+        QVERIFY(warning->text().contains(QStringLiteral("keymap.json")));
+        QVERIFY(warning->text().contains(QStringLiteral("Default keys")));
+        QCOMPARE(window.commands().lookup(QStringLiteral("f n")).commandId,
+                 QStringLiteral("buffer.new"));
+        QCOMPARE(window.commands().lookup(QStringLiteral("n")).match,
+                 omanotes::SequenceMatch::None);
+        auto* editor = activeEditor(window);
+        editor->setFocus();
+        QTRY_VERIFY(editor->hasFocus());
+        auto* target = QApplication::focusWidget();
+        QTest::keyClick(target, Qt::Key_Space);
+        QTest::keyClicks(target, QStringLiteral("?"));
+        auto* help = window.findChild<QDialog*>(QStringLiteral("helpOverlay"));
+        QTRY_VERIFY(help->isVisible());
+        help->reject();
+    }
+}
+
+void MainWindowTest::remappedPaneKeyReplacesTheOldRoute() {
+    ScopedKeymap configuration(R"({"shortcuts":{"pane.editor":"Ctrl+Alt+Shift+L"}})");
+    omanotes::MainWindow window(launchRequest());
+    window.show();
+    QVERIFY(window.findChild<QLabel*>(QStringLiteral("keymapWarning")) == nullptr);
+    auto* editor = activeEditor(window);
+    QTRY_VERIFY(editor->hasFocus());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_H, Qt::ControlModifier);
+    auto* tree = window.findChild<QTreeView*>(QStringLiteral("fileTree"));
+    QTRY_VERIFY(tree->hasFocus());
+    QTest::keyClick(tree, Qt::Key_L, Qt::ControlModifier);
+    QVERIFY(tree->hasFocus());
+    QTest::keyClick(tree, Qt::Key_L, Qt::ControlModifier | Qt::AltModifier | Qt::ShiftModifier);
+    QTRY_VERIFY(editor->hasFocus());
+}
+
+void MainWindowTest::leaderOverridesWinOverDirectShiftKeys() {
+    ScopedKeymap configuration(R"({"leaderBindings":{"help.show":["?","H"]}})");
+    omanotes::MainWindow window(launchRequest());
+    window.show();
+    auto* editor = activeEditor(window);
+    QTRY_VERIFY(editor->hasFocus());
+    auto* target = QApplication::focusWidget();
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("fn"));
+    target = QApplication::focusWidget();
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("H"));
+    auto* help = window.findChild<QDialog*>(QStringLiteral("helpOverlay"));
+    QTRY_VERIFY(help->isVisible());
+    help->reject();
 }
 
 QTEST_MAIN(MainWindowTest)
