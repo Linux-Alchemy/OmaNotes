@@ -24,6 +24,14 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/ui/buffer_strip.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/buffer_strip.hpp"
     "${CMAKE_SOURCE_DIR}/src/ui/main_window.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/help_overlay.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/help_overlay.hpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/file_index.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/file_index.hpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/text_search.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/text_search.hpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/search_palette.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/search_palette.hpp"
     "${CMAKE_SOURCE_DIR}/src/ui/main_window.hpp"
     "${CMAKE_SOURCE_DIR}/src/ui/sidebar.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/sidebar.hpp"
@@ -251,6 +259,21 @@ omanotes_enable_sanitizers(omanotes_process_tests)
 
 add_test(NAME launch-process COMMAND omanotes_process_tests)
 
+add_executable(omanotes_search_tests
+    integration/workspace_search_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/workspace/file_index.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/text_search.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/search_palette.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/search_palette.hpp"
+)
+target_include_directories(omanotes_search_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(omanotes_search_tests PRIVATE Qt6::Test Qt6::Widgets)
+omanotes_enable_warnings(omanotes_search_tests)
+omanotes_enable_hardening(omanotes_search_tests)
+omanotes_enable_sanitizers(omanotes_search_tests)
+add_test(NAME workspace-search COMMAND omanotes_search_tests)
+
 set(
     OMANOTES_TEST_ENVIRONMENT
     "QT_QPA_PLATFORM=offscreen"
@@ -264,7 +287,7 @@ set(
 )
 
 set_tests_properties(
-    atomic-save buffer-registry command-registry conflict-detector document-store editor-adapter file-tree-model
+    workspace-search atomic-save buffer-registry command-registry conflict-detector document-store editor-adapter file-tree-model
     file-watcher launch-process launch-request prefix-router ui-structure process-startup
     vim-behaviour
     PROPERTIES ENVIRONMENT "${OMANOTES_TEST_ENVIRONMENT}"

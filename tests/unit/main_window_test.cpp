@@ -7,14 +7,18 @@
 #include <KTextEditor/Editor>
 #include <KTextEditor/View>
 
+#include <QDialog>
 #include <QFile>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QTabBar>
 #include <QTemporaryDir>
+#include <QToolButton>
 #include <QTreeView>
+#include <QTreeWidget>
 #include <QtTest>
 
 #include <filesystem>
@@ -119,6 +123,8 @@ class MainWindowTest final : public QObject {
     void closesBuffersFromTheLeaderAndGuardsUnsavedWork();
     void refusesDisabledCommandsWithAReason();
     void clicksAndShortcutsRunTheSameCommands();
+    void searchOpensMatchesAndHelpRunsCommands();
+    void helpIsReachableFromSidebar();
     void closesCleanly();
 };
 
@@ -183,7 +189,9 @@ void MainWindowTest::spacePrefixDoesNotSwallowInsertTextOrControlB() {
     QKeyEvent questionPress(QEvent::KeyPress, Qt::Key_Question, Qt::ShiftModifier,
                             QStringLiteral("?"));
     QApplication::sendEvent(eventTarget, &questionPress);
-    QTRY_COMPARE(status->text(), QStringLiteral("Help is not available yet (Task 5.3)"));
+    auto* help = window.findChild<QDialog*>(QStringLiteral("helpOverlay"));
+    QTRY_VERIFY(help != nullptr && help->isVisible());
+    help->reject();
     QCOMPARE(editor->document()->text(), QStringLiteral("alpha"));
 
     QTest::keyClicks(eventTarget, QStringLiteral("ihello world"));
@@ -1188,22 +1196,10 @@ void MainWindowTest::refusesDisabledCommandsWithAReason() {
     QTest::keyClicks(target, QStringLiteral("bn"));
     QTRY_COMPARE(status->text(), QStringLiteral("Only one buffer is open"));
 
-    // Features from later blocks are registered, discoverable, and honest.
-    // A second Space is LazyVim's find-files key and spells itself out.
+    // Reading mode remains outside this phase.
     QTest::keyClick(target, Qt::Key_Space);
-    QTest::keyClick(target, Qt::Key_Space);
-    QTRY_COMPARE(status->text(), QStringLiteral("Find files is not available yet (Task 5.2)"));
-    for (const auto& [keys, message] :
-         {std::pair{QStringLiteral("ff"),
-                    QStringLiteral("Find files is not available yet (Task 5.2)")},
-          std::pair{QStringLiteral("/"),
-                    QStringLiteral("Search text is not available yet (Task 5.2)")},
-          std::pair{QStringLiteral("m"),
-                    QStringLiteral("Reading view is not available yet (Phase 6)")}}) {
-        QTest::keyClick(target, Qt::Key_Space);
-        QTest::keyClicks(target, keys);
-        QTRY_COMPARE(status->text(), message);
-    }
+    QTest::keyClicks(target, QStringLiteral("m"));
+    QTRY_COMPARE(status->text(), QStringLiteral("Reading view is not available yet (Phase 6)"));
     QCOMPARE(editor->document()->text(), QString{});
 
     // A pending prefix in Insert mode is cancelled, never executed.
@@ -1278,6 +1274,64 @@ void MainWindowTest::closesCleanly() {
     window.show();
     QVERIFY(window.close());
     QVERIFY(!window.isVisible());
+}
+
+void MainWindowTest::searchOpensMatchesAndHelpRunsCommands() {
+    QTemporaryDir temporary;
+    const auto root = pathFor(temporary.path());
+    writeFile(root / "found.md", "first\nfind me here\n");
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* editor = activeEditor(window);
+    QTRY_VERIFY(editor->hasFocus());
+    auto* target = QApplication::focusWidget();
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("/"));
+    auto* palette = window.findChild<QDialog*>(QStringLiteral("searchPalette"));
+    QTRY_VERIFY(palette->isVisible());
+    auto* query = palette->findChild<QLineEdit*>(QStringLiteral("searchQuery"));
+    QTest::keyClicks(query, QStringLiteral("find me"));
+    auto* list = palette->findChild<QListWidget*>(QStringLiteral("searchResults"));
+    QTRY_COMPARE(list->count(), 1);
+    QTest::keyClick(query, Qt::Key_Return);
+    QTRY_COMPARE(activeEditor(window)->document()->text(), QStringLiteral("first\nfind me here\n"));
+    QCOMPARE(activeEditor(window)->cursorPosition(), KTextEditor::Cursor(1, 0));
+    auto* helpButton = window.findChild<QToolButton*>(QStringLiteral("helpButton"));
+    QTest::mouseClick(helpButton, Qt::LeftButton);
+    auto* help = window.findChild<QDialog*>(QStringLiteral("helpOverlay"));
+    QTRY_VERIFY(help->isVisible());
+    auto* commands = help->findChild<QTreeWidget*>(QStringLiteral("helpCommands"));
+    QTreeWidgetItem* newBuffer = nullptr;
+    for (int row = 0; row < commands->topLevelItemCount(); ++row) {
+        auto* item = commands->topLevelItem(row);
+        QVERIFY(item->data(0, Qt::UserRole).toString() != QStringLiteral("view.reading"));
+        if (item->data(0, Qt::UserRole).toString() == QStringLiteral("buffer.new")) {
+            newBuffer = item;
+        }
+    }
+    QVERIFY(newBuffer != nullptr);
+    commands->setCurrentItem(newBuffer);
+    QTest::keyClick(commands, Qt::Key_Return);
+    QTRY_VERIFY(!help->isVisible());
+    QCOMPARE(activeEditor(window)->document()->text(), QString{});
+}
+
+void MainWindowTest::helpIsReachableFromSidebar() {
+    omanotes::MainWindow window(launchRequest());
+    window.show();
+    auto* editor = activeEditor(window);
+    QTRY_VERIFY(editor->hasFocus());
+    auto* target = QApplication::focusWidget();
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("e"));
+    auto* tree = window.findChild<QTreeView*>(QStringLiteral("fileTree"));
+    QTRY_VERIFY(tree->hasFocus());
+    QTest::keyClick(tree, Qt::Key_Space);
+    QTest::keyClicks(tree, QStringLiteral("?"));
+    auto* help = window.findChild<QDialog*>(QStringLiteral("helpOverlay"));
+    QTRY_VERIFY(help->isVisible());
+    QTest::keyClick(help, Qt::Key_Escape);
+    QTRY_VERIFY(!help->isVisible());
 }
 
 QTEST_MAIN(MainWindowTest)
