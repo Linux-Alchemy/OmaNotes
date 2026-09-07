@@ -2,6 +2,8 @@ add_executable(
     omanotes_ui_tests
     unit/main_window_test.cpp
     "${CMAKE_SOURCE_DIR}/src/app/launch_request.hpp"
+    "${CMAKE_SOURCE_DIR}/src/app/keymap.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/keymap.hpp"
     "${CMAKE_SOURCE_DIR}/src/core/buffer.hpp"
     "${CMAKE_SOURCE_DIR}/src/core/buffer_registry.cpp"
     "${CMAKE_SOURCE_DIR}/src/core/buffer_registry.hpp"
@@ -274,6 +276,18 @@ omanotes_enable_hardening(omanotes_search_tests)
 omanotes_enable_sanitizers(omanotes_search_tests)
 add_test(NAME workspace-search COMMAND omanotes_search_tests)
 
+add_executable(omanotes_keymap_tests
+    unit/keymap_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/app/keymap.cpp"
+    "${CMAKE_SOURCE_DIR}/src/core/command_registry.cpp"
+)
+target_include_directories(omanotes_keymap_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(omanotes_keymap_tests PRIVATE Qt6::Test Qt6::Widgets)
+omanotes_enable_warnings(omanotes_keymap_tests)
+omanotes_enable_hardening(omanotes_keymap_tests)
+omanotes_enable_sanitizers(omanotes_keymap_tests)
+add_test(NAME keymap COMMAND omanotes_keymap_tests)
+
 set(
     OMANOTES_TEST_ENVIRONMENT
     "QT_QPA_PLATFORM=offscreen"
@@ -287,7 +301,7 @@ set(
 )
 
 set_tests_properties(
-    workspace-search atomic-save buffer-registry command-registry conflict-detector document-store editor-adapter file-tree-model
+    keymap workspace-search atomic-save buffer-registry command-registry conflict-detector document-store editor-adapter file-tree-model
     file-watcher launch-process launch-request prefix-router ui-structure process-startup
     vim-behaviour
     PROPERTIES ENVIRONMENT "${OMANOTES_TEST_ENVIRONMENT}"

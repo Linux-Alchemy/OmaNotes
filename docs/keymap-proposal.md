@@ -1,4 +1,4 @@
-# P5.3 keymap proposal — awaiting approval
+# P5.3 keymap proposal — implemented
 
 The proposed file is `$XDG_CONFIG_HOME/omanotes/keymap.json`, with
 `~/.config/omanotes/keymap.json` as the standard fallback. Omanotes would only
@@ -29,5 +29,7 @@ An invalid configuration would report the file and offending property (or JSON
 parse location), retain all default bindings, and allow launch. Partial updates
 would be validated as a complete candidate keymap before becoming active.
 
-This is a review proposal, not an implemented config contract. The parser,
-startup loading, and keymap tests in 5.3.2–5.3.4 await approval of the format.
+This proposal was carried forward after PR #10 was reviewed and merged and
+Matt requested continuation. The implemented contract is documented in
+[configuration.md](configuration.md) and [ADR 0008](decisions/0008-keymap-format-and-safety.md).
+Phase 5 hands-on acceptance remains pending.

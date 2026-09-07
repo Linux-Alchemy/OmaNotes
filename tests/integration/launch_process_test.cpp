@@ -1,5 +1,6 @@
 #include <QFile>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -21,8 +22,11 @@ void writeFile(const std::filesystem::path& path, const QByteArray& contents = "
     QCOMPARE(file.write(contents), contents.size());
 }
 
-ProcessResult runOmanotes(const QStringList& arguments, const QString& workingDirectory) {
+ProcessResult
+runOmanotes(const QStringList& arguments, const QString& workingDirectory,
+            const QProcessEnvironment& environment = QProcessEnvironment::systemEnvironment()) {
     QProcess process;
+    process.setProcessEnvironment(environment);
     process.setWorkingDirectory(workingDirectory);
     process.start(QStringLiteral(OMANOTES_BINARY_PATH), arguments);
 
@@ -59,6 +63,7 @@ class LaunchProcessTest final : public QObject {
   private slots:
     void startsForEveryApprovedLaunchForm();
     void rejectsMissingFileWithoutCrashing();
+    void malformedKeymapStillStartsWithDefaults();
 };
 
 void LaunchProcessTest::startsForEveryApprovedLaunchForm() {
@@ -99,6 +104,32 @@ void LaunchProcessTest::rejectsMissingFileWithoutCrashing() {
     QCOMPARE(result.exitStatus, QProcess::NormalExit);
     QCOMPARE(result.exitCode, 2);
     QVERIFY(result.standardError.contains("does not exist"));
+}
+
+void LaunchProcessTest::malformedKeymapStillStartsWithDefaults() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::path(temporary.path().toStdString());
+    const auto config = root / "config";
+    std::filesystem::create_directories(config / "omanotes");
+    const auto keymap = config / "omanotes" / "keymap.json";
+    const QByteArray malformed = "{ broken json";
+    writeFile(keymap, malformed);
+    auto environment = QProcessEnvironment::systemEnvironment();
+    environment.insert(QStringLiteral("XDG_CONFIG_HOME"), QString::fromStdString(config.string()));
+    // Qt may otherwise send warnings to the desktop journal instead of the pipe.
+    environment.insert(QStringLiteral("QT_FORCE_STDERR_LOGGING"), QStringLiteral("1"));
+
+    const auto result =
+        runOmanotes({QStringLiteral("--smoke-test")}, temporary.path(), environment);
+    verifySuccess(result);
+    QVERIFY2(result.standardError.contains("keymap.json"), result.standardError.constData());
+    QVERIFY2(result.standardError.contains("byte"), result.standardError.constData());
+    QVERIFY2(result.standardError.contains("Default keys are active"),
+             result.standardError.constData());
+    QFile unchanged(QString::fromStdString(keymap.string()));
+    QVERIFY(unchanged.open(QIODevice::ReadOnly));
+    QCOMPARE(unchanged.readAll(), malformed);
 }
 
 QTEST_MAIN(LaunchProcessTest)

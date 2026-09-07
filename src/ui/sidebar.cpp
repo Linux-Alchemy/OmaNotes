@@ -62,10 +62,6 @@ void Sidebar::noteFileCreated(const std::filesystem::path& path) { model_->noteF
 bool Sidebar::eventFilter(QObject* watched, QEvent* event) {
     if (watched == tree_ && event->type() == QEvent::KeyPress) {
         const auto& keyEvent = *static_cast<QKeyEvent*>(event);
-        if (keyEvent.key() == Qt::Key_L && keyEvent.modifiers() == Qt::ControlModifier) {
-            emit editorFocusRequested();
-            return true;
-        }
         if (keyEvent.modifiers() == Qt::NoModifier) {
             switch (keyEvent.key()) {
             case Qt::Key_J:
