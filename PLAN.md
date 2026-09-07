@@ -483,10 +483,10 @@ public:
 
 **Blocks:**
 
-- [ ] **5.2.1** — Implement tested in-process file scoring and bounded Markdown text search.
-- [ ] **5.2.2** — Add keyboard/mouse palette navigation and result preview.
-- [ ] **5.2.3** — Add cancellation and performance fixtures for large workspaces.
-- [ ] **5.2.4** — Verify: root escapes, binary content, pathological lines, and cancellation pass.
+- [x] **5.2.1** — Implement tested in-process file scoring and bounded Markdown text search.
+- [x] **5.2.2** — Add keyboard/mouse palette navigation and result preview.
+- [x] **5.2.3** — Add cancellation and performance fixtures for large workspaces.
+- [x] **5.2.4** — Verify: root escapes, binary content, pathological lines, and cancellation pass.
 
 ### Task 5.3: Build contextual help and safe key configuration
 
@@ -508,7 +508,7 @@ public:
 
 **Blocks:**
 
-- [ ] **5.3.1** — Render current-context commands from the command registry.
+- [x] **5.3.1** — Render current-context commands from the command registry.
 - [ ] **5.3.2** — Add partial key overrides using the approved XDG config location.
 - [ ] **5.3.3** — Test duplicate, unreachable, invalid, and editor-conflicting mappings.
 - [ ] **5.3.4** — Verify: `Leader+?` remains reachable and the app starts safely with malformed config.
@@ -516,7 +516,7 @@ public:
 ### Phase 5 Checkpoint
 
 - [ ] Every core workflow has a tested keyboard path and a mouse path where visible.
-- [ ] Search remains responsive and root-scoped under stress fixtures.
+- [x] Search remains responsive and root-scoped under stress fixtures.
 - [ ] Configuration cannot invoke arbitrary programs.
 - [ ] **Matt gate:** operate for one session without the mouse, then repeat key actions with the mouse and assess the help overlay.
 
@@ -850,3 +850,12 @@ Decision required: approve / request changes / stop and redesign
   from the sidebar to the editor leaves no visible sign of which pane is live; deferred to Task
   6.2, where focus visibility is already a requirement. The sidebar now starts hidden, overriding
   the outline's "visible on the left"; Phase 7's session restore will remember its state.
+
+- **2026-09-07:** Task 5.2 implemented bounded in-process file/text search with a cancellable
+  worker, deterministic ordering, plain-text previews and keyboard/mouse result navigation.
+  Task 5.3.1 added contextual command help from the existing registry and a mouse help button;
+  leader routing also works from the sidebar. Search policy is documented in `docs/search.md`.
+  The 15-suite engineering gate passes with ASan/UBSan, formatting, clang-tidy and hardening.
+  Tasks 5.3.2–5.3.4 await the configuration-format decision in `docs/keymap-proposal.md`;
+  the Phase 5 hands-on gate remains open. The working baseline is merged upstream `b5260c8`,
+  which already records P4 acceptance and completion of 5.1.

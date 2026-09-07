@@ -31,6 +31,7 @@ find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format REQUIRED)
 find_program(RUN_CLANG_TIDY_EXECUTABLE NAMES run-clang-tidy REQUIRED)
 
 set(OMANOTES_FORMAT_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/workspace_search_test.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/app/prefix_router.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/app/prefix_router.hpp"
@@ -51,6 +52,14 @@ set(OMANOTES_FORMAT_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/buffer_strip.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/buffer_strip.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/main_window.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/help_overlay.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/help_overlay.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/file_index.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/file_index.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/text_search.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/text_search.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/search_palette.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/search_palette.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/main_window.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/sidebar.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/sidebar.hpp"
@@ -86,6 +95,7 @@ add_custom_target(
         -quiet
     DEPENDS
         omanotes
+        omanotes_search_tests
         omanotes_buffer_tests
         omanotes_editor_tests
         omanotes_persistence_tests
