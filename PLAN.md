@@ -554,7 +554,7 @@ public:
 
 **Blocks:**
 
-- [ ] **6.1.1** — Define supported Markdown and resource policy with malicious fixtures.
+- [x] **6.1.1** — Define supported Markdown and resource policy with malicious fixtures.
 - [ ] **6.1.2** — Implement writing/reading toggle while preserving cursor and buffer state.
 - [ ] **6.1.3** — Style typography, headings, lists, quotes, links, and code for restrained reading.
 - [ ] **6.1.4** — Verify: hostile HTML, remote images, traversal URLs, and malformed Markdown cause no execution or out-of-root reads.
@@ -875,6 +875,15 @@ Decision required: approve / request changes / stop and redesign
   commands. The keymap already lets a user add one today via `shortcuts` in
   `keymap.json` without losing the leader route, so the open question is only about
   defaults.
+
+- **2026-09-07:** Block 6.1.1: Matt set the reading-view direction (minimal deps, Obsidian
+  restraint, vault-model resources, clickable links) and accepted the security amendments,
+  recorded as ADR 0009 — Qt-native CommonMark+GFM with raw HTML never parsed, raster-only
+  root-scoped images with size caps and no SVG/data:/remote, and a link scheme allowlist
+  (http/https via the browser, in-root `.md` links open in-app, all else refused) with
+  hover target reveal. The malicious fixture set encoding the policy lives in
+  `tests/fixtures/markdown/`; block 6.1.4 verifies against it. Threat model note: agents
+  write into the workspace by design, so every note is untrusted input.
   The 15-suite engineering gate passes with ASan/UBSan, formatting, clang-tidy and hardening.
   Tasks 5.3.2–5.3.4 await the configuration-format decision in `docs/keymap-proposal.md`;
   the Phase 5 hands-on gate remains open. The working baseline is merged upstream `b5260c8`,
