@@ -6,7 +6,8 @@ Phase / blocks completed:
   Baseline b5260c8 already records accepted P4 and completed 5.1.
 
 Branch and PR:
-  phase/5-search-and-help. Draft PR to main accompanies this branch.
+  phase/5-search-and-help. Local commit b302d69. Push and draft PR to main
+  await explicit publication approval after automatic review rejected the push.
 
 Files changed:
   src/workspace/file_index.* — root-scoped Markdown enumeration and fuzzy scoring.
