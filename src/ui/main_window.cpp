@@ -23,6 +23,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStringDecoder>
@@ -106,6 +107,9 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
     status->setObjectName(QStringLiteral("statusArea"));
     status->setAccessibleName(QStringLiteral("Editor status"));
     status->setContentsMargins(10, 6, 10, 6);
+    // A long message must wrap here, not raise this pane's minimum width —
+    // that would make the splitter steal space from the sidebar.
+    status->setWordWrap(true);
 
     namePrompt = new QLineEdit(writingArea);
     namePrompt->setObjectName(QStringLiteral("namePrompt"));
@@ -203,11 +207,8 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
         context.targetBuffer = id;
         runCommand(QStringLiteral("buffer.show"), std::move(context));
     });
-    connect(bufferStrip_, &BufferStrip::bufferCloseRequested, this, [this](BufferId id) {
-        auto context = currentContext();
-        context.targetBuffer = id;
-        runCommand(QStringLiteral("buffer.close"), std::move(context));
-    });
+    connect(bufferStrip_, &BufferStrip::bufferCloseRequested, this,
+            [this](BufferId id) { confirmCloseBuffer(id); });
     connect(newBufferButton, &QToolButton::clicked, this,
             [this] { runCommand(QStringLiteral("buffer.new")); });
     connect(sidebar_, &Sidebar::fileActivated, this, [this](const std::filesystem::path& path) {
@@ -586,6 +587,61 @@ void MainWindow::runCommand(QStringView id, AppContext context) {
     }
 }
 
+void MainWindow::confirmCloseBuffer(BufferId id) {
+    const auto* state = buffers_.find(id);
+    if (state == nullptr) {
+        return;
+    }
+    if (!state->modified) {
+        auto context = currentContext();
+        context.targetBuffer = id;
+        runCommand(QStringLiteral("buffer.close"), std::move(context));
+        return;
+    }
+
+    // Bring the buffer being judged to the front before asking about it.
+    if (buffers_.activate(id)) {
+        showBuffer(id);
+    }
+    if (closePrompt_ == nullptr) {
+        closePrompt_ =
+            new QMessageBox(QMessageBox::Question, QString{}, QString{},
+                            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
+        closePrompt_->setObjectName(QStringLiteral("closeBufferPrompt"));
+        closePrompt_->setDefaultButton(QMessageBox::Save);
+        connect(closePrompt_, &QMessageBox::finished, this, [this](int result) {
+            const auto target = closePromptTarget_;
+            closePromptTarget_.reset();
+            if (!target.has_value() || buffers_.find(*target) == nullptr) {
+                return;
+            }
+            auto context = currentContext();
+            context.targetBuffer = *target;
+            if (result == QMessageBox::Discard) {
+                runCommand(QStringLiteral("buffer.close.discard"), std::move(context));
+                return;
+            }
+            if (result != QMessageBox::Save) {
+                return;
+            }
+            if (const auto* chosen = buffers_.find(*target); !chosen->path.has_value()) {
+                closeAfterNaming_ = *target;
+                beginNaming();
+            } else if (const auto failure = saveTo({}); failure.isEmpty()) {
+                runCommand(QStringLiteral("buffer.close"), std::move(context));
+            } else {
+                statusArea_->setText(failure);
+            }
+        });
+    }
+    closePromptTarget_ = id;
+    closePrompt_->setWindowTitle(QStringLiteral("Unsaved changes"));
+    closePrompt_->setText(QStringLiteral("%1 has unsaved changes.").arg(state->displayName));
+    closePrompt_->setInformativeText(
+        QStringLiteral("Save writes it inside the workspace; Discard closes without saving."));
+    closePrompt_->open();
+}
+
 void MainWindow::closeBuffer(BufferId id, bool discardChanges) {
     const auto* state = buffers_.find(id);
     if (state == nullptr) {
@@ -942,6 +998,7 @@ void MainWindow::beginNaming() {
 }
 
 void MainWindow::cancelNaming() {
+    closeAfterNaming_.reset();
     namePrompt_->clear();
     namePrompt_->hide();
     if (auto* editor = activeEditor(); editor != nullptr && editor->widget() != nullptr) {
@@ -967,6 +1024,14 @@ void MainWindow::commitNaming() {
     namePrompt_->hide();
     if (auto* editor = activeEditor(); editor != nullptr && editor->widget() != nullptr) {
         editor->widget()->setFocus(Qt::OtherFocusReason);
+    }
+
+    // A save begun from the close prompt finishes the close it interrupted.
+    if (closeAfterNaming_.has_value()) {
+        auto context = currentContext();
+        context.targetBuffer = *closeAfterNaming_;
+        closeAfterNaming_.reset();
+        runCommand(QStringLiteral("buffer.close"), std::move(context));
     }
 }
 
