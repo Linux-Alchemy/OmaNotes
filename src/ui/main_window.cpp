@@ -259,6 +259,9 @@ MainWindow::~MainWindow() {
 }
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
+    if (forwardingKeyToVi_) {
+        return false;
+    }
     const auto* watchedWidget = qobject_cast<QWidget*>(watched);
     const auto insideWindow =
         watchedWidget != nullptr && (watchedWidget == this || isAncestorOf(watchedWidget));
@@ -373,15 +376,15 @@ QString MainWindow::shortcutCommand(const QKeyEvent& event, const QWidget* targe
     if (event.modifiers() == Qt::ShiftModifier && (!inEditor || !normal || buffers_.count() < 2)) {
         return {};
     }
-    // The Meta modifier marks a compositor-injected chord: the physical
-    // Super is still held. Super+V therefore pastes in ANY mode — the same
-    // promise terminals keep, where Omarchy hands Neovim pasted text rather
-    // than a keystroke and vim.paste works regardless of mode. A bare
-    // Ctrl+V pastes only while inserting; everywhere else it falls through
-    // to Vi, where it is visual block (Matt's call, 2026-09-07).
-    const auto superChord = combination.keyboardModifiers().testFlag(Qt::MetaModifier);
-    if (id == QStringLiteral("edit.paste") &&
-        (!inEditor || editor == nullptr || (!superChord && editor->mode() != EditorMode::Insert))) {
+    // Omarchy's Super+V arrives as a clean Ctrl+V — clipboard.lua's
+    // send_key_state exists precisely to keep the held Super out of the
+    // injected chord — so the two are indistinguishable here. Matt's rule
+    // (2026-09-07): universal paste wins in every mode; Vi's visual block
+    // moves to Ctrl+Q, gvim's classic answer to this exact collision.
+    if (id == QStringLiteral("edit.paste") && (!inEditor || editor == nullptr)) {
+        return {};
+    }
+    if (id == QStringLiteral("editor.visual-block") && (!inEditor || !normal)) {
         return {};
     }
     // Copy runs only over a selection; without one, Ctrl+C stays Vi's abort.
@@ -460,6 +463,10 @@ void MainWindow::registerCommands() {
                 [this](AppContext&) { copySelectionToClipboard(); },
                 {}});
     routedOutsideLeader_.push_back(QStringLiteral("edit.copy"));
+    addCommand({QStringLiteral("editor.visual-block"), QStringLiteral("Visual block (Vi)"),
+                QStringLiteral("edit"), inNormalMode, [this](AppContext&) { enterVisualBlock(); },
+                QStringLiteral("Visual block starts from Normal mode")});
+    routedOutsideLeader_.push_back(QStringLiteral("editor.visual-block"));
 
     addCommand({QStringLiteral("file.open"), QStringLiteral("Open file"), QStringLiteral("file"),
                 [](const AppContext& context) { return context.targetPath.has_value(); },
@@ -1050,6 +1057,23 @@ void MainWindow::copySelectionToClipboard() {
         }
     }
     statusArea_->setText(QStringLiteral("Nothing is selected to copy"));
+}
+
+void MainWindow::enterVisualBlock() {
+    auto* editor = activeEditor();
+    if (editor == nullptr || editor->widget() == nullptr) {
+        return;
+    }
+    auto* target = QApplication::focusWidget();
+    if (target == nullptr || !editorStack_->isAncestorOf(target)) {
+        target = editor->widget();
+    }
+    forwardingKeyToVi_ = true;
+    QKeyEvent press(QEvent::KeyPress, Qt::Key_V, Qt::ControlModifier);
+    QApplication::sendEvent(target, &press);
+    QKeyEvent release(QEvent::KeyRelease, Qt::Key_V, Qt::ControlModifier);
+    QApplication::sendEvent(target, &release);
+    forwardingKeyToVi_ = false;
 }
 
 void MainWindow::saveActiveBuffer() {

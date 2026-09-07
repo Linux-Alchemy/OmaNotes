@@ -1074,10 +1074,11 @@ void MainWindowTest::everyCommandHasOneImplementationAndARoute() {
     for (const auto* id :
          {"file.save", "file.open", "buffer.new", "buffer.close", "buffer.close.discard",
           "buffer.next", "buffer.previous", "buffer.show", "pane.sidebar", "pane.editor",
-          "search.files", "search.text", "help.show", "view.reading", "edit.paste", "edit.copy"}) {
+          "search.files", "search.text", "help.show", "view.reading", "edit.paste", "edit.copy",
+          "editor.visual-block"}) {
         QVERIFY2(commands.find(QString::fromLatin1(id)) != nullptr, id);
     }
-    QCOMPARE(commands.commands().size(), std::size_t{17});
+    QCOMPARE(commands.commands().size(), std::size_t{18});
 }
 
 void MainWindowTest::leaderSequencesRunRegisteredCommands() {
@@ -1403,17 +1404,22 @@ void MainWindowTest::insertModePasteRoutesTheClipboard() {
     QTRY_VERIFY(editor->hasFocus());
     QApplication::clipboard()->setText(QStringLiteral("PASTED"));
 
-    // Normal mode: Ctrl+V remains Vi's visual block; nothing is inserted.
+    // Ctrl+V pastes in Normal mode: it is indistinguishable from Omarchy's
+    // Super+V, and universal paste wins in every mode.
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_V, Qt::ControlModifier);
-    QCOMPARE(editor->document()->text(), QStringLiteral("start\n"));
-    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QTRY_COMPARE(editor->document()->text(), QStringLiteral("PASTEDstart\n"));
 
-    // Insert mode: Ctrl+V is Omarchy's universal paste (Super+V arrives as
-    // a literal Ctrl+V) and typing continues normally afterwards.
+    // Visual block lives on Ctrl+Q, exactly as gvim resolves the clash.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Q, Qt::ControlModifier);
+    QTRY_COMPARE(editor->viewMode(), KTextEditor::View::ViModeVisualBlock);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QTRY_COMPARE(editor->viewMode(), KTextEditor::View::ViModeNormal);
+    QCOMPARE(editor->document()->text(), QStringLiteral("PASTEDstart\n"));
+
+    // Insert mode pastes too, and typing continues normally afterwards.
     QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("i"));
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_V, Qt::ControlModifier);
-    QTRY_VERIFY2(editor->document()->text().contains(QStringLiteral("PASTED")),
-                 qPrintable(editor->document()->text()));
+    QTRY_COMPARE(editor->document()->text().count(QStringLiteral("PASTED")), qsizetype{2});
     QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("x"));
     QTRY_VERIFY2(editor->document()->text().contains(QStringLiteral("PASTEDx")),
                  qPrintable(editor->document()->text()));
@@ -1452,15 +1458,13 @@ void MainWindowTest::superChordsRouteUniversalCopyAndPaste() {
 
     // Super+V pastes in Normal mode too — the universal promise — while a
     // bare Ctrl+V there remains Vi's visual block and inserts nothing.
-    // Vi's Escape steps the cursor back onto the final 'k', so the paste
-    // lands before it: deterministic, if not pretty.
+    // The chord pastes in Normal mode too, even if a lingering Meta from the
+    // held Super ever does reach the app. Vi's Escape steps the cursor back
+    // onto the final 'k', so the paste lands before it: deterministic, if
+    // not pretty.
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_V, Qt::ControlModifier | Qt::MetaModifier);
     QTRY_COMPARE(editor->document()->text(), QStringLiteral("stack overflowstacstackk\n"));
-    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
-    QTest::keyClick(QApplication::focusWidget(), Qt::Key_V, Qt::ControlModifier);
-    QTest::qWait(50);
-    QCOMPARE(editor->document()->text(), QStringLiteral("stack overflowstacstackk\n"));
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
 }
 

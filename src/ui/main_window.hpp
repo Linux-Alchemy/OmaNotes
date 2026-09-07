@@ -82,6 +82,9 @@ class MainWindow final : public QMainWindow {
     /// Copy the editor's current selection to the system clipboard via the
     /// editor's own copy action.
     void copySelectionToClipboard();
+    /// Hand the editor a synthetic Ctrl+V so Vi enters visual block: the
+    /// real key now means paste, and KTextEditor's Vi mode hardcodes Ctrl+V.
+    void enterVisualBlock();
     void beginNaming();
     void cancelNaming();
     void commitNaming();
@@ -131,6 +134,9 @@ class MainWindow final : public QMainWindow {
     BufferStrip* bufferStrip_ = nullptr;
     QLabel* statusArea_ = nullptr;
     QMessageBox* closePrompt_ = nullptr;
+    /// True while enterVisualBlock's synthetic key is in flight, so the
+    /// event filter lets it through to Vi instead of re-intercepting it.
+    bool forwardingKeyToVi_ = false;
     std::optional<BufferId> closePromptTarget_;
     std::optional<BufferId> closeAfterNaming_;
 };

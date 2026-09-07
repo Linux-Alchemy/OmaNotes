@@ -907,10 +907,13 @@ Decision required: approve / request changes / stop and redesign
   withdrawn). Fixed by ignoring the Meta modifier in application shortcut matching and
   adding `edit.copy` (default Ctrl+C, fires only over a selection, via the editor's own
   copy action; without a selection Ctrl+C stays Vi's abort). Matt then set the product
-  rule — Omarchy users expect Super+C/V to work everywhere, always — so the Meta
-  modifier became the discriminator instead of noise: the Super-injected chord pastes in
-  any mode (mirroring what terminals give Neovim via bracketed paste), while a bare
-  Ctrl+V pastes in Insert only and stays visual block elsewhere. Deviations recorded in
+  rule — Omarchy users expect Super+C/V to work everywhere, always. A Meta-modifier
+  discriminator was tried and failed on the real compositor: clipboard.lua's
+  send_key_state exists precisely to deliver a clean chord without the held Super, so
+  Super+V and Ctrl+V are indistinguishable at the application. Final resolution:
+  `Ctrl+V` pastes in every mode (matching what terminals give Neovim via bracketed
+  paste), and Vi's visual block relocates to `Ctrl+Q` — gvim's classic answer to this
+  collision — implemented by handing Vi a synthetic Ctrl+V. Deviations recorded in
   `docs/vim-acceptance.md`; the 2.2 matrix gap (no system-clipboard interop cases) is
   thereby closed.
   The 15-suite engineering gate passes with ASan/UBSan, formatting, clang-tidy and hardening.

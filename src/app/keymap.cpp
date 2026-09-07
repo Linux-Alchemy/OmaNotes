@@ -71,6 +71,7 @@ Keymap Keymap::defaults(const CommandRegistry& commands) {
         {QStringLiteral("file.save"), QKeySequence(QStringLiteral("Ctrl+S"))},
         {QStringLiteral("edit.paste"), QKeySequence(QStringLiteral("Ctrl+V"))},
         {QStringLiteral("edit.copy"), QKeySequence(QStringLiteral("Ctrl+C"))},
+        {QStringLiteral("editor.visual-block"), QKeySequence(QStringLiteral("Ctrl+Q"))},
         {QStringLiteral("pane.sidebar"), QKeySequence(QStringLiteral("Ctrl+H"))},
         {QStringLiteral("pane.editor"), QKeySequence(QStringLiteral("Ctrl+L"))},
         {QStringLiteral("buffer.next"), QKeySequence(QStringLiteral("Shift+L"))},
