@@ -6,7 +6,11 @@ Phase / blocks completed:
   open, and Phase 6 has not started.
 
 Branch and PR:
-  phase/5-key-configuration; PR link will accompany the delivery.
+  phase/5-key-configuration; implementation commit f923e6a.
+  Local PR draft prepared. Automatic approval review rejected publishing the new
+  source/document payload because it considered prior approval limited to PR #10.
+  This branch is not pushed and no GitHub PR exists for it yet; explicit approval
+  to publish it to Linux-Alchemy/OmaNotes is the remaining delivery step.
 
 Files changed:
   src/app/keymap.* — bounded JSON loading and complete-candidate validation.
