@@ -726,6 +726,10 @@ void MainWindow::confirmCloseBuffer(BufferId id) {
                             QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
         closePrompt_->setObjectName(QStringLiteral("closeBufferPrompt"));
         closePrompt_->setDefaultButton(QMessageBox::Save);
+        // Plain text, no platform-theme stock icons on the buttons.
+        for (auto* button : closePrompt_->buttons()) {
+            button->setIcon(QIcon());
+        }
         connect(closePrompt_, &QMessageBox::finished, this, [this](int result) {
             const auto target = closePromptTarget_;
             closePromptTarget_.reset();
@@ -1401,6 +1405,8 @@ QTabBar#bufferStrip { background-color: %3; }
 QTabBar#bufferStrip::tab { background-color: %3; color: %7; padding: 5px 12px; border: none; }
 QTabBar#bufferStrip::tab:selected { background-color: %1; color: %5; }
 QToolButton#newBufferButton { background-color: %3; color: %7; border: none; padding: 2px 8px; }
+QToolButton#tabCloseButton { background: transparent; color: %7; border: none; padding: 0px 2px; }
+QToolButton#tabCloseButton:hover { color: %4; }
 QDialog#helpOverlay, QDialog#searchPalette, QMessageBox { background-color: %1; color: %5; }
 QDialog#helpOverlay QLabel, QDialog#searchPalette QLabel, QMessageBox QLabel { color: %5; }
 QTreeWidget#helpCommands, QListWidget#searchResults, QPlainTextEdit#searchPreview { background-color: %3; color: %5; border: none; }

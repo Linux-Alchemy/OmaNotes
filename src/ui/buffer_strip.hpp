@@ -8,6 +8,8 @@
 #include <optional>
 #include <vector>
 
+class QToolButton;
+
 namespace omanotes {
 
 /// Tab strip for the open buffers.
@@ -27,6 +29,8 @@ class BufferStrip final : public QTabBar {
     void bufferCloseRequested(BufferId id);
 
   private:
+    [[nodiscard]] QToolButton* makeCloseButton();
+
     bool synchronising_ = false;
 };
 
