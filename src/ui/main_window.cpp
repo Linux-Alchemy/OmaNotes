@@ -406,17 +406,29 @@ QString MainWindow::shortcutCommand(const QKeyEvent& event, const QWidget* targe
     if (id == QStringLiteral("edit.paste") && (!inEditor || editor == nullptr)) {
         return {};
     }
-    if (id == QStringLiteral("editor.visual-block") && (!inEditor || !normal)) {
+    if (id == QStringLiteral("editor.visual-block") &&
+        (!inEditor || !normal || editorStack_->currentWidget() == readingView_)) {
         return {};
     }
     // Copy runs only over a selection; without one, Ctrl+C stays Vi's abort.
+    // The selection that counts is the visible pane's: the reading view's
+    // when it is showing, the editor's otherwise.
     if (id == QStringLiteral("edit.copy")) {
-        auto* adapter = activeEditor();
-        const auto* view = adapter != nullptr && adapter->widget() != nullptr
-                               ? qobject_cast<const KTextEditor::View*>(adapter->widget())
-                               : nullptr;
-        if (!inEditor || view == nullptr || !view->selection()) {
+        if (!inEditor) {
             return {};
+        }
+        if (editorStack_->currentWidget() == readingView_) {
+            if (!readingView_->textCursor().hasSelection()) {
+                return {};
+            }
+        } else {
+            auto* adapter = activeEditor();
+            const auto* view = adapter != nullptr && adapter->widget() != nullptr
+                                   ? qobject_cast<const KTextEditor::View*>(adapter->widget())
+                                   : nullptr;
+            if (view == nullptr || !view->selection()) {
+                return {};
+            }
         }
     }
     // Only Save and the clipboard routes are application shortcuts while
@@ -1093,6 +1105,12 @@ void MainWindow::loadMarkdownFile(const std::filesystem::path& path) {
 }
 
 void MainWindow::pasteFromClipboard() {
+    // The reading view is a projection, never an editor: pasting here would
+    // silently mutate the hidden source buffer. Refuse and say why.
+    if (editorStack_->currentWidget() == readingView_) {
+        statusArea_->setText(QStringLiteral("Reading view is read-only — Space m to write"));
+        return;
+    }
     auto* editor = activeEditor();
     if (editor == nullptr || editor->widget() == nullptr) {
         return;
@@ -1108,6 +1126,14 @@ void MainWindow::pasteFromClipboard() {
 }
 
 void MainWindow::copySelectionToClipboard() {
+    if (editorStack_->currentWidget() == readingView_) {
+        if (readingView_->textCursor().hasSelection()) {
+            readingView_->copy();
+            return;
+        }
+        statusArea_->setText(QStringLiteral("Nothing is selected to copy"));
+        return;
+    }
     auto* editor = activeEditor();
     if (editor == nullptr || editor->widget() == nullptr) {
         return;

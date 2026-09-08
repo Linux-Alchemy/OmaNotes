@@ -933,6 +933,15 @@ Decision required: approve / request changes / stop and redesign
   the Phase 5 hands-on gate remains open. The working baseline is merged upstream `b5260c8`,
   which already records P4 acceptance and completion of 5.1.
 
+- **2026-09-08:** Matt merged PRs #15 and #16 (the second refreshed against main with both
+  Change Log entries retained); all six gates re-ran clean on the merged tip. The known
+  interplay gap between the two — the clipboard chords consulted only the hidden editor
+  while the reading view was showing — is closed: `edit.copy` now reads the visible pane's
+  selection (the `QTextBrowser`'s when reading), `edit.paste` while reading refuses with a
+  status hint instead of silently mutating the hidden source buffer, and `Ctrl+Q` (visual
+  block, a writing-mode key) no longer routes while reading. No new commands; the registry
+  stays at 18.
+
 - **2026-09-07:** Matt reviewed and merged PR #10, then requested cleanup and
   continuation. Fast-forwarded to `eb2f5b2`, removed the merged search/help branch
   and superseded local P4 prototype, and retained the parked general-purpose
