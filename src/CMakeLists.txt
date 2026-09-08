@@ -13,6 +13,7 @@ add_executable(
     core/command.hpp
     core/command_registry.cpp
     core/command_registry.hpp
+    core/view_mode.hpp
     editor/editor_adapter.hpp
     editor/ktext_editor_adapter.cpp
     editor/ktext_editor_adapter.hpp
@@ -29,6 +30,8 @@ add_executable(
     ui/main_window.cpp
     ui/help_overlay.cpp
     ui/help_overlay.hpp
+    ui/markdown_view.cpp
+    ui/markdown_view.hpp
     workspace/file_index.cpp
     workspace/file_index.hpp
     workspace/text_search.cpp
