@@ -1401,6 +1401,14 @@ QTabBar#bufferStrip { background-color: %3; }
 QTabBar#bufferStrip::tab { background-color: %3; color: %7; padding: 5px 12px; border: none; }
 QTabBar#bufferStrip::tab:selected { background-color: %1; color: %5; }
 QToolButton#newBufferButton { background-color: %3; color: %7; border: none; padding: 2px 8px; }
+QDialog#helpOverlay, QDialog#searchPalette, QMessageBox { background-color: %1; color: %5; }
+QDialog#helpOverlay QLabel, QDialog#searchPalette QLabel, QMessageBox QLabel { color: %5; }
+QTreeWidget#helpCommands, QListWidget#searchResults, QPlainTextEdit#searchPreview { background-color: %3; color: %5; border: none; }
+QTreeWidget#helpCommands::item:selected, QListWidget#searchResults::item:selected { background-color: %6; color: %9; }
+QLineEdit#searchQuery { background-color: %3; color: %5; border: 1px solid %2; padding: 4px 6px; selection-background-color: %6; selection-color: %9; }
+QDialog QPushButton { background-color: %3; color: %5; border: 1px solid %2; padding: 4px 14px; }
+QDialog QPushButton:default { border: 1px solid %4; }
+QDialog QPushButton:hover { background-color: %2; }
 )")
                       .arg(name(palette.background), name(palette.border), name(palette.surface),
                            name(palette.accent), name(palette.text), name(palette.selection),
