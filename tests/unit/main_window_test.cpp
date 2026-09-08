@@ -1640,10 +1640,10 @@ void MainWindowTest::themeDressesEveryRegion() {
     QCOMPARE(reading->font().pointSizeF(), 15.0); // base-size plus the reading point.
     QCOMPARE(reading->font().family(), QStringLiteral("monospace"));
 
-    // Pure Omarchy: the whole app wears the system monospace at base-size,
-    // not whatever sans the platform theme would hand out.
-    QCOMPARE(QApplication::font().family(), QStringLiteral("monospace"));
-    QCOMPARE(QApplication::font().pointSizeF(), 14.0);
+    // Pure Omarchy: the whole app wears the system monospace at base-size —
+    // through the stylesheet, since app-wide setFont is ignored under an
+    // active style sheet (found at Matt's gate).
+    QVERIFY(sheet.contains(QStringLiteral("* { font-family: monospace; font-size: 14pt; }")));
 
     auto* editor = activeEditor(window);
     QVERIFY(editor != nullptr);
@@ -1722,10 +1722,10 @@ void MainWindowTest::themeFollowsALiveThemeSwitch() {
     QTRY_COMPARE(editor->configValue(QStringLiteral("background-color")).value<QColor>(),
                  QColor(QStringLiteral("#0e1410")));
 
-    // The text scale follows too, app-wide.
+    // The text scale follows too, app-wide through the stylesheet.
     writeFile(sources.configDir / "shell.toml", "[font]\nbase-size = 18\n");
     QTRY_COMPARE(editor->configValue(QStringLiteral("font")).value<QFont>().pointSizeF(), 18.0);
-    QTRY_COMPARE(QApplication::font().pointSizeF(), 18.0);
+    QVERIFY(window.styleSheet().contains(QStringLiteral("font-size: 18pt")));
 }
 
 void MainWindowTest::closesCleanly() {
