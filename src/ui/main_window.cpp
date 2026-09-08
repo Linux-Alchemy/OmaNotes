@@ -1389,14 +1389,14 @@ QSplitter#workspaceSplitter::handle { background-color: %2; }
 QFrame#sidebar { background-color: %3; border: none; border-top: 2px solid %3; }
 QFrame#sidebar[paneActive="true"] { border-top: 2px solid %4; }
 QFrame#sidebar QTreeView { background-color: %3; color: %5; border: none; }
-QFrame#sidebar QTreeView::item:selected:active { background-color: %6; color: %5; }
-QFrame#sidebar QTreeView::item:selected:!active { background-color: %8; color: %7; }
+QFrame#sidebar QTreeView::item:selected:active { background-color: %6; color: %9; }
+QFrame#sidebar QTreeView::item:selected:!active { background-color: %8; color: %10; }
 QLabel#sidebarHeading { color: %7; }
 QTextBrowser#readingView { background-color: %1; border: none; }
 QWidget#writingArea { background-color: %1; border-top: 2px solid %1; }
 QWidget#writingArea[paneActive="true"] { border-top: 2px solid %4; }
 QLabel#statusArea { background-color: %3; color: %5; }
-QLineEdit#namePrompt { background-color: %3; color: %5; selection-background-color: %6; }
+QLineEdit#namePrompt { background-color: %3; color: %5; selection-background-color: %6; selection-color: %9; }
 QTabBar#bufferStrip { background-color: %3; }
 QTabBar#bufferStrip::tab { background-color: %3; color: %7; padding: 5px 12px; border: none; }
 QTabBar#bufferStrip::tab:selected { background-color: %1; color: %5; }
@@ -1404,7 +1404,8 @@ QToolButton#newBufferButton { background-color: %3; color: %7; border: none; pad
 )")
                       .arg(name(palette.background), name(palette.border), name(palette.surface),
                            name(palette.accent), name(palette.text), name(palette.selection),
-                           name(palette.mutedText), name(palette.inactiveSelection)));
+                           name(palette.mutedText), name(palette.inactiveSelection),
+                           name(palette.selectedText), name(palette.inactiveSelectedText)));
     writingArea_->setAttribute(Qt::WA_StyledBackground, true);
 
     // Grounds and the tree's selected row live in the stylesheet above: with
@@ -1418,7 +1419,7 @@ QToolButton#newBufferButton { background-color: %3; color: %7; border: none; pad
     readingPalette.setColor(QPalette::Text, palette.text);
     readingPalette.setColor(QPalette::Link, palette.link);
     readingPalette.setColor(QPalette::Highlight, palette.selection);
-    readingPalette.setColor(QPalette::HighlightedText, palette.text);
+    readingPalette.setColor(QPalette::HighlightedText, palette.selectedText);
     readingView_->setPalette(readingPalette);
     auto readingFont = readingView_->font();
     // 6.1's restrained typography holds: the reading face sits one point up.

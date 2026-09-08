@@ -14,15 +14,17 @@ namespace omanotes {
 /// readable fallback, never trusted to be complete themselves.
 struct ThemePalette {
     bool dark = true;
-    QColor background;        ///< Editor and window ground.
-    QColor surface;           ///< Sidebar, status area, buffer strip ground.
-    QColor text;              ///< Primary foreground.
-    QColor mutedText;         ///< Secondary foreground: hints, pending keys.
-    QColor accent;            ///< The theme's accent; focus marking.
-    QColor selection;         ///< Selection ground in the focused pane.
-    QColor inactiveSelection; ///< Dimmed selection ground elsewhere.
-    QColor border;            ///< Pane separators.
-    QColor link;              ///< Links in the reading view and help.
+    QColor background;           ///< Editor and window ground.
+    QColor surface;              ///< Sidebar, status area, buffer strip ground.
+    QColor text;                 ///< Primary foreground.
+    QColor mutedText;            ///< Secondary foreground: hints, pending keys.
+    QColor accent;               ///< The theme's accent; focus marking.
+    QColor selection;            ///< Selection ground in the focused pane.
+    QColor selectedText;         ///< Ink readable on that selection ground.
+    QColor inactiveSelection;    ///< Dimmed selection ground elsewhere.
+    QColor inactiveSelectedText; ///< Ink readable on the dimmed ground.
+    QColor border;               ///< Pane separators.
+    QColor link;                 ///< Links in the reading view and help.
     qreal baseFontPointSize = 12.0;
 
     [[nodiscard]] bool operator==(const ThemePalette& other) const = default;
@@ -34,6 +36,11 @@ struct ThemeSources {
     std::filesystem::path stateDir;  ///< …/omarchy/current — theme.name, theme/colors.toml
     std::filesystem::path configDir; ///< …/omarchy — shell.toml with [font] base-size
 };
+
+/// WCAG contrast ratio between two colours, 1.0 (identical) to 21.0 (black
+/// on white). Exposed so the verification suite measures with the same
+/// arithmetic the adapter guards with.
+[[nodiscard]] double contrastRatio(const QColor& a, const QColor& b);
 
 /// Derives a complete palette from Omarchy Quattro's materialized current
 /// theme (documented in docs/omarchy-integration.md), reading and never

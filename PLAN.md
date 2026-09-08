@@ -587,7 +587,7 @@ signals:
   highlight stays as strong as when the tree had focus, and nothing says the editor is live
   (found at Matt's Task 5.1 gate, 2026-09-04). Dim the inactive selection and mark the active pane.
 - [x] **6.2.3** — Handle live theme/text-scale changes or document the minimal restart boundary.
-- [ ] **6.2.4** — Verify: representative dark/light themes retain contrast, focus visibility, and readable selection colours.
+- [x] **6.2.4** — Verify: representative dark/light themes retain contrast, focus visibility, and readable selection colours.
 
 ### Phase 6 Checkpoint
 
@@ -977,6 +977,18 @@ Decision required: approve / request changes / stop and redesign
   `ThemeAdapter::refresh()`, which repaints only on real change; a visible reading view
   re-renders so document colours follow. Block 6.2.3 resolved as live-change, box ticked;
   a new ui case rewrites the fixture theme and asserts the window follows without restart.
+
+- **2026-09-08:** Matt's third gate pass approved the live behaviour (theme hopping with the
+  reading view open, sidebar dim in and out). Block 6.2.4 closed with an automated
+  verification instead of eyeballs: representative themes of both schemas and both modes
+  (plus the fallback) must keep text, muted text, both selection inks, accent, and link
+  above WCAG contrast bars, measured with the exported `contrastRatio`. Writing it caught
+  a real bug before Matt could: legacy catppuccin pairs a cream `selection_background`
+  with its own `selection_foreground`, which the mapping ignored — light-on-light selected
+  rows. New `selectedText`/`inactiveSelectedText` roles are chosen by contrast
+  (`readableOn`: theme ink, then text, background, then black/white), the muted blend is
+  clamped to the bar, and the stylesheet paints rows with them. Task 6.2 complete;
+  Phase 6 checkpoint awaits Matt's gate.
 
 - **2026-09-07:** Matt reviewed and merged PR #10, then requested cleanup and
   continuation. Fast-forwarded to `eb2f5b2`, removed the merged search/help branch
