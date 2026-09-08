@@ -278,10 +278,21 @@ MainWindow::MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, Q
     }
     loadKeymap();
 
+    // A theme switch rewrites theme.name and regenerates the theme directory;
+    // an edit to colors.toml or shell.toml changes one file in place. Watching
+    // all three catches every route — theme.name's parent directory is the
+    // stable one, so it survives the regeneration — and the watcher's quiet
+    // period coalesces the burst into a single refresh.
+    themeWatcher_ = std::make_unique<FileWatcher>();
+    themeWatcher_->watch(themeSources.stateDir / "theme.name");
+    themeWatcher_->watch(themeSources.stateDir / "theme" / "colors.toml");
+    themeWatcher_->watch(themeSources.configDir / "shell.toml");
     theme_ = std::make_unique<ThemeAdapter>(std::move(themeSources));
     applyTheme(theme_->currentPalette());
     connect(theme_.get(), &ThemeAdapter::paletteChanged, this,
             [this](const ThemePalette& palette) { applyTheme(palette); });
+    connect(themeWatcher_.get(), &FileWatcher::fileChanged, this,
+            [this](const std::filesystem::path&) { theme_->refresh(); });
     if (auto* application = qobject_cast<QApplication*>(QApplication::instance());
         application != nullptr) {
         connect(application, &QApplication::focusChanged, this,
@@ -1377,6 +1388,8 @@ QMainWindow#mainWindow { background-color: %1; }
 QSplitter#workspaceSplitter::handle { background-color: %2; }
 QFrame#sidebar { background-color: %3; border: none; border-top: 2px solid %3; }
 QFrame#sidebar[paneActive="true"] { border-top: 2px solid %4; }
+QFrame#sidebar QTreeView { background-color: %3; color: %5; border: none; }
+QLabel#sidebarHeading { color: %7; }
 QWidget#writingArea { background-color: %1; border-top: 2px solid %1; }
 QWidget#writingArea[paneActive="true"] { border-top: 2px solid %4; }
 QLabel#statusArea { background-color: %3; color: %5; }
@@ -1420,6 +1433,13 @@ QToolButton#newBufferButton { background-color: %3; color: %7; border: none; pad
         if (auto* hosted = qobject_cast<KTextEditorAdapter*>(editor.get()); hosted != nullptr) {
             hosted->applyTheme(palette);
         }
+    }
+
+    // A visible projection re-renders so its document picks up the new link
+    // and text colours; hidden ones re-render on their next Space m anyway.
+    if (const auto active = buffers_.activeId();
+        active.has_value() && editorStack_->currentWidget() == readingView_) {
+        renderReadingView(*active);
     }
 }
 

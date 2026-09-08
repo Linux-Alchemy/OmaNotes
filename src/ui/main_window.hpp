@@ -145,6 +145,9 @@ class MainWindow final : public QMainWindow {
     AppContext helpContext_;
     SearchPalette* searchPalette_ = nullptr;
     std::unique_ptr<ThemeAdapter> theme_;
+    /// Watches the theme sources, separately from the note watcher: a theme
+    /// switch regenerates whole directories, and these paths are not buffers.
+    std::unique_ptr<FileWatcher> themeWatcher_;
     QWidget* writingArea_ = nullptr;
     Sidebar* sidebar_ = nullptr;
     QLineEdit* namePrompt_ = nullptr;

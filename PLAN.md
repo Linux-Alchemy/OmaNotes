@@ -586,7 +586,7 @@ signals:
   The focused pane must be unmistakable: after `Ctrl+L` from the tree, the sidebar's current-row
   highlight stays as strong as when the tree had focus, and nothing says the editor is live
   (found at Matt's Task 5.1 gate, 2026-09-04). Dim the inactive selection and mark the active pane.
-- [ ] **6.2.3** — Handle live theme/text-scale changes or document the minimal restart boundary.
+- [x] **6.2.3** — Handle live theme/text-scale changes or document the minimal restart boundary.
 - [ ] **6.2.4** — Verify: representative dark/light themes retain contrast, focus visibility, and readable selection colours.
 
 ### Phase 6 Checkpoint
@@ -966,6 +966,17 @@ Decision required: approve / request changes / stop and redesign
   window in a fixture theme; two new ui-suite cases assert region colours and the accent
   mark following Space e / Ctrl+L. Live re-application on theme change is wired
   (`paletteChanged` → repaint) but nothing watches the files yet — that decision is 6.2.3.
+
+- **2026-09-08:** Matt's first gate pass on 6.2.2 found the sidebar still flat grey (the
+  stylesheet painted the frame, not the QTreeView viewport or heading inside it) and made
+  the 6.2.3 call by testing it: switching to catppuccin mid-run must apply live, not on
+  restart. Fixed on the same PR: tree and heading joined the stylesheet (selection stays
+  in QPalette groups so the inactive dim survives), and a second FileWatcher now watches
+  theme.name, colors.toml, and shell.toml — theme.name's parent is the stable `current/`
+  directory, so a switch that regenerates the whole theme directory still fires — feeding
+  `ThemeAdapter::refresh()`, which repaints only on real change; a visible reading view
+  re-renders so document colours follow. Block 6.2.3 resolved as live-change, box ticked;
+  a new ui case rewrites the fixture theme and asserts the window follows without restart.
 
 - **2026-09-07:** Matt reviewed and merged PR #10, then requested cleanup and
   continuation. Fast-forwarded to `eb2f5b2`, removed the merged search/help branch

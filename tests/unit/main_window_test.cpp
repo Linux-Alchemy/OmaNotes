@@ -169,6 +169,7 @@ class MainWindowTest final : public QObject {
     void readingViewRoutesCopyAndRefusesPaste();
     void themeDressesEveryRegion();
     void focusMovesTheAccentMarkBetweenPanes();
+    void themeFollowsALiveThemeSwitch();
     void searchOpensMatchesAndHelpRunsCommands();
     void helpIsReachableFromSidebar();
     void configuredKeysRouteAndAppearInHelp();
@@ -1640,9 +1641,11 @@ void MainWindowTest::themeDressesEveryRegion() {
              QColor(QStringLiteral("#101018")));
     QCOMPARE(editor->configValue(QStringLiteral("font")).value<QFont>().pointSizeF(), 14.0);
 
-    // The window chrome carries the theme's grounds and accent.
+    // The window chrome carries the theme's grounds and accent, and the tree
+    // itself is painted — not just the frame around it (Matt's gate finding).
     QVERIFY(window.styleSheet().contains(QStringLiteral("#d08050")));
     QVERIFY(window.styleSheet().contains(QStringLiteral("#181826")));
+    QVERIFY(window.styleSheet().contains(QStringLiteral("QFrame#sidebar QTreeView")));
 }
 
 void MainWindowTest::focusMovesTheAccentMarkBetweenPanes() {
@@ -1674,6 +1677,38 @@ void MainWindowTest::focusMovesTheAccentMarkBetweenPanes() {
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_L, Qt::ControlModifier);
     QTRY_VERIFY(writingArea->property("paneActive").toBool());
     QVERIFY(!sidebar->property("paneActive").toBool());
+}
+
+void MainWindowTest::themeFollowsALiveThemeSwitch() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path())) / "notes";
+    const auto note = root / "note.md";
+    std::filesystem::create_directories(root);
+    writeFile(note, "# Title\n");
+    const auto sources = writeFixtureTheme(temporary);
+    omanotes::MainWindow window({root, note, false}, sources);
+    window.show();
+    QVERIFY(window.styleSheet().contains(QStringLiteral("#d08050")));
+
+    // A theme switch, as Omarchy performs it: the palette file changes and
+    // theme.name is rewritten. The window must follow without a restart.
+    writeFile(sources.stateDir / "theme" / "colors.toml", "mode = \"dark\"\n"
+                                                          "accent = \"#40c057\"\n"
+                                                          "selection = \"#2b4a33\"\n"
+                                                          "background = \"#0e1410\"\n"
+                                                          "foreground = \"#d8e8dc\"\n");
+    writeFile(sources.stateDir / "theme.name", "fixture-green\n");
+
+    QTRY_VERIFY(window.styleSheet().contains(QStringLiteral("#40c057")));
+    auto* editor = activeEditor(window);
+    QVERIFY(editor != nullptr);
+    QTRY_COMPARE(editor->configValue(QStringLiteral("background-color")).value<QColor>(),
+                 QColor(QStringLiteral("#0e1410")));
+
+    // The text scale follows too.
+    writeFile(sources.configDir / "shell.toml", "[font]\nbase-size = 18\n");
+    QTRY_COMPARE(editor->configValue(QStringLiteral("font")).value<QFont>().pointSizeF(), 18.0);
 }
 
 void MainWindowTest::closesCleanly() {
