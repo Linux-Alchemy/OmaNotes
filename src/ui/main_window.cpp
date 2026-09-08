@@ -1389,7 +1389,10 @@ QSplitter#workspaceSplitter::handle { background-color: %2; }
 QFrame#sidebar { background-color: %3; border: none; border-top: 2px solid %3; }
 QFrame#sidebar[paneActive="true"] { border-top: 2px solid %4; }
 QFrame#sidebar QTreeView { background-color: %3; color: %5; border: none; }
+QFrame#sidebar QTreeView::item:selected:active { background-color: %6; color: %5; }
+QFrame#sidebar QTreeView::item:selected:!active { background-color: %8; color: %7; }
 QLabel#sidebarHeading { color: %7; }
+QTextBrowser#readingView { background-color: %1; border: none; }
 QWidget#writingArea { background-color: %1; border-top: 2px solid %1; }
 QWidget#writingArea[paneActive="true"] { border-top: 2px solid %4; }
 QLabel#statusArea { background-color: %3; color: %5; }
@@ -1401,24 +1404,17 @@ QToolButton#newBufferButton { background-color: %3; color: %7; border: none; pad
 )")
                       .arg(name(palette.background), name(palette.border), name(palette.surface),
                            name(palette.accent), name(palette.text), name(palette.selection),
-                           name(palette.mutedText)));
+                           name(palette.mutedText), name(palette.inactiveSelection)));
     writingArea_->setAttribute(Qt::WA_StyledBackground, true);
 
-    // Tree selection goes through palette groups, not the stylesheet: the
-    // Inactive group is what lets the sidebar's selection dim when focus
-    // leaves it (Matt's 5.1 gate finding).
-    auto sidebarPalette = sidebar_->palette();
-    sidebarPalette.setColor(QPalette::Window, palette.surface);
-    sidebarPalette.setColor(QPalette::Base, palette.surface);
-    sidebarPalette.setColor(QPalette::Text, palette.text);
-    sidebarPalette.setColor(QPalette::Active, QPalette::Highlight, palette.selection);
-    sidebarPalette.setColor(QPalette::Active, QPalette::HighlightedText, palette.text);
-    sidebarPalette.setColor(QPalette::Inactive, QPalette::Highlight, palette.inactiveSelection);
-    sidebarPalette.setColor(QPalette::Inactive, QPalette::HighlightedText, palette.mutedText);
-    sidebar_->setPalette(sidebarPalette);
-
+    // Grounds and the tree's selected row live in the stylesheet above: with
+    // a stylesheet active, Qt ignores QPalette for widget backgrounds and
+    // item selection (Matt's gate found both the sidebar row and the reading
+    // pane stuck grey/blue), and the :active/:!active pseudo-states carry
+    // the inactive dim instead. The palette below still matters — the
+    // reading view's document rendering draws its text, links, and text
+    // selection from it, not from the stylesheet.
     auto readingPalette = readingView_->palette();
-    readingPalette.setColor(QPalette::Base, palette.background);
     readingPalette.setColor(QPalette::Text, palette.text);
     readingPalette.setColor(QPalette::Link, palette.link);
     readingPalette.setColor(QPalette::Highlight, palette.selection);

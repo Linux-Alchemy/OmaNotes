@@ -1619,19 +1619,23 @@ void MainWindowTest::themeDressesEveryRegion() {
     omanotes::MainWindow window({root, note, false}, writeFixtureTheme(temporary));
     window.show();
 
-    // The sidebar's selection is strong while its tree owns focus and dims
-    // to the derived inactive colour when it does not (the 5.1 gate debt).
-    auto* sidebar = window.findChild<QWidget*>(QStringLiteral("sidebar"));
-    QVERIFY(sidebar != nullptr);
-    const auto& sidebarPalette = sidebar->palette();
-    QCOMPARE(sidebarPalette.color(QPalette::Active, QPalette::Highlight),
-             QColor(QStringLiteral("#303a60")));
-    QVERIFY(sidebarPalette.color(QPalette::Inactive, QPalette::Highlight) !=
-            sidebarPalette.color(QPalette::Active, QPalette::Highlight));
+    // The sidebar's selected row is strong while its tree owns focus and
+    // dims when it does not (the 5.1 gate debt). Under an active stylesheet
+    // Qt ignores QPalette for item selection, so the rules must be in the
+    // stylesheet itself, dim included.
+    const auto sheet = window.styleSheet();
+    QVERIFY(sheet.contains(
+        QStringLiteral("QTreeView::item:selected:active { background-color: #303a60")));
+    const auto inactiveRule =
+        sheet.mid(sheet.indexOf(QStringLiteral("QTreeView::item:selected:!active")));
+    QVERIFY(!inactiveRule.isEmpty());
+    QVERIFY(!inactiveRule.first(inactiveRule.indexOf(u'}')).contains(QStringLiteral("#303a60")));
 
+    // The reading pane's ground is stylesheet-painted; its document colours
+    // (text, links) still come from the palette it renders with.
+    QVERIFY(sheet.contains(QStringLiteral("QTextBrowser#readingView { background-color: #101018")));
     auto* reading = window.findChild<QTextBrowser*>(QStringLiteral("readingView"));
     QVERIFY(reading != nullptr);
-    QCOMPARE(reading->palette().color(QPalette::Base), QColor(QStringLiteral("#101018")));
     QCOMPARE(reading->palette().color(QPalette::Link), QColor(QStringLiteral("#7090d0")));
     QCOMPARE(reading->font().pointSizeF(), 15.0); // base-size plus the reading point.
 
