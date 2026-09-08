@@ -3,6 +3,7 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QGuiApplication>
 #include <QTimer>
 
 #include <algorithm>
@@ -28,6 +29,10 @@ int main(int argc, char* argv[]) {
     QApplication application(argc, argv);
     QCoreApplication::setApplicationName(QStringLiteral("Omanotes"));
     QCoreApplication::setOrganizationName(QStringLiteral("Omanotes"));
+    // The Wayland app_id, which Omarchy's bar shows for the focused window;
+    // without this it falls back to the binary name, lowercase. Task 8.2's
+    // package must ship a matching OmaNotes.desktop file.
+    QGuiApplication::setDesktopFileName(QStringLiteral("OmaNotes"));
 
     std::vector<std::string_view> launchArguments;
     launchArguments.reserve(static_cast<std::size_t>(std::max(0, argc - 1)));

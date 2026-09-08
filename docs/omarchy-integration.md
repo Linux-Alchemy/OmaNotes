@@ -48,6 +48,8 @@ are ignored, never an error.
 | `text` | `foreground` | `foreground` | built-in ink |
 | `accent` | `accent` | `accent` | built-in accent |
 | `selection` | `selection` | `selection_background` | built-in selection |
+| `selectedText` | *derived*: first readable of `selection_foreground`, text, background | `selection_foreground` | black/white by ground luminance |
+| `inactiveSelectedText` | *derived*: first readable of muted, selectedText, text, background | | black/white by ground luminance |
 | `mutedText` | `muted`, `dark_foreground` | `color8` | text blended 40% toward background |
 | `surface` | `dark_background` | — | background blended 5% toward text |
 | `border` | `lighter_background` | — | background blended 15% toward text |
@@ -62,7 +64,13 @@ are ignored, never an error.
 - **Contrast guard:** `foreground` on `background` must reach a 3.0:1 WCAG
   contrast ratio or the pair is refused *as a pair* (fallback ground and ink
   are kept; independent roles such as the accent still apply). The same bar
-  applies to `mutedText` against the final background.
+  applies to `mutedText` against the final background, and to both selection
+  inks against their selection grounds — a theme pairing a light selection
+  with the normal light foreground (legacy catppuccin does) gets its own
+  `selection_foreground` honoured, or a readable black/white as a last
+  resort. Block 6.2.4's verification suite measures representative themes of
+  both schemas and both modes with the same arithmetic
+  (`omanotes::contrastRatio`, exported for exactly this purpose).
 - **Text scale** is clamped to 6–32 points; non-numeric values fall back
   to 12.
 - **Never write:** the adapter opens every file read-only and touches nothing

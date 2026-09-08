@@ -42,8 +42,7 @@ QHash<QString, QString> readFlatToml(const std::filesystem::path& file) {
         }
         const auto key = line.first(equals).trimmed();
         auto value = line.sliced(equals + 1).trimmed();
-        if (const auto comment = value.indexOf(u'#');
-            comment >= 0 && !value.startsWith(u'"')) {
+        if (const auto comment = value.indexOf(u'#'); comment >= 0 && !value.startsWith(u'"')) {
             value = value.first(comment).trimmed();
         }
         if (value.size() >= 2 && value.startsWith(u'"') && value.endsWith(u'"')) {
@@ -65,13 +64,6 @@ double channel(float srgbF) {
 double relativeLuminance(const QColor& colour) {
     return 0.2126 * channel(colour.redF()) + 0.7152 * channel(colour.greenF()) +
            0.0722 * channel(colour.blueF());
-}
-
-/// WCAG contrast ratio, 1.0 (identical) to 21.0 (black on white).
-double contrastRatio(const QColor& a, const QColor& b) {
-    const auto lighter = std::max(relativeLuminance(a), relativeLuminance(b));
-    const auto darker = std::min(relativeLuminance(a), relativeLuminance(b));
-    return (lighter + 0.05) / (darker + 0.05);
 }
 
 /// `amount` of `over` mixed into `base`, in sRGB.
@@ -107,6 +99,8 @@ ThemePalette fallbackPalette(bool dark) {
     palette.surface = blend(palette.background, palette.text, 0.05);
     palette.border = blend(palette.background, palette.text, 0.15);
     palette.inactiveSelection = blend(palette.selection, palette.background, 0.5);
+    palette.selectedText = palette.text;
+    palette.inactiveSelectedText = palette.text;
     return palette;
 }
 
@@ -136,7 +130,24 @@ constexpr double kMinimumTextContrast = 3.0;
 constexpr qreal kMinimumFontPoints = 6.0;
 constexpr qreal kMaximumFontPoints = 32.0;
 
+/// The first candidate readable on `ground`; when none reaches the bar,
+/// plain black or white, whichever the ground's luminance calls for.
+QColor readableOn(const QColor& ground, std::initializer_list<QColor> candidates) {
+    for (const auto& candidate : candidates) {
+        if (candidate.isValid() && contrastRatio(candidate, ground) >= kMinimumTextContrast) {
+            return candidate;
+        }
+    }
+    return relativeLuminance(ground) < 0.35 ? QColor(Qt::white) : QColor(Qt::black);
+}
+
 } // namespace
+
+double contrastRatio(const QColor& a, const QColor& b) {
+    const auto lighter = std::max(relativeLuminance(a), relativeLuminance(b));
+    const auto darker = std::min(relativeLuminance(a), relativeLuminance(b));
+    return (lighter + 0.05) / (darker + 0.05);
+}
 
 ThemeAdapter::ThemeAdapter(ThemeSources sources, QObject* parent)
     : QObject(parent), sources_(std::move(sources)), palette_(readPalette()) {}
@@ -207,12 +218,22 @@ ThemePalette ThemeAdapter::readPalette() const {
         selection.isValid()) {
         palette.selection = selection;
     }
+    // A legacy theme may pair a light selection ground with its own dark ink
+    // (catppuccin does); honour it, and never paint unreadable selected text.
+    palette.selectedText = readableOn(
+        palette.selection, {parsedColour(colours, QStringLiteral("selection_foreground")),
+                            palette.text, palette.background});
     if (const auto muted =
             firstColour(colours, {QStringLiteral("muted"), QStringLiteral("dark_foreground"),
                                   QStringLiteral("color8")});
         muted.isValid() && contrastRatio(muted, palette.background) >= kMinimumTextContrast) {
         palette.mutedText = muted;
     }
+    // The derived blend can dip below the bar when ground and ink barely
+    // clear it themselves; step back toward full ink until it reads.
+    palette.mutedText = readableOn(
+        palette.background,
+        {palette.mutedText, blend(palette.text, palette.background, 0.15), palette.text});
     if (const auto surface = parsedColour(colours, QStringLiteral("dark_background"));
         surface.isValid()) {
         palette.surface = surface;
@@ -228,6 +249,9 @@ ThemePalette ThemeAdapter::readPalette() const {
         palette.link = palette.accent;
     }
     palette.inactiveSelection = blend(palette.selection, palette.background, 0.5);
+    palette.inactiveSelectedText =
+        readableOn(palette.inactiveSelection,
+                   {palette.mutedText, palette.selectedText, palette.text, palette.background});
 
     if (const auto size = shell.constFind(QStringLiteral("font.base-size"));
         size != shell.constEnd()) {
