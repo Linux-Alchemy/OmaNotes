@@ -7,6 +7,7 @@
 #include "core/buffer_registry.hpp"
 #include "core/command.hpp"
 #include "core/command_registry.hpp"
+#include "core/view_mode.hpp"
 #include "persistence/conflict_detector.hpp"
 
 #include <QByteArrayView>
@@ -31,6 +32,7 @@ namespace omanotes {
 class BufferStrip;
 class EditorAdapter;
 class FileWatcher;
+class MarkdownView;
 class PrefixRouter;
 class SaveCommand;
 class Sidebar;
@@ -74,6 +76,10 @@ class MainWindow final : public QMainWindow {
     void refreshEditorStatus();
     void syncBufferStrip();
     void showBuffer(BufferId id);
+    /// Flip the active buffer between writing and the read-only projection.
+    void toggleReadingView();
+    [[nodiscard]] ViewMode viewModeFor(BufferId id) const;
+    void renderReadingView(BufferId id);
     void openScratchBuffer();
     void saveActiveBuffer();
     void beginNaming();
@@ -124,6 +130,8 @@ class MainWindow final : public QMainWindow {
     QStackedWidget* editorStack_ = nullptr;
     BufferStrip* bufferStrip_ = nullptr;
     QLabel* statusArea_ = nullptr;
+    MarkdownView* readingView_ = nullptr;
+    std::map<BufferId, ViewMode> viewModes_;
     QMessageBox* closePrompt_ = nullptr;
     std::optional<BufferId> closePromptTarget_;
     std::optional<BufferId> closeAfterNaming_;
