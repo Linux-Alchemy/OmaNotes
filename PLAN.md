@@ -581,7 +581,7 @@ signals:
 
 **Blocks:**
 
-- [ ] **6.2.1** — Document supported current-theme and text-scale inputs on Quattro.
+- [x] **6.2.1** — Document supported current-theme and text-scale inputs on Quattro.
 - [ ] **6.2.2** — Apply semantic colours consistently to window, editor, sidebar, status, and reading view.
   The focused pane must be unmistakable: after `Ctrl+L` from the tree, the sidebar's current-row
   highlight stays as strong as when the tree had focus, and nothing says the editor is live
@@ -941,6 +941,19 @@ Decision required: approve / request changes / stop and redesign
   status hint instead of silently mutating the hidden source buffer, and `Ctrl+Q` (visual
   block, a writing-mode key) no longer routes while reading. No new commands; the registry
   stays at 18.
+
+- **2026-09-08:** Task 6.2 dispatched. Block 6.2.1 surveyed the target machine: Quattro
+  materializes the active theme into `$XDG_STATE_HOME/omarchy/current/theme/` (a real
+  directory regenerated on switch, not 3.x's symlink), whose `colors.toml` comes in two
+  schemas — semantic (`mode`/`accent`/`selection`/layered grounds) and legacy flat
+  (`selection_background`, `color0–15`, no `mode`); text scale is `[font] base-size` in
+  `$XDG_CONFIG_HOME/omarchy/shell.toml`. All documented in `docs/omarchy-integration.md`
+  with the role mapping. `ThemeAdapter`/`ThemePalette` implement the contract: overlay
+  onto a complete readable fallback, a 3.0:1 WCAG contrast guard that refuses an
+  unreadable ground/ink pair as a pair, clamped text scale, XDG-resolved paths only, and
+  `refresh()` that emits only on real change (the 6.2.3 live-change hook). Read both
+  schemas' flat key/value subset directly rather than adding a TOML dependency. New
+  `theme-adapter` suite (7 cases); application to the widgets is blocks 6.2.2–6.2.4.
 
 - **2026-09-07:** Matt reviewed and merged PR #10, then requested cleanup and
   continuation. Fast-forwarded to `eb2f5b2`, removed the merged search/help branch
