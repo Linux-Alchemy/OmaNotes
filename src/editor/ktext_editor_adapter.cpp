@@ -1,11 +1,14 @@
 #include "editor/ktext_editor_adapter.hpp"
 
+#include "ui/theme_adapter.hpp"
+
 #include <KTextEditor/Document>
 #include <KTextEditor/Editor>
 #include <KTextEditor/View>
 
 #include <KActionCollection>
 #include <QAction>
+#include <QFont>
 #include <QKeySequence>
 #include <QWidget>
 
@@ -106,5 +109,19 @@ EditorMode KTextEditorAdapter::mode() const noexcept {
 }
 
 QString KTextEditorAdapter::modeName() const { return view_->viewModeHuman(); }
+
+void KTextEditorAdapter::applyTheme(const ThemePalette& palette) {
+    // The syntax theme supplies token colours in the right register; the
+    // semantic grounds are overlaid so the editor sits in the same room as
+    // the rest of the window.
+    view_->setConfigValue(QStringLiteral("theme"), palette.dark ? QStringLiteral("Breeze Dark")
+                                                                : QStringLiteral("Breeze Light"));
+    view_->setConfigValue(QStringLiteral("background-color"), palette.background);
+    view_->setConfigValue(QStringLiteral("selection-color"), palette.selection);
+    view_->setConfigValue(QStringLiteral("current-line-color"), palette.surface);
+    auto editorFont = view_->configValue(QStringLiteral("font")).value<QFont>();
+    editorFont.setPointSizeF(palette.baseFontPointSize);
+    view_->setConfigValue(QStringLiteral("font"), editorFont);
+}
 
 } // namespace omanotes

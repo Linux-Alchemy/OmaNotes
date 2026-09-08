@@ -29,6 +29,7 @@
 #include <QStackedWidget>
 #include <QStringDecoder>
 #include <QStringView>
+#include <QStyle>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -136,6 +137,9 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
 } // namespace
 
 MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
+    : MainWindow(std::move(launchRequest), ThemeAdapter::systemSources(), parent) {}
+
+MainWindow::MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, QWidget* parent)
     : QMainWindow(parent), launchRequest_(std::move(launchRequest)) {
     setObjectName(QStringLiteral("mainWindow"));
     const auto rootName =
@@ -159,8 +163,9 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
     connect(watcher_.get(), &FileWatcher::fileChanged, this,
             [this](const std::filesystem::path& path) { handleExternalChange(path); });
     QToolButton* newBufferButton = nullptr;
-    splitter->addWidget(buildWritingArea(splitter, editorStack_, bufferStrip_, newBufferButton,
-                                         statusArea_, namePrompt_));
+    writingArea_ = buildWritingArea(splitter, editorStack_, bufferStrip_, newBufferButton,
+                                    statusArea_, namePrompt_);
+    splitter->addWidget(writingArea_);
     splitter->setStretchFactor(0, 0);
     splitter->setStretchFactor(1, 1);
     splitter->setSizes({240, 860});
@@ -272,6 +277,17 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
         }
     }
     loadKeymap();
+
+    theme_ = std::make_unique<ThemeAdapter>(std::move(themeSources));
+    applyTheme(theme_->currentPalette());
+    connect(theme_.get(), &ThemeAdapter::paletteChanged, this,
+            [this](const ThemePalette& palette) { applyTheme(palette); });
+    if (auto* application = qobject_cast<QApplication*>(QApplication::instance());
+        application != nullptr) {
+        connect(application, &QApplication::focusChanged, this,
+                [this](QWidget*, QWidget*) { markActivePane(); });
+    }
+    markActivePane();
 }
 
 MainWindow::~MainWindow() {
@@ -993,6 +1009,9 @@ EditorAdapter& MainWindow::createEditorFor(BufferId id) {
     auto& editor = *adapter;
     editors_.emplace(id, std::move(adapter));
     editorStack_->addWidget(editor.widget());
+    if (theme_ != nullptr) {
+        static_cast<KTextEditorAdapter&>(editor).applyTheme(theme_->currentPalette());
+    }
 
     connect(&editor, &EditorAdapter::modeChanged, this, [this] { refreshEditorStatus(); });
     connect(&editor, &EditorAdapter::modifiedChanged, this, [this, id](bool modified) {
@@ -1347,6 +1366,76 @@ void MainWindow::refreshEditorStatus() {
     }
     statusArea_->setText(
         QStringLiteral("%1    %2%3%4").arg(modeName, name, modifiedMarker, diskMarker));
+}
+
+void MainWindow::applyTheme(const ThemePalette& palette) {
+    const auto name = [](const QColor& colour) { return colour.name(QColor::HexRgb); };
+    // Every pane wears a permanent 2px top border so the accent mark on the
+    // focused one never shifts the layout, only the colour.
+    setStyleSheet(QStringLiteral(R"(
+QMainWindow#mainWindow { background-color: %1; }
+QSplitter#workspaceSplitter::handle { background-color: %2; }
+QFrame#sidebar { background-color: %3; border: none; border-top: 2px solid %3; }
+QFrame#sidebar[paneActive="true"] { border-top: 2px solid %4; }
+QWidget#writingArea { background-color: %1; border-top: 2px solid %1; }
+QWidget#writingArea[paneActive="true"] { border-top: 2px solid %4; }
+QLabel#statusArea { background-color: %3; color: %5; }
+QLineEdit#namePrompt { background-color: %3; color: %5; selection-background-color: %6; }
+QTabBar#bufferStrip { background-color: %3; }
+QTabBar#bufferStrip::tab { background-color: %3; color: %7; padding: 5px 12px; border: none; }
+QTabBar#bufferStrip::tab:selected { background-color: %1; color: %5; }
+QToolButton#newBufferButton { background-color: %3; color: %7; border: none; padding: 2px 8px; }
+)")
+                      .arg(name(palette.background), name(palette.border), name(palette.surface),
+                           name(palette.accent), name(palette.text), name(palette.selection),
+                           name(palette.mutedText)));
+    writingArea_->setAttribute(Qt::WA_StyledBackground, true);
+
+    // Tree selection goes through palette groups, not the stylesheet: the
+    // Inactive group is what lets the sidebar's selection dim when focus
+    // leaves it (Matt's 5.1 gate finding).
+    auto sidebarPalette = sidebar_->palette();
+    sidebarPalette.setColor(QPalette::Window, palette.surface);
+    sidebarPalette.setColor(QPalette::Base, palette.surface);
+    sidebarPalette.setColor(QPalette::Text, palette.text);
+    sidebarPalette.setColor(QPalette::Active, QPalette::Highlight, palette.selection);
+    sidebarPalette.setColor(QPalette::Active, QPalette::HighlightedText, palette.text);
+    sidebarPalette.setColor(QPalette::Inactive, QPalette::Highlight, palette.inactiveSelection);
+    sidebarPalette.setColor(QPalette::Inactive, QPalette::HighlightedText, palette.mutedText);
+    sidebar_->setPalette(sidebarPalette);
+
+    auto readingPalette = readingView_->palette();
+    readingPalette.setColor(QPalette::Base, palette.background);
+    readingPalette.setColor(QPalette::Text, palette.text);
+    readingPalette.setColor(QPalette::Link, palette.link);
+    readingPalette.setColor(QPalette::Highlight, palette.selection);
+    readingPalette.setColor(QPalette::HighlightedText, palette.text);
+    readingView_->setPalette(readingPalette);
+    auto readingFont = readingView_->font();
+    // 6.1's restrained typography holds: the reading face sits one point up.
+    readingFont.setPointSizeF(palette.baseFontPointSize + 1.0);
+    readingView_->setFont(readingFont);
+
+    for (const auto& [bufferId, editor] : editors_) {
+        if (auto* hosted = qobject_cast<KTextEditorAdapter*>(editor.get()); hosted != nullptr) {
+            hosted->applyTheme(palette);
+        }
+    }
+}
+
+void MainWindow::markActivePane() {
+    auto* focus = QApplication::focusWidget();
+    const auto mark = [focus](QWidget* pane) {
+        const auto active = focus != nullptr && pane->isAncestorOf(focus);
+        if (pane->property("paneActive").toBool() == active) {
+            return;
+        }
+        pane->setProperty("paneActive", active);
+        pane->style()->unpolish(pane);
+        pane->style()->polish(pane);
+    };
+    mark(sidebar_);
+    mark(writingArea_);
 }
 
 } // namespace omanotes

@@ -37,6 +37,8 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/workspace/text_search.hpp"
     "${CMAKE_SOURCE_DIR}/src/ui/search_palette.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/search_palette.hpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/theme_adapter.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/theme_adapter.hpp"
     "${CMAKE_SOURCE_DIR}/src/ui/main_window.hpp"
     "${CMAKE_SOURCE_DIR}/src/ui/sidebar.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/sidebar.hpp"

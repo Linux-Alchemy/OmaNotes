@@ -167,6 +167,8 @@ class MainWindowTest final : public QObject {
     void superChordsRouteUniversalCopyAndPaste();
     void readingViewTogglesAndPreservesState();
     void readingViewRoutesCopyAndRefusesPaste();
+    void themeDressesEveryRegion();
+    void focusMovesTheAccentMarkBetweenPanes();
     void searchOpensMatchesAndHelpRunsCommands();
     void helpIsReachableFromSidebar();
     void configuredKeysRouteAndAppearInHelp();
@@ -1579,6 +1581,99 @@ void MainWindowTest::readingViewRoutesCopyAndRefusesPaste() {
     QTest::qWait(50);
     QCOMPARE(stack->currentWidget(), reading);
     QCOMPARE(editor->document()->text(), QStringLiteral("# Title\n\nbody text\n"));
+}
+
+namespace {
+
+/// A distinct fixture theme so every assertion below proves a colour came
+/// from the theme, not from any default.
+omanotes::ThemeSources writeFixtureTheme(const QTemporaryDir& directory) {
+    const auto root = pathFor(directory.path());
+    const omanotes::ThemeSources sources{root / "state" / "omarchy" / "current",
+                                         root / "config" / "omarchy"};
+    std::filesystem::create_directories(sources.stateDir / "theme");
+    std::filesystem::create_directories(sources.configDir);
+    writeFile(sources.stateDir / "theme" / "colors.toml", "mode = \"dark\"\n"
+                                                          "accent = \"#d08050\"\n"
+                                                          "selection = \"#303a60\"\n"
+                                                          "muted = \"#8a90a8\"\n"
+                                                          "background = \"#101018\"\n"
+                                                          "dark_background = \"#181826\"\n"
+                                                          "lighter_background = \"#262636\"\n"
+                                                          "foreground = \"#e6e0d2\"\n"
+                                                          "blue = \"#7090d0\"\n");
+    writeFile(sources.configDir / "shell.toml", "[font]\nbase-size = 14\n");
+    return sources;
+}
+
+} // namespace
+
+void MainWindowTest::themeDressesEveryRegion() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path())) / "notes";
+    const auto note = root / "note.md";
+    std::filesystem::create_directories(root);
+    writeFile(note, "# Title\n");
+    omanotes::MainWindow window({root, note, false}, writeFixtureTheme(temporary));
+    window.show();
+
+    // The sidebar's selection is strong while its tree owns focus and dims
+    // to the derived inactive colour when it does not (the 5.1 gate debt).
+    auto* sidebar = window.findChild<QWidget*>(QStringLiteral("sidebar"));
+    QVERIFY(sidebar != nullptr);
+    const auto& sidebarPalette = sidebar->palette();
+    QCOMPARE(sidebarPalette.color(QPalette::Active, QPalette::Highlight),
+             QColor(QStringLiteral("#303a60")));
+    QVERIFY(sidebarPalette.color(QPalette::Inactive, QPalette::Highlight) !=
+            sidebarPalette.color(QPalette::Active, QPalette::Highlight));
+
+    auto* reading = window.findChild<QTextBrowser*>(QStringLiteral("readingView"));
+    QVERIFY(reading != nullptr);
+    QCOMPARE(reading->palette().color(QPalette::Base), QColor(QStringLiteral("#101018")));
+    QCOMPARE(reading->palette().color(QPalette::Link), QColor(QStringLiteral("#7090d0")));
+    QCOMPARE(reading->font().pointSizeF(), 15.0); // base-size plus the reading point.
+
+    auto* editor = activeEditor(window);
+    QVERIFY(editor != nullptr);
+    QCOMPARE(editor->configValue(QStringLiteral("background-color")).value<QColor>(),
+             QColor(QStringLiteral("#101018")));
+    QCOMPARE(editor->configValue(QStringLiteral("font")).value<QFont>().pointSizeF(), 14.0);
+
+    // The window chrome carries the theme's grounds and accent.
+    QVERIFY(window.styleSheet().contains(QStringLiteral("#d08050")));
+    QVERIFY(window.styleSheet().contains(QStringLiteral("#181826")));
+}
+
+void MainWindowTest::focusMovesTheAccentMarkBetweenPanes() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path())) / "notes";
+    const auto note = root / "note.md";
+    std::filesystem::create_directories(root);
+    writeFile(note, "# Title\n");
+    omanotes::MainWindow window({root, note, false}, writeFixtureTheme(temporary));
+    window.show();
+    auto* sidebar = window.findChild<QWidget*>(QStringLiteral("sidebar"));
+    auto* writingArea = window.findChild<QWidget*>(QStringLiteral("writingArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(sidebar != nullptr && writingArea != nullptr && editor != nullptr);
+
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QTRY_VERIFY(writingArea->property("paneActive").toBool());
+    QVERIFY(!sidebar->property("paneActive").toBool());
+
+    // Space e brings the tree; the mark follows the focus into the sidebar.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("e"));
+    QTRY_VERIFY(sidebar->property("paneActive").toBool());
+    QVERIFY(!writingArea->property("paneActive").toBool());
+
+    // Ctrl+L returns to the editor; the mark returns with it.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_L, Qt::ControlModifier);
+    QTRY_VERIFY(writingArea->property("paneActive").toBool());
+    QVERIFY(!sidebar->property("paneActive").toBool());
 }
 
 void MainWindowTest::closesCleanly() {

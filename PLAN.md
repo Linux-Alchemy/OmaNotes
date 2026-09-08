@@ -582,7 +582,7 @@ signals:
 **Blocks:**
 
 - [x] **6.2.1** — Document supported current-theme and text-scale inputs on Quattro.
-- [ ] **6.2.2** — Apply semantic colours consistently to window, editor, sidebar, status, and reading view.
+- [x] **6.2.2** — Apply semantic colours consistently to window, editor, sidebar, status, and reading view.
   The focused pane must be unmistakable: after `Ctrl+L` from the tree, the sidebar's current-row
   highlight stays as strong as when the tree had focus, and nothing says the editor is live
   (found at Matt's Task 5.1 gate, 2026-09-04). Dim the inactive selection and mark the active pane.
@@ -954,6 +954,18 @@ Decision required: approve / request changes / stop and redesign
   `refresh()` that emits only on real change (the 6.2.3 live-change hook). Read both
   schemas' flat key/value subset directly rather than adding a TOML dependency. New
   `theme-adapter` suite (7 cases); application to the widgets is blocks 6.2.2–6.2.4.
+
+- **2026-09-08:** Block 6.2.2: the window wears the theme. One stylesheet paints the chrome
+  (window, sidebar, status, buffer strip, name prompt, splitter handles); the sidebar tree's
+  selection goes through QPalette groups so it dims to the derived inactive colour when
+  focus leaves it, and both panes carry a permanent 2px top border that turns accent on the
+  focused one — the 5.1 gate debt (dim inactive selection, mark the active pane). The
+  editor takes the semantic grounds plus a mode-matched Breeze syntax theme via KTextEditor
+  config; the reading view takes background/text/link/selection and keeps its one-point-up
+  face at the theme's base size. A `ThemeSources` constructor overload lets tests dress the
+  window in a fixture theme; two new ui-suite cases assert region colours and the accent
+  mark following Space e / Ctrl+L. Live re-application on theme change is wired
+  (`paletteChanged` → repaint) but nothing watches the files yet — that decision is 6.2.3.
 
 - **2026-09-07:** Matt reviewed and merged PR #10, then requested cleanup and
   continuation. Fast-forwarded to `eb2f5b2`, removed the merged search/help branch
