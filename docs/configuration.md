@@ -48,6 +48,9 @@ New combinations use `Ctrl+Alt+letter/digit` or
 | Command | Default | Other supported exception |
 | --- | --- | --- |
 | `file.save` | `Ctrl+S` | `Ctrl+Shift+S` |
+| `edit.paste` | `Ctrl+V` (any mode; identical to Omarchy's Super+V) | — |
+| `edit.copy` | `Ctrl+C` (acts only over a selection) | — |
+| `editor.visual-block` | `Ctrl+Q` (Normal mode; Vi's visual block) | — |
 | `pane.sidebar` | `Ctrl+H` | — |
 | `pane.editor` | `Ctrl+L` in the sidebar | — |
 | `buffer.next` | `Shift+L` | `Shift+H` |

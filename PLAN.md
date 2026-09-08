@@ -905,6 +905,29 @@ Decision required: approve / request changes / stop and redesign
   point, 130% line height, wide document margin — with colour left to Task 6.2's theme.
   Test-contract updates: help now lists `view.reading` (its mouse route), and editor-stack
   counts include the one permanent reading-view widget.
+
+- **2026-09-07:** Matt's gate on the Phase 6 build found Omarchy's universal paste broken:
+  Super+V delivers a literal Ctrl+V (per `default/hypr/bindings/clipboard.lua`), which the
+  Phase 2 matrix had released to Vi as visual block, and bare `p` never reads the system
+  clipboard in stock Vi (LazyVim's `clipboard=unnamedplus` is why it does in Neovim). Matt
+  chose mode-sensitive routing: a new `edit.paste` command defaults to Ctrl+V and acts in
+  Insert mode only, pasting via the editor's own paste action; Normal and Visual keep
+  visual block, and `"+p`/`"+y` remain the Vim-correct registers. Matt's retest found the
+  Super chords still dead: Hyprland's `sendshortcut` injects Ctrl+key while the physical
+  Super is held, so the app receives Ctrl+Meta+key, which no widget or keymap shortcut
+  matched (the initial claim that Super+C "already worked" was wrong — untested optimism,
+  withdrawn). Fixed by ignoring the Meta modifier in application shortcut matching and
+  adding `edit.copy` (default Ctrl+C, fires only over a selection, via the editor's own
+  copy action; without a selection Ctrl+C stays Vi's abort). Matt then set the product
+  rule — Omarchy users expect Super+C/V to work everywhere, always. A Meta-modifier
+  discriminator was tried and failed on the real compositor: clipboard.lua's
+  send_key_state exists precisely to deliver a clean chord without the held Super, so
+  Super+V and Ctrl+V are indistinguishable at the application. Final resolution:
+  `Ctrl+V` pastes in every mode (matching what terminals give Neovim via bracketed
+  paste), and Vi's visual block relocates to `Ctrl+Q` — gvim's classic answer to this
+  collision — implemented by handing Vi a synthetic Ctrl+V. Deviations recorded in
+  `docs/vim-acceptance.md`; the 2.2 matrix gap (no system-clipboard interop cases) is
+  thereby closed.
   The 15-suite engineering gate passes with ASan/UBSan, formatting, clang-tidy and hardening.
   Tasks 5.3.2–5.3.4 await the configuration-format decision in `docs/keymap-proposal.md`;
   the Phase 5 hands-on gate remains open. The working baseline is merged upstream `b5260c8`,

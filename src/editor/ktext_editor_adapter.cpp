@@ -30,6 +30,10 @@ void releaseCanonicalViShortcuts(KTextEditor::View& view) {
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+F")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+R")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+V")));
+    // Copy routes through the application's edit.copy command so Omarchy's
+    // Super+C (delivered as Ctrl+Meta+C) can reach it; a widget-level QAction
+    // shortcut can never match the Meta-carrying chord.
+    releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+C")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+S")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+Shift+S")));
 }
