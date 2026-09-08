@@ -28,6 +28,9 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/ui/main_window.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/help_overlay.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/help_overlay.hpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/markdown_view.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/markdown_view.hpp"
+    "${CMAKE_SOURCE_DIR}/src/core/view_mode.hpp"
     "${CMAKE_SOURCE_DIR}/src/workspace/file_index.cpp"
     "${CMAKE_SOURCE_DIR}/src/workspace/file_index.hpp"
     "${CMAKE_SOURCE_DIR}/src/workspace/text_search.cpp"
@@ -276,6 +279,23 @@ omanotes_enable_hardening(omanotes_search_tests)
 omanotes_enable_sanitizers(omanotes_search_tests)
 add_test(NAME workspace-search COMMAND omanotes_search_tests)
 
+add_executable(omanotes_markdown_tests
+    integration/markdown_render_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/ui/markdown_view.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/markdown_view.hpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.hpp"
+)
+target_include_directories(omanotes_markdown_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_definitions(
+    omanotes_markdown_tests PRIVATE OMANOTES_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+)
+target_link_libraries(omanotes_markdown_tests PRIVATE Qt6::Test Qt6::Widgets)
+omanotes_enable_warnings(omanotes_markdown_tests)
+omanotes_enable_hardening(omanotes_markdown_tests)
+omanotes_enable_sanitizers(omanotes_markdown_tests)
+add_test(NAME markdown-render COMMAND omanotes_markdown_tests)
+
 add_executable(omanotes_keymap_tests
     unit/keymap_test.cpp
     "${CMAKE_SOURCE_DIR}/src/app/keymap.cpp"
@@ -301,7 +321,7 @@ set(
 )
 
 set_tests_properties(
-    keymap workspace-search atomic-save buffer-registry command-registry conflict-detector document-store editor-adapter file-tree-model
+    keymap markdown-render workspace-search atomic-save buffer-registry command-registry conflict-detector document-store editor-adapter file-tree-model
     file-watcher launch-process launch-request prefix-router ui-structure process-startup
     vim-behaviour
     PROPERTIES ENVIRONMENT "${OMANOTES_TEST_ENVIRONMENT}"

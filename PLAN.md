@@ -555,9 +555,9 @@ public:
 **Blocks:**
 
 - [x] **6.1.1** — Define supported Markdown and resource policy with malicious fixtures.
-- [ ] **6.1.2** — Implement writing/reading toggle while preserving cursor and buffer state.
-- [ ] **6.1.3** — Style typography, headings, lists, quotes, links, and code for restrained reading.
-- [ ] **6.1.4** — Verify: hostile HTML, remote images, traversal URLs, and malformed Markdown cause no execution or out-of-root reads.
+- [x] **6.1.2** — Implement writing/reading toggle while preserving cursor and buffer state.
+- [x] **6.1.3** — Style typography, headings, lists, quotes, links, and code for restrained reading.
+- [x] **6.1.4** — Verify: hostile HTML, remote images, traversal URLs, and malformed Markdown cause no execution or out-of-root reads.
 
 ### Task 6.2: Integrate Omarchy theme and scaling
 
@@ -893,6 +893,18 @@ Decision required: approve / request changes / stop and redesign
   hover target reveal. The malicious fixture set encoding the policy lives in
   `tests/fixtures/markdown/`; block 6.1.4 verifies against it. Threat model note: agents
   write into the workspace by design, so every note is untrusted input.
+
+- **2026-09-07:** Blocks 6.1.2–6.1.4 implemented the reading view per ADR 0009. `Space m`
+  toggles per buffer between the editor and a `QTextBrowser` projection, preserving cursor,
+  text, and modified state; the reading view re-renders when a clean buffer reloads from an
+  external change. Every image is requested eagerly at render so policy verdicts are not at
+  the mercy of lazy layout; refusals show a small placeholder and are recorded per render.
+  The fixture suite (`markdown-render`, 12 cases) covers raw HTML as inert text, remote and
+  traversal images, the scheme allowlist, plus runtime-generated symlink escapes, size/pixel
+  bombs, and pathological text. Typography is deliberately restrained — system face plus one
+  point, 130% line height, wide document margin — with colour left to Task 6.2's theme.
+  Test-contract updates: help now lists `view.reading` (its mouse route), and editor-stack
+  counts include the one permanent reading-view widget.
 
 - **2026-09-07:** Matt's gate on the Phase 6 build found Omarchy's universal paste broken:
   Super+V delivers a literal Ctrl+V (per `default/hypr/bindings/clipboard.lua`), which the

@@ -7,6 +7,7 @@
 #include "persistence/document_store.hpp"
 #include "ui/buffer_strip.hpp"
 #include "ui/help_overlay.hpp"
+#include "ui/markdown_view.hpp"
 #include "ui/search_palette.hpp"
 #include "ui/sidebar.hpp"
 
@@ -165,6 +166,27 @@ MainWindow::MainWindow(LaunchRequest launchRequest, QWidget* parent)
     splitter->setSizes({240, 860});
 
     setCentralWidget(splitter);
+
+    readingView_ = new MarkdownView(editorStack_);
+    editorStack_->addWidget(readingView_);
+    connect(readingView_, &MarkdownView::noteLinkActivated, this,
+            [this](const std::filesystem::path& path) {
+                auto context = currentContext();
+                context.targetPath = path;
+                runCommand(QStringLiteral("file.open"), std::move(context));
+            });
+    connect(readingView_, &MarkdownView::externalLinkOpened, this, [this](const QString& url) {
+        statusArea_->setText(QStringLiteral("Opened %1 in the browser").arg(url));
+    });
+    connect(readingView_, &MarkdownView::linkRefused, this,
+            [this](const QString& reason) { statusArea_->setText(reason); });
+    connect(readingView_, &MarkdownView::linkTargetChanged, this, [this](const QString& target) {
+        if (target.isEmpty()) {
+            refreshEditorStatus();
+        } else {
+            statusArea_->setText(target);
+        }
+    });
 
     searchPalette_ = new SearchPalette(launchRequest_.root, this);
     connect(searchPalette_, &SearchPalette::matchChosen, this,
@@ -434,7 +456,6 @@ void MainWindow::registerCommands() {
     // close-button, + button and tree clicks; those routes name the command
     // ids in routedOutsideLeader_.
     const auto always = [](const AppContext&) { return true; };
-    const auto notYet = [](const AppContext&) { return false; };
     const auto severalBuffers = [](const AppContext& context) { return context.bufferCount > 1; };
     const auto inNormalMode = [](const AppContext& context) { return context.normalMode; };
 
@@ -605,9 +626,12 @@ void MainWindow::registerCommands() {
                 },
                 {}},
                {QStringLiteral("?")});
-    addCommand({QStringLiteral("view.reading"), QStringLiteral("Reading view"),
-                QStringLiteral("view"), notYet, [](AppContext&) {},
-                QStringLiteral("Reading view is not available yet (Phase 6)")},
+    addCommand({QStringLiteral("view.reading"),
+                QStringLiteral("Reading view"),
+                QStringLiteral("view"),
+                always,
+                [this](AppContext&) { toggleReadingView(); },
+                {}},
                {QStringLiteral("m")});
 }
 
@@ -724,6 +748,7 @@ void MainWindow::closeBuffer(BufferId id, bool discardChanges) {
         editors_.erase(editor);
     }
     tracked_.erase(id);
+    viewModes_.erase(id);
     if (path.has_value()) {
         watcher_->unwatch(*path);
     }
@@ -913,6 +938,10 @@ void MainWindow::handleExternalChange(const std::filesystem::path& path) {
         tracked->second = TrackedFile{SavedRevision::of(QByteArrayView(*bytes)), DiskNote::InSync};
         buffers_.setModified(*id, false);
         syncBufferStrip();
+        // A reader must see the agent's edit too, not a stale projection.
+        if (buffers_.activeId() == *id && viewModeFor(*id) == ViewMode::Reading) {
+            renderReadingView(*id);
+        }
         statusArea_->setText(QStringLiteral("Reloaded %1 from disk").arg(name));
         return;
     }
@@ -969,12 +998,47 @@ void MainWindow::showBuffer(BufferId id) {
     }
 
     prefixRouter_->cancelPending();
+    if (viewModeFor(id) == ViewMode::Reading) {
+        renderReadingView(id);
+        editorStack_->setCurrentWidget(readingView_);
+        syncBufferStrip();
+        refreshEditorStatus();
+        readingView_->setFocus(Qt::OtherFocusReason);
+        return;
+    }
     editorStack_->setCurrentWidget(editor->second->widget());
     syncBufferStrip();
     refreshEditorStatus();
     if (editor->second->widget() != nullptr) {
         editor->second->widget()->setFocus(Qt::OtherFocusReason);
     }
+}
+
+void MainWindow::toggleReadingView() {
+    const auto active = buffers_.activeId();
+    if (!active.has_value()) {
+        return;
+    }
+    viewModes_[*active] = toggled(viewModeFor(*active));
+    showBuffer(*active);
+}
+
+ViewMode MainWindow::viewModeFor(BufferId id) const {
+    const auto found = viewModes_.find(id);
+    return found == viewModes_.end() ? ViewMode::Writing : found->second;
+}
+
+void MainWindow::renderReadingView(BufferId id) {
+    const auto editor = editors_.find(id);
+    if (editor == editors_.end()) {
+        return;
+    }
+    const auto* state = buffers_.find(id);
+    ResourcePolicy policy;
+    policy.root = launchRequest_.root;
+    policy.noteDirectory = state != nullptr && state->path.has_value() ? state->path->parent_path()
+                                                                       : launchRequest_.root;
+    readingView_->render(editor->second->text(), policy);
 }
 
 void MainWindow::syncBufferStrip() {
@@ -1238,6 +1302,8 @@ void MainWindow::refreshEditorStatus() {
     const auto active = buffers_.activeId();
     const auto* state = active.has_value() ? buffers_.find(*active) : nullptr;
     const auto name = state != nullptr ? state->displayName : scratchDisplayName();
+    const auto reading = active.has_value() && viewModeFor(*active) == ViewMode::Reading;
+    const auto modeName = reading ? QStringLiteral("READING") : editor->modeName().toUpper();
     const auto modifiedMarker = editor->isModified() ? QStringLiteral(" [+]") : QString{};
     auto diskMarker = QString{};
     if (const auto tracked = active.has_value() ? tracked_.find(*active) : tracked_.end();
@@ -1253,8 +1319,8 @@ void MainWindow::refreshEditorStatus() {
             break;
         }
     }
-    statusArea_->setText(QStringLiteral("%1    %2%3%4")
-                             .arg(editor->modeName().toUpper(), name, modifiedMarker, diskMarker));
+    statusArea_->setText(
+        QStringLiteral("%1    %2%3%4").arg(modeName, name, modifiedMarker, diskMarker));
 }
 
 } // namespace omanotes

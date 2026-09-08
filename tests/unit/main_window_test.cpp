@@ -20,6 +20,7 @@
 #include <QStackedWidget>
 #include <QTabBar>
 #include <QTemporaryDir>
+#include <QTextBrowser>
 #include <QToolButton>
 #include <QTreeView>
 #include <QTreeWidget>
@@ -164,6 +165,7 @@ class MainWindowTest final : public QObject {
     void mouseCreatesAndClosesBuffers();
     void insertModePasteRoutesTheClipboard();
     void superChordsRouteUniversalCopyAndPaste();
+    void readingViewTogglesAndPreservesState();
     void searchOpensMatchesAndHelpRunsCommands();
     void helpIsReachableFromSidebar();
     void configuredKeysRouteAndAppearInHelp();
@@ -1174,7 +1176,8 @@ void MainWindowTest::closesBuffersFromTheLeaderAndGuardsUnsavedWork() {
     auto* editor = activeEditor(window);
     QVERIFY(status != nullptr && strip != nullptr && stack != nullptr && editor != nullptr);
     QCOMPARE(strip->count(), 1);
-    QCOMPARE(stack->count(), 1);
+    // One editor per open buffer plus the permanent reading view.
+    QCOMPARE(stack->count(), 2);
 
     editor->document()->setText(QStringLiteral("keep me\nand this\n"));
     editor->setFocus();
@@ -1198,7 +1201,8 @@ void MainWindowTest::closesBuffersFromTheLeaderAndGuardsUnsavedWork() {
     QTRY_COMPARE(status->text(), QStringLiteral("Closed closing.md, discarding changes"));
     QCOMPARE(strip->count(), 1);
     QCOMPARE(strip->tabText(0), QStringLiteral("[No Name]"));
-    QCOMPARE(stack->count(), 1);
+    // One editor per open buffer plus the permanent reading view.
+    QCOMPARE(stack->count(), 2);
     QCOMPARE(readFile(note), QByteArray("keep me\n"));
     auto* scratch = activeEditor(window);
     QVERIFY(scratch != nullptr && scratch != editor);
@@ -1221,7 +1225,8 @@ void MainWindowTest::closesBuffersFromTheLeaderAndGuardsUnsavedWork() {
     QTest::keyClicks(target, QStringLiteral("bd"));
     QTRY_COMPARE(status->text(), QStringLiteral("Closed [No Name]"));
     QCOMPARE(strip->count(), 1);
-    QCOMPARE(stack->count(), 1);
+    // One editor per open buffer plus the permanent reading view.
+    QCOMPARE(stack->count(), 2);
     QCOMPARE(activeEditor(window), scratch);
     QCOMPARE(scratch->document()->text(), QStringLiteral("scratch"));
     QVERIFY(scratch->hasFocus());
@@ -1241,12 +1246,6 @@ void MainWindowTest::refusesDisabledCommandsWithAReason() {
     QTest::keyClick(target, Qt::Key_Space);
     QTest::keyClicks(target, QStringLiteral("bn"));
     QTRY_COMPARE(status->text(), QStringLiteral("Only one buffer is open"));
-
-    // Reading mode remains outside this phase.
-    QTest::keyClick(target, Qt::Key_Space);
-    QTest::keyClicks(target, QStringLiteral("m"));
-    QTRY_COMPARE(status->text(), QStringLiteral("Reading view is not available yet (Phase 6)"));
-    QCOMPARE(editor->document()->text(), QString{});
 
     // A pending prefix in Insert mode is cancelled, never executed.
     QTest::keyClicks(target, QStringLiteral("i"));
@@ -1468,6 +1467,68 @@ void MainWindowTest::superChordsRouteUniversalCopyAndPaste() {
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
 }
 
+void MainWindowTest::readingViewTogglesAndPreservesState() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "# Title\n\nbody text\n");
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* strip = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    auto* stack = window.findChild<QStackedWidget*>(QStringLiteral("editorStack"));
+    auto* reading = window.findChild<QTextBrowser*>(QStringLiteral("readingView"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr && strip != nullptr && stack != nullptr && reading != nullptr &&
+            editor != nullptr);
+
+    editor->setCursorPosition(KTextEditor::Cursor(2, 5));
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+
+    // Space m projects the note; the source and its state are untouched.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("m"));
+    QTRY_COMPARE(stack->currentWidget(), reading);
+    QVERIFY(reading->toPlainText().contains(QStringLiteral("body text")));
+    QVERIFY(!editor->document()->isModified());
+    QTRY_VERIFY2(status->text().contains(QStringLiteral("READING")), qPrintable(status->text()));
+
+    // Space m from the reading view returns to writing, cursor intact.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("m"));
+    QTRY_COMPARE(stack->currentWidget(), editor);
+    QCOMPARE(activeEditor(window)->cursorPosition(), KTextEditor::Cursor(2, 5));
+    QTRY_VERIFY(status->text().contains(QStringLiteral("NORMAL"), Qt::CaseInsensitive));
+
+    // The mode is per buffer: a reading note stays reading behind a new
+    // scratch, which opens writing.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("m"));
+    QTRY_COMPARE(stack->currentWidget(), reading);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("fn"));
+    QTRY_COMPARE(strip->count(), 2);
+    QVERIFY(stack->currentWidget() != reading);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_H, Qt::ShiftModifier);
+    QTRY_COMPARE(stack->currentWidget(), reading);
+
+    // Dirty text projects too, without ever cleaning or dirtying the buffer.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("m"));
+    QTRY_VERIFY(activeEditor(window) != nullptr);
+    auto* backToWriting = activeEditor(window);
+    backToWriting->document()->setText(QStringLiteral("# Title\n\nedited body\n"));
+    QTRY_VERIFY(backToWriting->document()->isModified());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("m"));
+    QTRY_COMPARE(stack->currentWidget(), reading);
+    QVERIFY(reading->toPlainText().contains(QStringLiteral("edited body")));
+    QVERIFY(backToWriting->document()->isModified());
+    QVERIFY2(status->text().contains(QStringLiteral("[+]")), qPrintable(status->text()));
+}
+
 void MainWindowTest::closesCleanly() {
     omanotes::MainWindow window(launchRequest());
     window.show();
@@ -1503,7 +1564,6 @@ void MainWindowTest::searchOpensMatchesAndHelpRunsCommands() {
     QTreeWidgetItem* newBuffer = nullptr;
     for (int row = 0; row < commands->topLevelItemCount(); ++row) {
         auto* item = commands->topLevelItem(row);
-        QVERIFY(item->data(0, Qt::UserRole).toString() != QStringLiteral("view.reading"));
         if (item->data(0, Qt::UserRole).toString() == QStringLiteral("buffer.new")) {
             newBuffer = item;
         }
