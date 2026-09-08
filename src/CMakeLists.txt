@@ -38,6 +38,8 @@ add_executable(
     workspace/text_search.hpp
     ui/search_palette.cpp
     ui/search_palette.hpp
+    ui/theme_adapter.cpp
+    ui/theme_adapter.hpp
     ui/main_window.hpp
     ui/sidebar.cpp
     ui/sidebar.hpp

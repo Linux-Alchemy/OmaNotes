@@ -308,6 +308,18 @@ omanotes_enable_hardening(omanotes_keymap_tests)
 omanotes_enable_sanitizers(omanotes_keymap_tests)
 add_test(NAME keymap COMMAND omanotes_keymap_tests)
 
+add_executable(omanotes_theme_tests
+    unit/theme_adapter_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/ui/theme_adapter.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/theme_adapter.hpp"
+)
+target_include_directories(omanotes_theme_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(omanotes_theme_tests PRIVATE Qt6::Test Qt6::Widgets)
+omanotes_enable_warnings(omanotes_theme_tests)
+omanotes_enable_hardening(omanotes_theme_tests)
+omanotes_enable_sanitizers(omanotes_theme_tests)
+add_test(NAME theme-adapter COMMAND omanotes_theme_tests)
+
 set(
     OMANOTES_TEST_ENVIRONMENT
     "QT_QPA_PLATFORM=offscreen"
