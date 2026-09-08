@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <QByteArray>
 #include <QFile>
+#include <QFont>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
@@ -1435,7 +1436,16 @@ QDialog QPushButton:hover { background-color: %2; }
     readingPalette.setColor(QPalette::Highlight, palette.selection);
     readingPalette.setColor(QPalette::HighlightedText, palette.selectedText);
     readingView_->setPalette(readingPalette);
-    auto readingFont = readingView_->font();
+    // Pure Omarchy (Matt's call, 2026-09-08): the system monospace
+    // everywhere, at the shell's base size. "monospace" resolves through
+    // fontconfig, exactly the source of truth omarchy-font-current reads;
+    // the GTK platform theme's sans (which Omarchy never chose) is retired.
+    QFont uiFont(QStringLiteral("monospace"));
+    uiFont.setStyleHint(QFont::Monospace);
+    uiFont.setPointSizeF(palette.baseFontPointSize);
+    QApplication::setFont(uiFont);
+
+    auto readingFont = uiFont;
     // 6.1's restrained typography holds: the reading face sits one point up.
     readingFont.setPointSizeF(palette.baseFontPointSize + 1.0);
     readingView_->setFont(readingFont);
