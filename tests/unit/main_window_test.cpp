@@ -1650,6 +1650,12 @@ void MainWindowTest::themeDressesEveryRegion() {
     QVERIFY(window.styleSheet().contains(QStringLiteral("#d08050")));
     QVERIFY(window.styleSheet().contains(QStringLiteral("#181826")));
     QVERIFY(window.styleSheet().contains(QStringLiteral("QFrame#sidebar QTreeView")));
+
+    // The dialogs are separate windows the scoped rules used to miss: the
+    // help overlay, the search palette, and the close prompt all theme.
+    QVERIFY(sheet.contains(QStringLiteral("QTreeWidget#helpCommands")));
+    QVERIFY(sheet.contains(QStringLiteral("QListWidget#searchResults")));
+    QVERIFY(sheet.contains(QStringLiteral("QMessageBox")));
 }
 
 void MainWindowTest::focusMovesTheAccentMarkBetweenPanes() {
