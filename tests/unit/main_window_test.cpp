@@ -166,6 +166,7 @@ class MainWindowTest final : public QObject {
     void insertModePasteRoutesTheClipboard();
     void superChordsRouteUniversalCopyAndPaste();
     void readingViewTogglesAndPreservesState();
+    void readingViewRoutesCopyAndRefusesPaste();
     void searchOpensMatchesAndHelpRunsCommands();
     void helpIsReachableFromSidebar();
     void configuredKeysRouteAndAppearInHelp();
@@ -1527,6 +1528,57 @@ void MainWindowTest::readingViewTogglesAndPreservesState() {
     QVERIFY(reading->toPlainText().contains(QStringLiteral("edited body")));
     QVERIFY(backToWriting->document()->isModified());
     QVERIFY2(status->text().contains(QStringLiteral("[+]")), qPrintable(status->text()));
+}
+
+void MainWindowTest::readingViewRoutesCopyAndRefusesPaste() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "# Title\n\nbody text\n");
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* stack = window.findChild<QStackedWidget*>(QStringLiteral("editorStack"));
+    auto* reading = window.findChild<QTextBrowser*>(QStringLiteral("readingView"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr && stack != nullptr && reading != nullptr && editor != nullptr);
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("m"));
+    QTRY_COMPARE(stack->currentWidget(), reading);
+    QTRY_VERIFY(reading->hasFocus());
+
+    // Super+C (Ctrl+Meta+C) over a reading-view selection copies it — the
+    // gate must consult the visible pane's selection, not the hidden editor's.
+    auto cursor = reading->textCursor();
+    cursor.movePosition(QTextCursor::Start);
+    cursor.movePosition(QTextCursor::EndOfWord, QTextCursor::KeepAnchor);
+    reading->setTextCursor(cursor);
+    QApplication::clipboard()->setText(QStringLiteral("seed"));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_C, Qt::ControlModifier | Qt::MetaModifier);
+    QTRY_COMPARE(QApplication::clipboard()->text(), QStringLiteral("Title"));
+
+    // Without a selection the chord stays inert.
+    cursor.clearSelection();
+    reading->setTextCursor(cursor);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_C, Qt::ControlModifier | Qt::MetaModifier);
+    QTest::qWait(50);
+    QCOMPARE(QApplication::clipboard()->text(), QStringLiteral("Title"));
+
+    // Paste while reading must never mutate the hidden source buffer.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_V, Qt::ControlModifier | Qt::MetaModifier);
+    QTRY_VERIFY2(status->text().contains(QStringLiteral("read-only")), qPrintable(status->text()));
+    QCOMPARE(editor->document()->text(), QStringLiteral("# Title\n\nbody text\n"));
+    QVERIFY(!editor->document()->isModified());
+
+    // Ctrl+Q (visual block) is a writing-mode key; reading ignores it.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Q, Qt::ControlModifier);
+    QTest::qWait(50);
+    QCOMPARE(stack->currentWidget(), reading);
+    QCOMPARE(editor->document()->text(), QStringLiteral("# Title\n\nbody text\n"));
 }
 
 void MainWindowTest::closesCleanly() {
