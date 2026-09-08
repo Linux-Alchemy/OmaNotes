@@ -45,7 +45,7 @@ namespace omanotes {
 
 namespace {
 
-constexpr auto kWindowTitle = "Omanotes";
+constexpr auto kWindowTitle = "OmaNotes";
 
 QString displayName(const std::filesystem::path& path) {
     return QFile::decodeName(QByteArray::fromStdString(path.filename().native()));
