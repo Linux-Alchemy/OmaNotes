@@ -9,6 +9,7 @@
 #include "core/command_registry.hpp"
 #include "core/view_mode.hpp"
 #include "persistence/conflict_detector.hpp"
+#include "ui/theme_adapter.hpp"
 
 #include <QByteArrayView>
 #include <QMainWindow>
@@ -42,6 +43,9 @@ class HelpOverlay;
 class MainWindow final : public QMainWindow {
   public:
     explicit MainWindow(LaunchRequest launchRequest, QWidget* parent = nullptr);
+    /// As above, but reading the theme from `themeSources` instead of the
+    /// desktop's — how tests dress the window in a fixture theme.
+    MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, QWidget* parent = nullptr);
     ~MainWindow() override;
 
     /// The application's command table: every keyboard, mouse, and leader
@@ -111,6 +115,12 @@ class MainWindow final : public QMainWindow {
     /// through the atomic writer and nothing replaces a buffer unchecked.
     [[nodiscard]] bool interceptEditorFileCommand(QObject* watched, const QKeyEvent& event);
     QString saveActiveBufferOrReport(bool force = false);
+    /// Paint every region with the semantic palette: window chrome via one
+    /// stylesheet, tree selection via palette groups (so the inactive
+    /// selection dims), the reading view's colours, and each editor.
+    void applyTheme(const ThemePalette& palette);
+    /// Keep the accent bar over whichever pane owns focus.
+    void markActivePane();
 
     /// What the editor believes about a buffer's file, beyond its bytes.
     enum class DiskNote : std::uint8_t { InSync, ChangedOnDisk, Removed };
@@ -134,6 +144,11 @@ class MainWindow final : public QMainWindow {
     HelpOverlay* helpOverlay_ = nullptr;
     AppContext helpContext_;
     SearchPalette* searchPalette_ = nullptr;
+    std::unique_ptr<ThemeAdapter> theme_;
+    /// Watches the theme sources, separately from the note watcher: a theme
+    /// switch regenerates whole directories, and these paths are not buffers.
+    std::unique_ptr<FileWatcher> themeWatcher_;
+    QWidget* writingArea_ = nullptr;
     Sidebar* sidebar_ = nullptr;
     QLineEdit* namePrompt_ = nullptr;
     QStackedWidget* editorStack_ = nullptr;

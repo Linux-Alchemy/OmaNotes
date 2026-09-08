@@ -10,6 +10,8 @@ class View;
 
 namespace omanotes {
 
+struct ThemePalette;
+
 class KTextEditorAdapter final : public EditorAdapter {
     Q_OBJECT
 
@@ -25,6 +27,10 @@ class KTextEditorAdapter final : public EditorAdapter {
     void markSaved() override;
     [[nodiscard]] EditorMode mode() const noexcept override;
     [[nodiscard]] QString modeName() const override;
+
+    /// Dress the hosted view in the semantic palette: grounds, selection,
+    /// current line, base font size, and a syntax theme matching its mode.
+    void applyTheme(const ThemePalette& palette);
 
   private:
     KTextEditor::Document* document_;

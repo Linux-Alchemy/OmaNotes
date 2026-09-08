@@ -10,7 +10,7 @@
 namespace omanotes {
 HelpOverlay::HelpOverlay(QWidget* parent) : QDialog(parent) {
     setObjectName(QStringLiteral("helpOverlay"));
-    setWindowTitle(QStringLiteral("Omanotes commands"));
+    setWindowTitle(QStringLiteral("OmaNotes commands"));
     setWindowModality(Qt::WindowModal);
     resize(650, 440);
     auto* layout = new QVBoxLayout(this);
