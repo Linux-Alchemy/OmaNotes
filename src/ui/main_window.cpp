@@ -281,6 +281,9 @@ MainWindow::~MainWindow() {
 }
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
+    if (forwardingKeyToVi_) {
+        return false;
+    }
     const auto* watchedWidget = qobject_cast<QWidget*>(watched);
     const auto insideWindow =
         watchedWidget != nullptr && (watchedWidget == this || isAncestorOf(watchedWidget));
@@ -375,7 +378,13 @@ QString MainWindow::shortcutCommand(const QKeyEvent& event, const QWidget* targe
         qobject_cast<const QLineEdit*>(target) != nullptr) {
         return {};
     }
-    auto id = keymap_.commandFor(QKeySequence(event.keyCombination()));
+    // Omarchy's universal clipboard chords are compositor-injected Ctrl
+    // events delivered while the physical Super key is still held, so they
+    // arrive as Ctrl+Meta combinations. Super belongs to the desktop, never
+    // to an application shortcut: ignore it when matching.
+    const auto combination = event.keyCombination();
+    auto id = keymap_.commandFor(QKeySequence(
+        QKeyCombination(combination.keyboardModifiers() & ~Qt::MetaModifier, combination.key())));
     if (id.isEmpty()) {
         return {};
     }
@@ -389,9 +398,32 @@ QString MainWindow::shortcutCommand(const QKeyEvent& event, const QWidget* targe
     if (event.modifiers() == Qt::ShiftModifier && (!inEditor || !normal || buffers_.count() < 2)) {
         return {};
     }
-    // Only Save is an application shortcut while editing Insert/Visual text.
-    // Plain typing, command bars, search fields and dialog controls keep keys.
-    if (inEditor && !normal && id != QStringLiteral("file.save")) {
+    // Omarchy's Super+V arrives as a clean Ctrl+V — clipboard.lua's
+    // send_key_state exists precisely to keep the held Super out of the
+    // injected chord — so the two are indistinguishable here. Matt's rule
+    // (2026-09-07): universal paste wins in every mode; Vi's visual block
+    // moves to Ctrl+Q, gvim's classic answer to this exact collision.
+    if (id == QStringLiteral("edit.paste") && (!inEditor || editor == nullptr)) {
+        return {};
+    }
+    if (id == QStringLiteral("editor.visual-block") && (!inEditor || !normal)) {
+        return {};
+    }
+    // Copy runs only over a selection; without one, Ctrl+C stays Vi's abort.
+    if (id == QStringLiteral("edit.copy")) {
+        auto* adapter = activeEditor();
+        const auto* view = adapter != nullptr && adapter->widget() != nullptr
+                               ? qobject_cast<const KTextEditor::View*>(adapter->widget())
+                               : nullptr;
+        if (!inEditor || view == nullptr || !view->selection()) {
+            return {};
+        }
+    }
+    // Only Save and the clipboard routes are application shortcuts while
+    // editing Insert/Visual text. Plain typing, command bars, search fields
+    // and dialog controls keep their keys.
+    if (inEditor && !normal && id != QStringLiteral("file.save") &&
+        id != QStringLiteral("edit.paste") && id != QStringLiteral("edit.copy")) {
         return {};
     }
     return id;
@@ -434,6 +466,28 @@ void MainWindow::registerCommands() {
                 [this](AppContext&) { saveActiveBuffer(); },
                 {}});
     routedOutsideLeader_.push_back(QStringLiteral("file.save"));
+
+    // Omarchy's Super+V arrives as a literal Ctrl+V (universal paste). It
+    // pastes while typing; Normal and Visual keep Ctrl+V as Vi's visual
+    // block, per Matt's call of 2026-09-07.
+    addCommand({QStringLiteral("edit.paste"),
+                QStringLiteral("Paste from clipboard"),
+                QStringLiteral("edit"),
+                always,
+                [this](AppContext&) { pasteFromClipboard(); },
+                {}});
+    routedOutsideLeader_.push_back(QStringLiteral("edit.paste"));
+    addCommand({QStringLiteral("edit.copy"),
+                QStringLiteral("Copy selection"),
+                QStringLiteral("edit"),
+                always,
+                [this](AppContext&) { copySelectionToClipboard(); },
+                {}});
+    routedOutsideLeader_.push_back(QStringLiteral("edit.copy"));
+    addCommand({QStringLiteral("editor.visual-block"), QStringLiteral("Visual block (Vi)"),
+                QStringLiteral("edit"), inNormalMode, [this](AppContext&) { enterVisualBlock(); },
+                QStringLiteral("Visual block starts from Normal mode")});
+    routedOutsideLeader_.push_back(QStringLiteral("editor.visual-block"));
 
     addCommand({QStringLiteral("file.open"), QStringLiteral("Open file"), QStringLiteral("file"),
                 [](const AppContext& context) { return context.targetPath.has_value(); },
@@ -1036,6 +1090,54 @@ void MainWindow::loadMarkdownFile(const std::filesystem::path& path) {
     createEditorFor(*opened).loadText(*text);
     trackFile(*opened, *resolved, QByteArrayView(*bytes));
     showBuffer(*opened);
+}
+
+void MainWindow::pasteFromClipboard() {
+    auto* editor = activeEditor();
+    if (editor == nullptr || editor->widget() == nullptr) {
+        return;
+    }
+    if (auto* view = qobject_cast<KTextEditor::View*>(editor->widget())) {
+        if (auto* paste = view->actionCollection()->action(QStringLiteral("edit_paste"));
+            paste != nullptr) {
+            paste->trigger();
+            return;
+        }
+    }
+    statusArea_->setText(QStringLiteral("Nothing to paste into"));
+}
+
+void MainWindow::copySelectionToClipboard() {
+    auto* editor = activeEditor();
+    if (editor == nullptr || editor->widget() == nullptr) {
+        return;
+    }
+    if (auto* view = qobject_cast<KTextEditor::View*>(editor->widget());
+        view != nullptr && view->selection()) {
+        if (auto* copy = view->actionCollection()->action(QStringLiteral("edit_copy"));
+            copy != nullptr) {
+            copy->trigger();
+            return;
+        }
+    }
+    statusArea_->setText(QStringLiteral("Nothing is selected to copy"));
+}
+
+void MainWindow::enterVisualBlock() {
+    auto* editor = activeEditor();
+    if (editor == nullptr || editor->widget() == nullptr) {
+        return;
+    }
+    auto* target = QApplication::focusWidget();
+    if (target == nullptr || !editorStack_->isAncestorOf(target)) {
+        target = editor->widget();
+    }
+    forwardingKeyToVi_ = true;
+    QKeyEvent press(QEvent::KeyPress, Qt::Key_V, Qt::ControlModifier);
+    QApplication::sendEvent(target, &press);
+    QKeyEvent release(QEvent::KeyRelease, Qt::Key_V, Qt::ControlModifier);
+    QApplication::sendEvent(target, &release);
+    forwardingKeyToVi_ = false;
 }
 
 void MainWindow::saveActiveBuffer() {
