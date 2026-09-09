@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <QByteArray>
 #include <QFile>
+#include <QFont>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
@@ -726,6 +727,10 @@ void MainWindow::confirmCloseBuffer(BufferId id) {
                             QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
         closePrompt_->setObjectName(QStringLiteral("closeBufferPrompt"));
         closePrompt_->setDefaultButton(QMessageBox::Save);
+        // Plain text, no platform-theme stock icons on the buttons.
+        for (auto* button : closePrompt_->buttons()) {
+            button->setIcon(QIcon());
+        }
         connect(closePrompt_, &QMessageBox::finished, this, [this](int result) {
             const auto target = closePromptTarget_;
             closePromptTarget_.reset();
@@ -1384,6 +1389,7 @@ void MainWindow::applyTheme(const ThemePalette& palette) {
     // Every pane wears a permanent 2px top border so the accent mark on the
     // focused one never shifts the layout, only the colour.
     setStyleSheet(QStringLiteral(R"(
+* { font-family: monospace; font-size: %11pt; }
 QMainWindow#mainWindow { background-color: %1; }
 QSplitter#workspaceSplitter::handle { background-color: %2; }
 QFrame#sidebar { background-color: %3; border: none; border-top: 2px solid %3; }
@@ -1392,7 +1398,7 @@ QFrame#sidebar QTreeView { background-color: %3; color: %5; border: none; }
 QFrame#sidebar QTreeView::item:selected:active { background-color: %6; color: %9; }
 QFrame#sidebar QTreeView::item:selected:!active { background-color: %8; color: %10; }
 QLabel#sidebarHeading { color: %7; }
-QTextBrowser#readingView { background-color: %1; border: none; }
+QTextBrowser#readingView { background-color: %1; border: none; font-size: %12pt; }
 QWidget#writingArea { background-color: %1; border-top: 2px solid %1; }
 QWidget#writingArea[paneActive="true"] { border-top: 2px solid %4; }
 QLabel#statusArea { background-color: %3; color: %5; }
@@ -1401,6 +1407,8 @@ QTabBar#bufferStrip { background-color: %3; }
 QTabBar#bufferStrip::tab { background-color: %3; color: %7; padding: 5px 12px; border: none; }
 QTabBar#bufferStrip::tab:selected { background-color: %1; color: %5; }
 QToolButton#newBufferButton { background-color: %3; color: %7; border: none; padding: 2px 8px; }
+QToolButton#tabCloseButton { background: transparent; color: %7; border: none; padding: 0px 2px; }
+QToolButton#tabCloseButton:hover { color: %4; }
 QDialog#helpOverlay, QDialog#searchPalette, QMessageBox { background-color: %1; color: %5; }
 QDialog#helpOverlay QLabel, QDialog#searchPalette QLabel, QMessageBox QLabel { color: %5; }
 QTreeWidget#helpCommands, QListWidget#searchResults, QPlainTextEdit#searchPreview { background-color: %3; color: %5; border: none; }
@@ -1413,7 +1421,9 @@ QDialog QPushButton:hover { background-color: %2; }
                       .arg(name(palette.background), name(palette.border), name(palette.surface),
                            name(palette.accent), name(palette.text), name(palette.selection),
                            name(palette.mutedText), name(palette.inactiveSelection),
-                           name(palette.selectedText), name(palette.inactiveSelectedText)));
+                           name(palette.selectedText), name(palette.inactiveSelectedText),
+                           QString::number(palette.baseFontPointSize),
+                           QString::number(palette.baseFontPointSize + 1.0)));
     writingArea_->setAttribute(Qt::WA_StyledBackground, true);
 
     // Grounds and the tree's selected row live in the stylesheet above: with
@@ -1429,7 +1439,16 @@ QDialog QPushButton:hover { background-color: %2; }
     readingPalette.setColor(QPalette::Highlight, palette.selection);
     readingPalette.setColor(QPalette::HighlightedText, palette.selectedText);
     readingView_->setPalette(readingPalette);
-    auto readingFont = readingView_->font();
+    // Pure Omarchy (Matt's call, 2026-09-08): the system monospace
+    // everywhere, at the shell's base size — via the stylesheet's `*` rule,
+    // because QApplication::setFont is documented not to mix with style
+    // sheets and the chrome duly ignored it. "monospace" resolves through
+    // fontconfig, exactly the source of truth omarchy-font-current reads;
+    // the GTK platform theme's sans (which Omarchy never chose) is retired.
+    // The reading view still gets an explicit font: its QTextDocument reads
+    // the widget font when rendering, not the stylesheet.
+    QFont readingFont(QStringLiteral("monospace"));
+    readingFont.setStyleHint(QFont::Monospace);
     // 6.1's restrained typography holds: the reading face sits one point up.
     readingFont.setPointSizeF(palette.baseFontPointSize + 1.0);
     readingView_->setFont(readingFont);

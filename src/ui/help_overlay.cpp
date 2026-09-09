@@ -29,6 +29,9 @@ HelpOverlay::HelpOverlay(QWidget* parent) : QDialog(parent) {
     list_->setRootIsDecorated(false);
     layout->addWidget(list_, 1);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
+    // The platform theme staples a stock icon onto standard buttons; plain
+    // text keeps them in the app's own register.
+    buttons->button(QDialogButtonBox::Close)->setIcon(QIcon());
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     connect(list_, &QTreeWidget::itemActivated, this, [this] { chooseCurrent(); });

@@ -43,6 +43,9 @@ SearchPalette::SearchPalette(std::filesystem::path root, QWidget* parent)
     layout->addWidget(status_);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Open | QDialogButtonBox::Cancel, this);
     buttons->button(QDialogButtonBox::Open)->setDefault(false);
+    // Plain text, no platform-theme stock icons.
+    buttons->button(QDialogButtonBox::Open)->setIcon(QIcon());
+    buttons->button(QDialogButtonBox::Cancel)->setIcon(QIcon());
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::accepted, this, [this] { chooseCurrent(); });
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
