@@ -24,6 +24,8 @@ add_executable(
     persistence/conflict_detector.cpp
     persistence/conflict_detector.hpp
     persistence/document_store.cpp
+    persistence/recovery_store.cpp
+    persistence/recovery_store.hpp
     persistence/document_store.hpp
     session/session_snapshot.cpp
     session/session_snapshot.hpp

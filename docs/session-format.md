@@ -15,7 +15,7 @@ implemented independently in C++ with no code copied.
 | Kind | Location | Contains |
 |---|---|---|
 | Structural snapshot | `$XDG_STATE_HOME/omanotes/sessions/<workspace-id>/session.json` | Layout and references. **Never note text.** |
-| Recovery records | `$XDG_STATE_HOME/omanotes/sessions/<workspace-id>/recovery/<uuid>` | The unsaved text of one dirty buffer (Task 7.3) |
+| Recovery records | `$XDG_STATE_HOME/omanotes/sessions/<workspace-id>/recovery/<uuid>.json` | The unsaved text of one dirty buffer (Task 7.3) |
 
 `$XDG_STATE_HOME` defaults to `~/.local/state`. Omanotes never stores session
 state inside the workspace, in `$XDG_CONFIG_HOME`, or anywhere shared.
@@ -62,6 +62,90 @@ A restorer must call `checkSessionRoot` before using any of it. The document
 is deliberately self-describing enough — root path, buffer count, dirty count
 — that the parked-work notice for *other* roots can be produced from
 snapshots alone, without opening a single recovery record.
+
+## Recovery records (Task 7.3)
+
+A recovery record is the unsaved text of one dirty buffer, kept so a crash or
+forced kill loses nothing. It is the only place note content ever leaves the
+workspace, so it is treated with more care than the snapshot.
+
+### What a record holds
+
+`recovery/<uuid>.json`, owner-only, one JSON object:
+
+| Field | Type | Required | Rules |
+|---|---|---|---|
+| `version` | integer | yes | Same policy as the snapshot; currently 1 |
+| `path` | string | no (none) | The buffer's note, relative to the root, same rules as snapshot paths; absent for a scratch buffer |
+| `contents` | string | yes | The full buffer text, at most 16 MiB of UTF-8 |
+| `baseDigest` | string | no (none) | Hex SHA-256 of the note's on-disk bytes when the checkpoint was taken; absent when the note did not exist |
+
+`baseDigest` is what lets a restore tell whether the note changed underneath
+the crashed session, using the same content-hash machinery as external change
+detection (ADR 0006). A buffer larger than the cap is not checkpointed; the
+caller is told, on the status line, so the user knows that buffer is
+unprotected until saved.
+
+### Identity and lookup
+
+The `<uuid>` is chosen when a buffer first becomes dirty and reused for every
+later checkpoint of that buffer, so the snapshot only changes when the desk
+changes. Lookup is **by id inside the current workspace's own `recovery/`
+directory and nowhere else**: an id is validated as a UUID before it becomes a
+file name, so a record can never be addressed by path, and a snapshot can never
+point a restore at another workspace's text (ADR 0010). Symlinks in the
+directory are refused, never followed.
+
+### Checkpoint cadence
+
+Wired in Task 7.4. A dirty buffer is checkpointed two seconds after its last
+change, when the window loses focus, and on a clean close. A buffer that
+returns to clean (saved, or edited back to its saved text) has its record
+removed at that moment. The cadence is a ceiling on loss, not a guarantee of
+zero loss: the last two seconds before a power cut are not promised.
+
+### Retention and cleanup
+
+- **Save succeeds:** the record is removed immediately. A saved note needs no
+  second copy.
+- **Buffer discarded:** closing with `:q!`, `Space b D`, or declining to save
+  removes the record. Discarding is a decision; the record honours it.
+- **Restore:** a record is removed only once the restored buffer is saved or
+  discarded, never merely because it was loaded. A crash during restore must
+  not eat the only copy.
+- **Orphans:** after a successful restore, any record in this workspace's
+  directory that the snapshot no longer references is removed. An orphan is
+  a record whose buffer was already resolved; it holds nothing the user
+  still has.
+- **Other workspaces:** never touched. A workspace that has moved or been
+  deleted keeps its records until the user removes
+  `~/.local/state/omanotes/sessions/<id>/` by hand. Deleting unsaved work
+  because a directory went missing is not a decision this program makes.
+
+### Restoring a record
+
+A restored buffer comes back **dirty**, with the recovered text, never
+silently written to disk. Where it can be saved depends on what the disk
+looks like now, decided by `planRecovery`:
+
+| Situation | Restored as | Saving |
+|---|---|---|
+| Scratch (no `path`) | `[No Name]`, modified | Needs an explicit name, as any scratch buffer does |
+| Note unchanged since the checkpoint | The note, modified | `:w` writes as usual |
+| Note changed on disk since the checkpoint | The note, modified, in conflict | `:w` refuses; `:w!` overwrites, `:e!` discards, exactly as ADR 0006 |
+| Note gone from disk | The note, modified | `:w` recreates it |
+| Path now escapes the root | Not restored; reported | — |
+
+### Sensitive content
+
+Recovery records are plaintext, like Neovim's swap files and for the same
+reason: they exist to survive a crash, and a key that must be available to
+recover after a crash offers little against anyone who can already read the
+user's files. They are owner-only, short-lived by the retention rules above,
+and never contain anything the user did not type into a buffer. Anyone for
+whom plaintext at rest is unacceptable should treat the workspace itself the
+same way, since the saved notes carry the same exposure. Encryption at rest is
+not implemented and not claimed.
 
 ## The document
 
