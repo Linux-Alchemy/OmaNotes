@@ -2,6 +2,8 @@
 
 #include <QFile>
 #include <QImage>
+#include <QScrollBar>
+#include <QStackedWidget>
 #include <QTemporaryDir>
 #include <QUrl>
 #include <QtTest>
@@ -66,6 +68,7 @@ class MarkdownRenderTest final : public QObject {
     void survivesMalformedInput();
     void survivesPathologicalText();
     void rendersDeterministically();
+    void opensAtTheTopOnFirstAndLaterRenders();
 };
 
 void MarkdownRenderTest::rendersSupportedBasicsWithoutRefusals() {
@@ -230,6 +233,43 @@ void MarkdownRenderTest::rendersDeterministically() {
     QCOMPARE(first.document()->toHtml(), second.document()->toHtml());
     // Rendering never touched the source.
     QCOMPARE(readFixture(workspace.root() / "supported-basics.md"), markdown);
+}
+
+void MarkdownRenderTest::opensAtTheTopOnFirstAndLaterRenders() {
+    // Matt's report: on a fresh launch the first switch to reading mode
+    // landed at the bottom of any note long enough to scroll. The view was
+    // still hidden in the editor stack when it was first rendered, so the
+    // stale cursor was pushed to the end of the new document and the
+    // deferred layout scrolled to it.
+    FixtureWorkspace workspace;
+    QString longNote;
+    for (int line = 0; line < 400; ++line) {
+        longNote += QStringLiteral("Paragraph %1 of a note that certainly needs a scrollbar.\n\n")
+                        .arg(line);
+    }
+    QWidget host;
+    QStackedWidget stack(&host);
+    auto* view = new omanotes::MarkdownView(&stack);
+    stack.addWidget(new QWidget(&stack)); // the editor page, showing first
+    stack.addWidget(view);
+    host.resize(600, 400);
+    host.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&host));
+    QVERIFY(!view->isVisible());
+
+    view->render(longNote, workspace.policy());
+    stack.setCurrentWidget(view);
+    QCoreApplication::processEvents();
+    QVERIFY(view->verticalScrollBar()->maximum() > 0);
+    QCOMPARE(view->verticalScrollBar()->value(), 0);
+    QCOMPARE(view->textCursor().position(), 0);
+
+    // Later renders, with the view already shown and sized, behave the same.
+    view->verticalScrollBar()->setValue(view->verticalScrollBar()->maximum());
+    view->render(longNote, workspace.policy());
+    QCoreApplication::processEvents();
+    QCOMPARE(view->verticalScrollBar()->value(), 0);
+    QCOMPARE(view->textCursor().position(), 0);
 }
 
 QTEST_MAIN(MarkdownRenderTest)

@@ -6,6 +6,7 @@
 #include <QImage>
 #include <QImageReader>
 #include <QPainter>
+#include <QScrollBar>
 #include <QTextBlock>
 #include <QTextDocument>
 #include <QTextFragment>
@@ -214,6 +215,13 @@ void MarkdownView::render(QStringView markdown, const ResourcePolicy& policy) {
             }
         }
     }
+    // Replacing the document's content pushes the widget's own cursor to the
+    // end of the new text, and the next layout scrolls to keep it visible;
+    // on a fresh launch that layout is deferred until the view is first
+    // shown, so the first note opened for reading landed at the bottom. A
+    // freshly rendered note opens at the top.
+    moveCursor(QTextCursor::Start);
+    verticalScrollBar()->setValue(0);
 }
 
 const QStringList& MarkdownView::refusedResources() const noexcept { return refusals_; }
