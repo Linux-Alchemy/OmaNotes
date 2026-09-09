@@ -1015,3 +1015,10 @@ Decision required: approve / request changes / stop and redesign
   whole-candidate validation, safe direct shortcuts, effective help labels and
   visible default fallback. ADR 0008 records the format and constraints.
   Phase 5 engineering is complete; Matt's hands-on gate remains open before P6.
+
+- **2026-09-09:** Pre-dispatch review of Phase 7. Matt questioned what happens when the
+  app is killed with dirty buffers in one root and next launched in another. Settled as
+  ADR 0010: session and recovery state are root-scoped and restored only in their own
+  root; recovering into a different root is rejected as a trust-boundary breach; a
+  metadata-only status-line notice announces parked work in other roots. Task 7.1.1
+  must specify the per-root metadata that notice needs. Task 7.1 not yet dispatched.
