@@ -591,10 +591,10 @@ signals:
 
 ### Phase 6 Checkpoint
 
-- [ ] Markdown security fixtures and theme tests pass.
-- [ ] Writing/reading toggles never alter source or modified state.
-- [ ] The app looks coherent across approved Omarchy themes and scale settings.
-- [ ] **Matt gate:** write, read, switch themes/scales, inspect links/images, and approve the visual character.
+- [x] Markdown security fixtures and theme tests pass.
+- [x] Writing/reading toggles never alter source or modified state.
+- [x] The app looks coherent across approved Omarchy themes and scale settings.
+- [x] **Matt gate:** write, read, switch themes/scales, inspect links/images, and approve the visual character.
 
 ## Phase 7: Herdr-inspired Session Snapshot and Recovery
 
@@ -989,6 +989,24 @@ Decision required: approve / request changes / stop and redesign
   (`readableOn`: theme ink, then text, background, then black/white), the muted blend is
   clamped to the bar, and the stylesheet paints rows with them. Task 6.2 complete;
   Phase 6 checkpoint awaits Matt's gate.
+
+- **2026-09-08:** Phase 6 accepted. After Task 6.2 merged (PR #19), Matt's hands-on gates
+  drove a venustas campaign across three further PRs, each finding what the offscreen suite
+  structurally cannot see: PR #20 themed the dialogs (help, search, close prompt — separate
+  windows the scoped stylesheet rules missed); PR #21 replaced the stock chrome (a quiet ×
+  close glyph on tabs, platform-theme icons stripped from every dialog button) and, at
+  Matt's "pure Omarchy" call, unified typography — the font census had found three fonts
+  and two size systems (GTK's Adwaita Sans 11 on the chrome, fontconfig monospace in the
+  editor, Adwaita 13 in the reading view); the whole app now wears the system monospace at
+  shell.toml's base-size via a `*` stylesheet rule, scaling live. The recurring lesson of
+  the phase, now structural: with a stylesheet active, Qt ignores QPalette for backgrounds
+  and item selection and app-wide setFont entirely, so every visual decision lives in the
+  stylesheet — the palette survives only where document rendering genuinely reads it.
+  Also: window title and Wayland app_id spell OmaNotes (packaging must ship a matching
+  OmaNotes.desktop, noted for 8.2). Matt's gate ran the full checkpoint list live across
+  ethereal-black, catppuccin, and osaka-jade with the reading view open; all four
+  checkpoint boxes ticked. All six engineering gates green on merged main `4b7dac5`.
+  Phase 7 (session snapshot and recovery) awaits dispatch.
 
 - **2026-09-07:** Matt reviewed and merged PR #10, then requested cleanup and
   continuation. Fast-forwarded to `eb2f5b2`, removed the merged search/help branch
