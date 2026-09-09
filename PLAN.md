@@ -683,10 +683,10 @@ public:
 
 **Blocks:**
 
-- [ ] **7.3.1** — Define checkpoint cadence, retention, cleanup, and sensitive-content documentation.
-- [ ] **7.3.2** — Implement dirty recovery records referenced from the structural snapshot.
-- [ ] **7.3.3** — Restore dirty buffers as dirty and require explicit save targets where appropriate.
-- [ ] **7.3.4** — Verify: crash simulation restores text; normal save and discarded buffers clean obsolete recovery records.
+- [x] **7.3.1** — Define checkpoint cadence, retention, cleanup, and sensitive-content documentation.
+- [x] **7.3.2** — Implement dirty recovery records referenced from the structural snapshot.
+- [x] **7.3.3** — Restore dirty buffers as dirty and require explicit save targets where appropriate.
+- [x] **7.3.4** — Verify: crash simulation restores text; normal save and discarded buffers clean obsolete recovery records.
 
 ### Task 7.4: Restore the full working context
 
@@ -1058,3 +1058,17 @@ Decision required: approve / request changes / stop and redesign
   byte-identical with no temporary; corrupt prior state is reported on load and replaced
   on save; four writers and a concurrent reader never observe a partial file. Awaiting
   Matt's gate before 7.3.
+
+- **2026-09-09:** Task 7.3 built on `task/7.3-recovery-store` (blocks 7.3.1–7.3.4).
+  `docs/session-format.md` gains a "Recovery records" section: format, id-only lookup inside
+  the workspace's own `recovery/` directory (ADR 0010), checkpoint cadence (2 s debounce,
+  focus loss, clean close; wired in 7.4), retention (removed on save and discard, orphans
+  swept after restore, other workspaces never touched), restore dispositions, and the
+  plaintext-like-swap-files statement Matt accepted. `RecoveryStore` checkpoints through
+  `replaceFileAtomically` (0700/0600, symlinks refused, 16 MiB cap with a diagnostic);
+  `planRecovery` reuses ADR 0006's content hashes to restore a record as dirty scratch,
+  dirty file, dirty-in-conflict, or dirty-recreating a missing file, and refuses paths that
+  now leave the root. New `recovery-store` suite (15 cases) including a two-process crash
+  simulation through the snapshot reference. The UI half of 7.3.3 (opening the restored
+  buffer dirty, naming prompt, conflict flag) lands with the restorer in 7.4, whose files
+  it lives in. Awaiting Matt's gate.
