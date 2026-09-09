@@ -9,6 +9,9 @@
 #include "core/command_registry.hpp"
 #include "core/view_mode.hpp"
 #include "persistence/conflict_detector.hpp"
+#include "persistence/recovery_store.hpp"
+#include "session/session_restorer.hpp"
+#include "session/session_snapshot.hpp"
 #include "ui/theme_adapter.hpp"
 
 #include <QByteArrayView>
@@ -22,10 +25,12 @@
 #include <optional>
 #include <vector>
 
+class QCloseEvent;
 class QKeyEvent;
 class QLabel;
 class QLineEdit;
 class QMessageBox;
+class QSplitter;
 class QStackedWidget;
 
 namespace omanotes {
@@ -40,7 +45,9 @@ class Sidebar;
 class SearchPalette;
 class HelpOverlay;
 
-class MainWindow final : public QMainWindow {
+class MainWindow final : public QMainWindow, public SessionHost {
+    Q_OBJECT
+
   public:
     explicit MainWindow(LaunchRequest launchRequest, QWidget* parent = nullptr);
     /// As above, but reading the theme from `themeSources` instead of the
@@ -55,8 +62,51 @@ class MainWindow final : public QMainWindow {
     /// action has exactly one implementation and at least one route.
     [[nodiscard]] std::vector<AuditFinding> auditCommands() const;
 
+    [[nodiscard]] const BufferRegistry& buffers() const noexcept;
+    void showStatus(const QString& message);
+    [[nodiscard]] QString statusText() const;
+
+    // --- Session (Phase 7): what the controller reads and the restorer drives.
+
+    /// The desk as it stands: structural state only, recovery ids left for
+    /// the controller to fill in.
+    [[nodiscard]] SessionSnapshot captureSnapshot() const;
+    /// A dirty buffer's text and provenance for a checkpoint; absent when the
+    /// buffer is unknown or clean.
+    [[nodiscard]] std::optional<BufferRecovery> dirtyRecord(BufferId id) const;
+    /// The scratch buffer the constructor opened when nothing was requested,
+    /// if it is still the only buffer and untouched.
+    [[nodiscard]] std::optional<BufferId> untouchedInitialBuffer() const;
+    /// Close `id` quietly if it is an empty, unmodified scratch buffer.
+    void closeIfUntouched(BufferId id);
+    /// Open, or bring to the front, the file named on the command line.
+    void focusRequestedFile(const std::filesystem::path& path);
+
+    // SessionHost
+    void applyWindow(const WindowSnapshot& window) override;
+    void applySidebar(const SidebarSnapshot& sidebar,
+                      const std::optional<std::filesystem::path>& selected) override;
+    std::optional<BufferId> openNote(const std::filesystem::path& absolute) override;
+    BufferId openScratch() override;
+    std::optional<BufferId> openRecovered(const BufferRecovery& record,
+                                          const RecoveryPlan& plan) override;
+    void applyBufferView(BufferId id, ViewMode mode, CursorSnapshot cursor,
+                         int scrollLine) override;
+    void activateBuffer(BufferId id) override;
+
+  signals:
+    /// The desk changed in a way a snapshot would record.
+    void sessionStateChanged();
+    /// A buffer was saved, reloaded from disk, or closed: its unsaved text,
+    /// if any, is accounted for and its recovery record may go.
+    void bufferResolved(omanotes::BufferId id);
+    void windowDeactivated();
+    void aboutToClose();
+
   protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
+    bool event(QEvent* event) override;
+    void closeEvent(QCloseEvent* event) override;
 
   private:
     void registerCommands();
@@ -149,6 +199,7 @@ class MainWindow final : public QMainWindow {
     /// switch regenerates whole directories, and these paths are not buffers.
     std::unique_ptr<FileWatcher> themeWatcher_;
     QWidget* writingArea_ = nullptr;
+    QSplitter* splitter_ = nullptr;
     Sidebar* sidebar_ = nullptr;
     QLineEdit* namePrompt_ = nullptr;
     QStackedWidget* editorStack_ = nullptr;
@@ -160,6 +211,9 @@ class MainWindow final : public QMainWindow {
     /// True while enterVisualBlock's synthetic key is in flight, so the
     /// event filter lets it through to Vi instead of re-intercepting it.
     bool forwardingKeyToVi_ = false;
+    /// The application-wide focus hook; disconnected before children are
+    /// destroyed, or a focus change during teardown reaches dead panes.
+    QMetaObject::Connection focusConnection_;
     std::optional<BufferId> closePromptTarget_;
     std::optional<BufferId> closeAfterNaming_;
 };

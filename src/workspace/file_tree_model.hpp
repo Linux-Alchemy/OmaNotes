@@ -22,6 +22,9 @@ class FileTreeModel final : public QAbstractItemModel {
     /// saved note appears without waiting for a relaunch.
     void noteFileCreated(const std::filesystem::path& path);
     [[nodiscard]] std::filesystem::path pathForIndex(const QModelIndex& index) const;
+    /// The index for a file inside the root, fetching the directories above
+    /// it as needed. Invalid when the path is outside the root or absent.
+    [[nodiscard]] QModelIndex indexForPath(const std::filesystem::path& path);
     [[nodiscard]] bool isDirectory(const QModelIndex& index) const;
 
     [[nodiscard]] QModelIndex index(int row, int column,
