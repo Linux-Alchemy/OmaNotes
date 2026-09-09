@@ -322,6 +322,23 @@ omanotes_enable_hardening(omanotes_theme_tests)
 omanotes_enable_sanitizers(omanotes_theme_tests)
 add_test(NAME theme-adapter COMMAND omanotes_theme_tests)
 
+add_executable(omanotes_session_tests
+    unit/session_snapshot_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/session/session_snapshot.cpp"
+    "${CMAKE_SOURCE_DIR}/src/session/session_snapshot.hpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.hpp"
+)
+target_include_directories(omanotes_session_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_definitions(
+    omanotes_session_tests PRIVATE OMANOTES_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+)
+target_link_libraries(omanotes_session_tests PRIVATE Qt6::Test Qt6::Widgets)
+omanotes_enable_warnings(omanotes_session_tests)
+omanotes_enable_hardening(omanotes_session_tests)
+omanotes_enable_sanitizers(omanotes_session_tests)
+add_test(NAME session-snapshot COMMAND omanotes_session_tests)
+
 set(
     OMANOTES_TEST_ENVIRONMENT
     "QT_QPA_PLATFORM=offscreen"
@@ -337,6 +354,6 @@ set(
 set_tests_properties(
     keymap markdown-render workspace-search atomic-save buffer-registry command-registry conflict-detector document-store editor-adapter file-tree-model
     file-watcher launch-process launch-request prefix-router ui-structure process-startup
-    vim-behaviour
+    vim-behaviour theme-adapter session-snapshot
     PROPERTIES ENVIRONMENT "${OMANOTES_TEST_ENVIRONMENT}"
 )

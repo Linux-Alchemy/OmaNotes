@@ -25,6 +25,8 @@ add_executable(
     persistence/conflict_detector.hpp
     persistence/document_store.cpp
     persistence/document_store.hpp
+    session/session_snapshot.cpp
+    session/session_snapshot.hpp
     ui/buffer_strip.cpp
     ui/buffer_strip.hpp
     ui/main_window.cpp
