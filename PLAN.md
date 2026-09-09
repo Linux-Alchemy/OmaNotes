@@ -631,10 +631,10 @@ struct SessionSnapshot {
 
 **Blocks:**
 
-- [ ] **7.1.1** — Specify fields, limits, version policy, XDG paths, and privacy boundaries.
-- [ ] **7.1.2** — Implement serialization/parsing with round-trip, corrupt, oversized, missing-field, old-version, and future-version fixtures.
-- [ ] **7.1.3** — Validate every restored path against the resolved workspace root.
-- [ ] **7.1.4** — Verify: invalid state yields a clean launch and a diagnostic without modifying the bad file.
+- [x] **7.1.1** — Specify fields, limits, version policy, XDG paths, and privacy boundaries.
+- [x] **7.1.2** — Implement serialization/parsing with round-trip, corrupt, oversized, missing-field, old-version, and future-version fixtures.
+- [x] **7.1.3** — Validate every restored path against the resolved workspace root.
+- [x] **7.1.4** — Verify: invalid state yields a clean launch and a diagnostic without modifying the bad file.
 
 ### Task 7.2: Write snapshots atomically and privately
 
@@ -1022,3 +1022,16 @@ Decision required: approve / request changes / stop and redesign
   root; recovering into a different root is rejected as a trust-boundary breach; a
   metadata-only status-line notice announces parked work in other roots. Task 7.1.1
   must specify the per-root metadata that notice needs. Task 7.1 not yet dispatched.
+
+- **2026-09-09:** Task 7.1 built on `task/7.1-session-snapshot` (blocks 7.1.1–7.1.4).
+  `docs/session-format.md` specifies format version 1: JSON via Qt's parser, structural
+  state only, per-root under `$XDG_STATE_HOME/omanotes/sessions/<id>/`, explicit limits
+  (256 KiB, 256 buffers, 4096-byte paths), unknown fields refused, version checked first so
+  a future document is reported as newer rather than malformed, dirty iff recovery record.
+  `session_snapshot.*` implements deterministic serialize, bounded parse, a read that never
+  writes, `checkSessionRoot` (ADR 0010) and `resolveSessionPath` through the existing
+  `WorkspaceRoot` policy. New `session-snapshot` suite (23 cases) over 15 committed fixtures
+  plus generated oversized, symlink-escape and root-mismatch cases. Also gave the
+  `theme-adapter` suite the headless test environment it had been missing: without it the
+  GTK platform theme leaked under LeakSanitizer and the suite failed on this machine.
+  Awaiting Matt's gate on the format document before 7.2.
