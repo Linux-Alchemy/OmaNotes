@@ -1,0 +1,9 @@
+{
+    "version": 1,
+    "workspaceRoot": "/home/matt/notes",
+    "window": {"width": 800, "height": 600},
+    "sidebar": {"visible": false},
+    "buffers": [
+        {"id": "0d5b7d8e-1f6a-4c3b-9e2d-8a7f6b5c4d3e", "path": "../.ssh/id_ed25519"}
+    ]
+}
