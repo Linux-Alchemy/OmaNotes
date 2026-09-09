@@ -712,6 +712,10 @@ public:
 - [ ] **7.4.1** — Capture final snapshot on clean close and debounced checkpoints during meaningful state changes.
 - [ ] **7.4.2** — Restore session before presenting the final window; honour `--fresh` without deleting state.
 - [ ] **7.4.3** — Apply explicit file arguments after restore so they open/focus predictably.
+  - Note (2026-09-09): once the editor adapter exposes cursor and scroll position for the
+    snapshot, use the same accessor so `Ctrl+M` lands the reading view near the editor cursor
+    and switching back returns there (Obsidian behaviour). Matt approved; bug fix that opens
+    reading at the top shipped separately on `fix/reading-view-scroll-top`.
 - [ ] **7.4.4** — Verify: clean close, forced kill, missing files, changed roots, corrupt state, and concurrent-launch scenarios match the documented matrix.
 
 ### Phase 7 Checkpoint
@@ -1022,3 +1026,10 @@ Decision required: approve / request changes / stop and redesign
   root; recovering into a different root is rejected as a trust-boundary breach; a
   metadata-only status-line notice announces parked work in other roots. Task 7.1.1
   must specify the per-root metadata that notice needs. Task 7.1 not yet dispatched.
+
+- **2026-09-09:** Matt found that on a fresh launch the first `Ctrl+M` landed at the bottom of
+  any note long enough to scroll. Cause: `MarkdownView::render` replaced the document under
+  the widget's own cursor, pushing it to the end, and the view's deferred first layout
+  scrolled to it. Fixed on `fix/reading-view-scroll-top`: a rendered note opens at the top;
+  regression test reproduces the hidden-then-shown first render. Cursor-following between
+  writing and reading noted under 7.4.3.
