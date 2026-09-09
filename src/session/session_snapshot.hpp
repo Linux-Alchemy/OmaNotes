@@ -100,7 +100,8 @@ enum class SessionErrorCode : std::uint8_t {
     UnsupportedVersion,
     FutureVersion,
     InvalidField,
-    RootMismatch
+    RootMismatch,
+    StoreFailed
 };
 
 /// One parse or validation failure, phrased for the status line: which

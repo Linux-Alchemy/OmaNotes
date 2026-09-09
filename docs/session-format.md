@@ -20,11 +20,31 @@ implemented independently in C++ with no code copied.
 `$XDG_STATE_HOME` defaults to `~/.local/state`. Omanotes never stores session
 state inside the workspace, in `$XDG_CONFIG_HOME`, or anywhere shared.
 
-`<workspace-id>` is derived from the canonical root path so that the state
-directory listing does not spell out where every workspace lives; the exact
-derivation (and the atomic write, `0700`/`0600` permissions, and stale-temp
-cleanup) belong to Task 7.2. The snapshot itself does carry the root path,
-because a snapshot must be able to prove which workspace it belongs to.
+`<workspace-id>` is the first 128 bits of SHA-256 over the canonical root
+path, as 32 lowercase hex characters (ADR 0011). It is deterministic, needs no
+index, and keeps the state directory listing from spelling out where every
+workspace lives. The snapshot itself still carries the root path, so a
+collision, however unlikely, is caught by `checkSessionRoot` rather than
+restoring the wrong desk.
+
+### Permissions and replacement (Task 7.2)
+
+`omanotes/`, `sessions/` and each `<workspace-id>/` are created `0700` and
+tightened back to `0700` if found wider; `session.json` is `0600` from the
+moment it exists, regardless of the umask. Replacement is the same
+temporary-file-and-rename used for notes (ADR 0005): temporary in the same
+directory, flushed, renamed over the file, directory flushed. A failure at any
+step leaves the previous file byte-for-byte intact and removes the temporary.
+
+Two instances saving the same workspace at once each write their own
+temporary and rename; the last rename wins and a reader only ever sees a
+complete document. A temporary older than fifteen minutes is presumed
+abandoned by a crashed writer and removed before the next save; younger ones
+may belong to a live instance and are left alone.
+
+Nothing in the store is ever followed through a symlink. A symlinked
+directory or `session.json` is refused, on read and on write, with a
+diagnostic.
 
 ### Privacy boundary
 
