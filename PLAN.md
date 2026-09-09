@@ -657,10 +657,10 @@ public:
 
 **Blocks:**
 
-- [ ] **7.2.1** — Implement per-workspace state identity without exposing raw path names unnecessarily.
-- [ ] **7.2.2** — Implement atomic write, permission enforcement, and stale-temp cleanup.
-- [ ] **7.2.3** — Add failure injection for partial write, rename failure, full disk, corrupt prior state, and concurrent launch.
-- [ ] **7.2.4** — Verify: the previous valid session always survives an interrupted replacement.
+- [x] **7.2.1** — Implement per-workspace state identity without exposing raw path names unnecessarily.
+- [x] **7.2.2** — Implement atomic write, permission enforcement, and stale-temp cleanup.
+- [x] **7.2.3** — Add failure injection for partial write, rename failure, full disk, corrupt prior state, and concurrent launch.
+- [x] **7.2.4** — Verify: the previous valid session always survives an interrupted replacement.
 
 ### Task 7.3: Protect dirty-buffer recovery separately
 
@@ -1045,3 +1045,16 @@ Decision required: approve / request changes / stop and redesign
   `theme-adapter` suite the headless test environment it had been missing: without it the
   GTK platform theme leaked under LeakSanitizer and the suite failed on this machine.
   Awaiting Matt's gate on the format document before 7.2.
+
+- **2026-09-09:** Task 7.2 built on `task/7.2-session-store` (blocks 7.2.1–7.2.4). ADR 0011
+  fixes the layout (`$XDG_STATE_HOME/omanotes/sessions/<id>/session.json`) and the id
+  (first 128 bits of SHA-256 over the canonical root, hex). `SessionStore` saves through
+  the Phase 4 note writer's core, extracted as `replaceFileAtomically` with an explicit
+  mode and a test-only fault seam; the workspace-facing `AtomicFileWriter::write` is
+  unchanged and its suite still passes. Directories 0700 and file 0600 enforced on every
+  save; symlinks in the store refused on read and write; temporaries older than 15 min
+  removed, younger kept. New `session-store` suite (15 cases): five injected failures
+  (short write, ENOSPC, EIO, failed fsync, failed rename) each leave the prior snapshot
+  byte-identical with no temporary; corrupt prior state is reported on load and replaced
+  on save; four writers and a concurrent reader never observe a partial file. Awaiting
+  Matt's gate before 7.3.

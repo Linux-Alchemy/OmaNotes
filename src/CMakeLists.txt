@@ -27,6 +27,8 @@ add_executable(
     persistence/document_store.hpp
     session/session_snapshot.cpp
     session/session_snapshot.hpp
+    session/session_store.cpp
+    session/session_store.hpp
     ui/buffer_strip.cpp
     ui/buffer_strip.hpp
     ui/main_window.cpp

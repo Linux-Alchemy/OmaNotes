@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <string>
@@ -85,6 +86,92 @@ std::expected<void, SaveError> flushDirectory(const std::filesystem::path& direc
 
 } // namespace
 
+std::string atomicTemporaryPrefix() { return ".omanotes-"; }
+
+std::expected<void, SaveError> replaceFileAtomically(const std::filesystem::path& destination,
+                                                     QByteArrayView contents, mode_t mode,
+                                                     const AtomicWriteFaults* faults) {
+    const auto directory = destination.parent_path();
+    const auto pattern =
+        (directory / (atomicTemporaryPrefix() + destination.filename().string() + "-XXXXXX"))
+            .string();
+    std::vector<char> temporaryPath(pattern.begin(), pattern.end());
+    temporaryPath.push_back('\0');
+
+    int descriptor = ::mkstemp(temporaryPath.data());
+    if (descriptor < 0) {
+        return std::unexpected(SaveError{SaveErrorCode::TemporaryFailed,
+                                         describe("Could not create a temporary file", errno)});
+    }
+    const std::filesystem::path temporary(temporaryPath.data());
+
+    const auto abandon = [&temporary, &descriptor](SaveErrorCode code, const std::string& message) {
+        if (descriptor >= 0) {
+            ::close(descriptor);
+            descriptor = -1;
+        }
+        std::error_code ignored;
+        std::filesystem::remove(temporary, ignored);
+        return std::unexpected(SaveError{code, message});
+    };
+
+    // mkstemp creates 0600; apply the requested mode before any bytes land so
+    // the file is never observable with the wrong permissions.
+    if (::fchmod(descriptor, mode) != 0) {
+        return abandon(SaveErrorCode::WriteFailed,
+                       describe("Could not set file permissions", errno));
+    }
+
+    const char* bytes = contents.data();
+    auto remaining = static_cast<std::size_t>(contents.size());
+    std::size_t landed = 0;
+    while (remaining > 0) {
+        auto chunk = remaining;
+        if (faults != nullptr && faults->failWriteAfterBytes.has_value()) {
+            if (landed >= *faults->failWriteAfterBytes) {
+                return abandon(SaveErrorCode::WriteFailed,
+                               describe("Could not write the file", faults->writeErrno));
+            }
+            chunk = std::min(chunk, *faults->failWriteAfterBytes - landed);
+        }
+        const auto written = ::write(descriptor, bytes, chunk);
+        if (written < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return abandon(SaveErrorCode::WriteFailed, describe("Could not write the file", errno));
+        }
+        bytes += written;
+        remaining -= static_cast<std::size_t>(written);
+        landed += static_cast<std::size_t>(written);
+    }
+
+    // Durability before visibility: the bytes reach storage before the rename
+    // makes them the file every other reader sees.
+    if ((faults != nullptr && faults->failSync) || ::fsync(descriptor) != 0) {
+        return abandon(SaveErrorCode::SyncFailed,
+                       describe("Could not flush the file", faults != nullptr ? EIO : errno));
+    }
+    if (::close(descriptor) != 0) {
+        descriptor = -1;
+        return abandon(SaveErrorCode::WriteFailed, describe("Could not close the file", errno));
+    }
+    descriptor = -1;
+
+    std::error_code error;
+    if (faults != nullptr && faults->failRename) {
+        error = std::make_error_code(std::errc::io_error);
+    } else {
+        std::filesystem::rename(temporary, destination, error);
+    }
+    if (error) {
+        return abandon(SaveErrorCode::ReplaceFailed,
+                       "Could not replace the file: " + error.message());
+    }
+
+    return flushDirectory(directory);
+}
+
 std::expected<std::filesystem::path, SaveError>
 AtomicFileWriter::write(const std::filesystem::path& target, QByteArrayView contents,
                         const WorkspaceRoot& root) const {
@@ -112,68 +199,10 @@ AtomicFileWriter::write(const std::filesystem::path& target, QByteArrayView cont
         return std::unexpected(SaveError{SaveErrorCode::InvalidTarget, "That path is a directory"});
     }
 
-    const auto directory = destination->parent_path();
-    const auto pattern =
-        (directory / (".omanotes-" + destination->filename().string() + "-XXXXXX")).string();
-    std::vector<char> temporaryPath(pattern.begin(), pattern.end());
-    temporaryPath.push_back('\0');
-
-    int descriptor = ::mkstemp(temporaryPath.data());
-    if (descriptor < 0) {
-        return std::unexpected(SaveError{SaveErrorCode::TemporaryFailed,
-                                         describe("Could not create a temporary file", errno)});
+    if (auto replaced = replaceFileAtomically(*destination, contents, modeFor(*destination));
+        !replaced) {
+        return std::unexpected(replaced.error());
     }
-    const std::filesystem::path temporary(temporaryPath.data());
-
-    const auto abandon = [&temporary, &descriptor](SaveErrorCode code, const std::string& message) {
-        if (descriptor >= 0) {
-            ::close(descriptor);
-            descriptor = -1;
-        }
-        std::error_code ignored;
-        std::filesystem::remove(temporary, ignored);
-        return std::unexpected(SaveError{code, message});
-    };
-
-    const char* bytes = contents.data();
-    auto remaining = static_cast<std::size_t>(contents.size());
-    while (remaining > 0) {
-        const auto written = ::write(descriptor, bytes, remaining);
-        if (written < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            return abandon(SaveErrorCode::WriteFailed, describe("Could not write the file", errno));
-        }
-        bytes += written;
-        remaining -= static_cast<std::size_t>(written);
-    }
-
-    if (::fchmod(descriptor, modeFor(*destination)) != 0) {
-        return abandon(SaveErrorCode::WriteFailed,
-                       describe("Could not set file permissions", errno));
-    }
-    // Durability before visibility: the bytes reach storage before the rename
-    // makes them the file every other reader sees.
-    if (::fsync(descriptor) != 0) {
-        return abandon(SaveErrorCode::SyncFailed, describe("Could not flush the file", errno));
-    }
-    if (::close(descriptor) != 0) {
-        descriptor = -1;
-        return abandon(SaveErrorCode::WriteFailed, describe("Could not close the file", errno));
-    }
-    descriptor = -1;
-
-    std::filesystem::rename(temporary, *destination, error);
-    if (error) {
-        return abandon(SaveErrorCode::ReplaceFailed,
-                       "Could not replace the file: " + error.message());
-    }
-
-    if (auto flushed = flushDirectory(directory); !flushed) {
-        return std::unexpected(flushed.error());
-    }
-
     return *destination;
 }
 
