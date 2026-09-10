@@ -28,6 +28,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QRegularExpression>
 #include <QScrollBar>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -137,6 +138,19 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
     layout->addWidget(namePrompt);
     layout->addWidget(status);
     return writingArea;
+}
+
+/// KTextEditor reports its mode as "VI: NORMAL", "VI: VISUAL LINE" and so on.
+/// The status line drops the prefix and the shouting: "Normal", "Visual Line".
+QString humanModeName(QString modeName) {
+    static const auto viPrefix = QRegularExpression(QStringLiteral("^\\s*VI:\\s*"),
+                                                    QRegularExpression::CaseInsensitiveOption);
+    modeName.remove(viPrefix);
+    auto words = modeName.toLower().split(QLatin1Char(' '), Qt::SkipEmptyParts);
+    for (auto& word : words) {
+        word[0] = word[0].toUpper();
+    }
+    return words.join(QLatin1Char(' '));
 }
 
 } // namespace
@@ -1614,7 +1628,7 @@ void MainWindow::refreshEditorStatus() {
 
     const auto active = buffers_.activeId();
     const auto reading = active.has_value() && viewModeFor(*active) == ViewMode::Reading;
-    const auto modeName = reading ? QStringLiteral("READING") : editor->modeName().toUpper();
+    const auto modeName = reading ? QStringLiteral("Reading") : humanModeName(editor->modeName());
     auto diskMarker = QString{};
     if (const auto tracked = active.has_value() ? tracked_.find(*active) : tracked_.end();
         tracked != tracked_.end()) {

@@ -198,7 +198,8 @@ void MainWindowTest::statusTracksEditorState() {
 
     QVERIFY(editor != nullptr);
     QVERIFY(status != nullptr);
-    QVERIFY(status->text().contains(QStringLiteral("NORMAL"), Qt::CaseInsensitive));
+    // Mode only, sentence case, no editor prefix: "Normal", not "VI: NORMAL".
+    QCOMPARE(status->text(), QStringLiteral("Normal"));
 
     editor->document()->setText(QStringLiteral("scratch"));
     QTRY_VERIFY(editor->document()->isModified());
@@ -211,7 +212,7 @@ void MainWindowTest::statusTracksEditorState() {
     auto* eventTarget = QApplication::focusWidget();
     QVERIFY(eventTarget != nullptr);
     QTest::keyClicks(eventTarget, QStringLiteral("i"));
-    QTRY_VERIFY(status->text().contains(QStringLiteral("INSERT"), Qt::CaseInsensitive));
+    QTRY_COMPARE(status->text(), QStringLiteral("Insert"));
 }
 
 void MainWindowTest::spacePrefixDoesNotSwallowInsertTextOrControlB() {
@@ -1505,7 +1506,7 @@ void MainWindowTest::readingViewTogglesAndPreservesState() {
     QTRY_COMPARE(stack->currentWidget(), reading);
     QVERIFY(reading->toPlainText().contains(QStringLiteral("body text")));
     QVERIFY(!editor->document()->isModified());
-    QTRY_VERIFY2(status->text().contains(QStringLiteral("READING")), qPrintable(status->text()));
+    QTRY_COMPARE(status->text(), QStringLiteral("Reading"));
 
     // Space m from the reading view returns to writing, cursor intact.
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
