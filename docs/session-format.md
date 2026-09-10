@@ -141,7 +141,7 @@ looks like now, decided by `planRecovery`:
 
 | Situation | Restored as | Saving |
 |---|---|---|
-| Scratch (no `path`) | `[No Name]`, modified | Needs an explicit name, as any scratch buffer does |
+| Scratch (no `path`) | `Untitled`, modified | Needs an explicit name, as any scratch buffer does |
 | Note unchanged since the checkpoint | The note, modified | `:w` writes as usual |
 | Note changed on disk since the checkpoint | The note, modified, in conflict | `:w` refuses; `:w!` overwrites, `:e!` discards, exactly as ADR 0006 |
 | Note gone from disk | The note, modified | `:w` recreates it |

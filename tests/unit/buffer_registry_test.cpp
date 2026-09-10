@@ -42,7 +42,7 @@ void BufferRegistryTest::scratchBuffersHaveDistinctIdentity() {
     QVERIFY(first != second);
     QCOMPARE(registry.count(), std::size_t{2});
     QCOMPARE(registry.activeId(), std::optional{second});
-    QCOMPARE(registry.find(first)->displayName, QStringLiteral("[No Name]"));
+    QCOMPARE(registry.find(first)->displayName, QStringLiteral("Untitled"));
     QVERIFY(!registry.find(first)->path.has_value());
 }
 
@@ -155,7 +155,7 @@ void BufferRegistryTest::closingTheFinalBufferLeavesAScratchBuffer() {
 
     QVERIFY(*replacement != *only);
     QVERIFY(!state->path.has_value());
-    QCOMPARE(state->displayName, QStringLiteral("[No Name]"));
+    QCOMPARE(state->displayName, QStringLiteral("Untitled"));
 }
 
 void BufferRegistryTest::reportsMissingBuffersInsteadOfGuessing() {

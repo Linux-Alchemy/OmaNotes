@@ -201,7 +201,10 @@ void MainWindowTest::statusTracksEditorState() {
     QVERIFY(status->text().contains(QStringLiteral("NORMAL"), Qt::CaseInsensitive));
 
     editor->document()->setText(QStringLiteral("scratch"));
-    QTRY_VERIFY(status->text().contains(QStringLiteral("[+]")));
+    QTRY_VERIFY(editor->document()->isModified());
+    // The status line names neither the buffer nor its unsaved state.
+    QVERIFY(!status->text().contains(QStringLiteral("[+]")));
+    QVERIFY(!status->text().contains(QStringLiteral("Untitled")));
 
     editor->setFocus();
     QTRY_VERIFY(editor->hasFocus());
@@ -287,13 +290,14 @@ void MainWindowTest::markdownSidebarFiltersAndLoadsWithoutWriting() {
     editor = activeEditor(window);
     QVERIFY(editor != nullptr);
     QCOMPARE(editor->document()->text(), QStringLiteral("# Original\n"));
-    QCOMPARE(buffers->tabText(0), QStringLiteral("[No Name]"));
+    QCOMPARE(buffers->tabText(0), QStringLiteral("Untitled"));
     QCOMPARE(buffers->tabText(1), QStringLiteral("note.md"));
     QCOMPARE(buffers->currentIndex(), 1);
     QVERIFY(!editor->document()->isModified());
 
     editor->document()->setText(QStringLiteral("changed in memory"));
-    QTRY_COMPARE(buffers->tabText(1), QStringLiteral("note.md [+]"));
+    QTRY_VERIFY(editor->document()->isModified());
+    QCOMPARE(buffers->tabText(1), QStringLiteral("note.md"));
     QFile diskFile(QString::fromStdString((root / "note.md").string()));
     QVERIFY(diskFile.open(QIODevice::ReadOnly));
     QCOMPARE(diskFile.readAll(), QByteArray("# Original\n"));
@@ -440,7 +444,8 @@ void MainWindowTest::reopeningAnOpenFileKeepsUnsavedEditsAndDoesNotDuplicate() {
     auto* editor = activeEditor(window);
     QVERIFY(editor != nullptr);
     editor->document()->setText(QStringLiteral("unsaved work"));
-    QTRY_COMPARE(buffers->tabText(0), QStringLiteral("note.md [+]"));
+    QTRY_VERIFY(editor->document()->isModified());
+    QCOMPARE(buffers->tabText(0), QStringLiteral("note.md"));
 
     auto* model = static_cast<omanotes::FileTreeModel*>(tree->model());
     if (model->canFetchMore({})) {
@@ -527,7 +532,8 @@ void MainWindowTest::savesAnOpenFileWithControlS() {
     QVERIFY(editor != nullptr);
 
     editor->document()->setText(QStringLiteral("# Edited\n"));
-    QTRY_COMPARE(buffers->tabText(0), QStringLiteral("note.md [+]"));
+    QTRY_VERIFY(editor->document()->isModified());
+    QCOMPARE(buffers->tabText(0), QStringLiteral("note.md"));
 
     editor->setFocus();
     QTRY_VERIFY(editor->hasFocus());
@@ -556,7 +562,7 @@ void MainWindowTest::namesAScratchBufferBeforeWritingIt() {
     QVERIFY(prompt != nullptr);
     QVERIFY(editor != nullptr);
     QVERIFY(!prompt->isVisible());
-    QCOMPARE(buffers->tabText(0), QStringLiteral("[No Name]"));
+    QCOMPARE(buffers->tabText(0), QStringLiteral("Untitled"));
 
     editor->document()->setText(QStringLiteral("# Fresh\n"));
     editor->setFocus();
@@ -1196,7 +1202,7 @@ void MainWindowTest::closesBuffersFromTheLeaderAndGuardsUnsavedWork() {
         qPrintable(status->text()));
     QVERIFY(status->text().contains(QStringLiteral("Space+b+D")));
     QCOMPARE(strip->count(), 1);
-    QCOMPARE(strip->tabText(0), QStringLiteral("closing.md [+]"));
+    QCOMPARE(strip->tabText(0), QStringLiteral("closing.md"));
 
     // Space b D discards. The last buffer closing leaves a scratch buffer to
     // type in, with its own editor, and nothing reaches the disk.
@@ -1204,7 +1210,7 @@ void MainWindowTest::closesBuffersFromTheLeaderAndGuardsUnsavedWork() {
     QTest::keyClicks(target, QStringLiteral("bD"));
     QTRY_COMPARE(status->text(), QStringLiteral("Closed closing.md, discarding changes"));
     QCOMPARE(strip->count(), 1);
-    QCOMPARE(strip->tabText(0), QStringLiteral("[No Name]"));
+    QCOMPARE(strip->tabText(0), QStringLiteral("Untitled"));
     // One editor per open buffer plus the permanent reading view.
     QCOMPARE(stack->count(), 2);
     QCOMPARE(readFile(note), QByteArray("keep me\n"));
@@ -1227,7 +1233,7 @@ void MainWindowTest::closesBuffersFromTheLeaderAndGuardsUnsavedWork() {
     target = QApplication::focusWidget();
     QTest::keyClick(target, Qt::Key_Space);
     QTest::keyClicks(target, QStringLiteral("bd"));
-    QTRY_COMPARE(status->text(), QStringLiteral("Closed [No Name]"));
+    QTRY_COMPARE(status->text(), QStringLiteral("Closed Untitled"));
     QCOMPARE(strip->count(), 1);
     // One editor per open buffer plus the permanent reading view.
     QCOMPARE(stack->count(), 2);
@@ -1336,19 +1342,20 @@ void MainWindowTest::mouseCreatesAndClosesBuffers() {
     QTest::mouseClick(newBuffer, Qt::LeftButton);
     QTRY_COMPARE(strip->count(), 2);
     QCOMPARE(strip->currentIndex(), 1);
-    QCOMPARE(strip->tabText(1), QStringLiteral("[No Name]"));
+    QCOMPARE(strip->tabText(1), QStringLiteral("Untitled"));
     QVERIFY(activeEditor(window)->document()->text().isEmpty());
 
     // A dirty buffer's close button asks first; Cancel keeps everything.
     activeEditor(window)->document()->setText(QStringLiteral("draft"));
-    QTRY_COMPARE(strip->tabText(1), QStringLiteral("[No Name] [+]"));
+    QTRY_VERIFY(activeEditor(window)->document()->isModified());
+    QCOMPARE(strip->tabText(1), QStringLiteral("Untitled"));
     auto* scratchClose = closeButtonFor(*strip, 1);
     QVERIFY(scratchClose != nullptr);
     QTest::mouseClick(scratchClose, Qt::LeftButton);
     auto* prompt = window.findChild<QMessageBox*>(QStringLiteral("closeBufferPrompt"));
     QVERIFY(prompt != nullptr);
     QTRY_VERIFY(prompt->isVisible());
-    QVERIFY(prompt->text().contains(QStringLiteral("[No Name]")));
+    QVERIFY(prompt->text().contains(QStringLiteral("Untitled")));
     QTest::mouseClick(prompt->button(QMessageBox::Cancel), Qt::LeftButton);
     QTRY_VERIFY(!prompt->isVisible());
     QCOMPARE(strip->count(), 2);
@@ -1369,7 +1376,8 @@ void MainWindowTest::mouseCreatesAndClosesBuffers() {
 
     // Discard closes without touching the disk; the last buffer leaves a scratch.
     activeEditor(window)->document()->setText(QStringLiteral("note\nedited\n"));
-    QTRY_COMPARE(strip->tabText(0), QStringLiteral("note.md [+]"));
+    QTRY_VERIFY(activeEditor(window)->document()->isModified());
+    QCOMPARE(strip->tabText(0), QStringLiteral("note.md"));
     auto* noteClose = closeButtonFor(*strip, 0);
     QVERIFY(noteClose != nullptr);
     QTest::mouseClick(noteClose, Qt::LeftButton);
@@ -1378,7 +1386,7 @@ void MainWindowTest::mouseCreatesAndClosesBuffers() {
     QTRY_COMPARE(status->text(), QStringLiteral("Closed note.md, discarding changes"));
     QCOMPARE(readFile(note), QByteArray("note\n"));
     QCOMPARE(strip->count(), 1);
-    QCOMPARE(strip->tabText(0), QStringLiteral("[No Name]"));
+    QCOMPARE(strip->tabText(0), QStringLiteral("Untitled"));
 
     // A clean close needs no prompt and acts on the clicked tab, not the
     // active buffer.
@@ -1530,7 +1538,7 @@ void MainWindowTest::readingViewTogglesAndPreservesState() {
     QTRY_COMPARE(stack->currentWidget(), reading);
     QVERIFY(reading->toPlainText().contains(QStringLiteral("edited body")));
     QVERIFY(backToWriting->document()->isModified());
-    QVERIFY2(status->text().contains(QStringLiteral("[+]")), qPrintable(status->text()));
+    QVERIFY2(!status->text().contains(QStringLiteral("[+]")), qPrintable(status->text()));
 }
 
 void MainWindowTest::readingViewRoutesCopyAndRefusesPaste() {

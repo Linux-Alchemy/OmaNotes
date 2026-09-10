@@ -1613,11 +1613,8 @@ void MainWindow::refreshEditorStatus() {
     }
 
     const auto active = buffers_.activeId();
-    const auto* state = active.has_value() ? buffers_.find(*active) : nullptr;
-    const auto name = state != nullptr ? state->displayName : scratchDisplayName();
     const auto reading = active.has_value() && viewModeFor(*active) == ViewMode::Reading;
     const auto modeName = reading ? QStringLiteral("READING") : editor->modeName().toUpper();
-    const auto modifiedMarker = editor->isModified() ? QStringLiteral(" [+]") : QString{};
     auto diskMarker = QString{};
     if (const auto tracked = active.has_value() ? tracked_.find(*active) : tracked_.end();
         tracked != tracked_.end()) {
@@ -1632,8 +1629,7 @@ void MainWindow::refreshEditorStatus() {
             break;
         }
     }
-    statusArea_->setText(
-        QStringLiteral("%1    %2%3%4").arg(modeName, name, modifiedMarker, diskMarker));
+    statusArea_->setText(QStringLiteral("%1%2").arg(modeName, diskMarker));
 }
 
 void MainWindow::applyTheme(const ThemePalette& palette) {
