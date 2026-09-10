@@ -16,6 +16,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QScrollBar>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QTabBar>
@@ -24,6 +25,7 @@
 #include <QToolButton>
 #include <QTreeView>
 #include <QTreeWidget>
+#include <QWheelEvent>
 #include <QtTest>
 
 #include <filesystem>
@@ -177,6 +179,7 @@ class MainWindowTest final : public QObject {
     void remappedPaneKeyReplacesTheOldRoute();
     void leaderOverridesWinOverDirectShiftKeys();
     void closesCleanly();
+    void scrollbarsAreNeverShown();
 };
 
 void MainWindowTest::hasRequiredRegions() {
@@ -1478,6 +1481,57 @@ void MainWindowTest::superChordsRouteUniversalCopyAndPaste() {
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_V, Qt::ControlModifier | Qt::MetaModifier);
     QTRY_COMPARE(editor->document()->text(), QStringLiteral("stack overflowstacstackk\n"));
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+}
+
+void MainWindowTest::scrollbarsAreNeverShown() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "long.md";
+    QByteArray body("# Long\n\n");
+    for (int line = 0; line < 400; ++line) {
+        body += "a line of body text that goes on for a while\n";
+    }
+    writeFile(note, body);
+    omanotes::MainWindow window({root, note, false});
+    window.resize(600, 300);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    auto* editor = activeEditor(window);
+    QVERIFY(editor != nullptr);
+    auto* reading = window.findChild<QTextBrowser*>(QStringLiteral("readingView"));
+    QVERIFY(reading != nullptr);
+    auto* tree = window.findChild<QTreeView*>();
+    QVERIFY(tree != nullptr);
+
+    // A note far taller than the window would earn a scrollbar anywhere
+    // else. Here the bars have no size, so nothing to grab, nothing to see.
+    QTRY_VERIFY(editor->document()->lines() > 300);
+    QVERIFY(editor->verticalScrollBar()->maximum() > 0);
+    // Layout runs on a posted event, and a bar Qt never shows keeps a stale
+    // default geometry, so "hidden or zero width" is the honest check.
+    const auto unseen = [](const QScrollBar* bar) {
+        return !bar->isVisible() || bar->width() == 0;
+    };
+    QTRY_VERIFY(unseen(editor->verticalScrollBar()));
+    QTRY_VERIFY(unseen(editor->horizontalScrollBar()));
+
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("m"));
+    QTRY_VERIFY(reading->isVisible());
+    QTRY_VERIFY(reading->verticalScrollBar()->maximum() > 0);
+    QTRY_VERIFY(unseen(reading->verticalScrollBar()));
+    QTRY_VERIFY(unseen(tree->verticalScrollBar()));
+
+    // Scrolling itself still works: the wheel moves the view without a bar.
+    const auto before = reading->verticalScrollBar()->value();
+    QWheelEvent wheel(QPointF(10, 10), reading->viewport()->mapToGlobal(QPoint(10, 10)),
+                      QPoint(0, -120), QPoint(0, -120), Qt::NoButton, Qt::NoModifier,
+                      Qt::NoScrollPhase, false);
+    QApplication::sendEvent(reading->viewport(), &wheel);
+    QTRY_VERIFY(reading->verticalScrollBar()->value() > before);
 }
 
 void MainWindowTest::readingViewTogglesAndPreservesState() {

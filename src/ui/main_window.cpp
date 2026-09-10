@@ -1652,6 +1652,8 @@ void MainWindow::applyTheme(const ThemePalette& palette) {
     // focused one never shifts the layout, only the colour.
     setStyleSheet(QStringLiteral(R"(
 * { font-family: monospace; font-size: %11pt; }
+QScrollBar:vertical { width: 0px; }
+QScrollBar:horizontal { height: 0px; }
 QMainWindow#mainWindow { background-color: %1; }
 QSplitter#workspaceSplitter::handle { background-color: %2; }
 QFrame#sidebar { background-color: %3; border: none; border-top: 2px solid %3; }
@@ -1687,6 +1689,9 @@ QDialog QPushButton:hover { background-color: %2; }
                            QString::number(palette.baseFontPointSize),
                            QString::number(palette.baseFontPointSize + 1.0)));
     writingArea_->setAttribute(Qt::WA_StyledBackground, true);
+    // No scrollbars anywhere (Matt's call, 2026-09-10): the wheel, the keys
+    // and the trackpad still scroll; the bars are given zero size rather
+    // than a policy because KTextEditor owns its own and offers no switch.
 
     // Grounds and the tree's selected row live in the stylesheet above: with
     // a stylesheet active, Qt ignores QPalette for widget backgrounds and
