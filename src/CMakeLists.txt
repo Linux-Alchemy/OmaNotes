@@ -2,6 +2,8 @@ add_executable(
     omanotes
     main.cpp
     app/launch_request.cpp
+    app/application_controller.cpp
+    app/application_controller.hpp
     app/keymap.cpp
     app/keymap.hpp
     app/launch_request.hpp
@@ -27,6 +29,8 @@ add_executable(
     persistence/recovery_store.cpp
     persistence/recovery_store.hpp
     persistence/document_store.hpp
+    session/session_restorer.cpp
+    session/session_restorer.hpp
     session/session_snapshot.cpp
     session/session_snapshot.hpp
     session/session_store.cpp

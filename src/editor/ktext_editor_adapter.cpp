@@ -88,6 +88,28 @@ bool KTextEditorAdapter::isModified() const noexcept { return document_->isModif
 
 void KTextEditorAdapter::markSaved() { document_->setModified(false); }
 
+void KTextEditorAdapter::markModified() { document_->setModified(true); }
+
+EditorPosition KTextEditorAdapter::cursorPosition() const {
+    const auto cursor = view_->cursorPosition();
+    return {cursor.line(), cursor.column()};
+}
+
+void KTextEditorAdapter::setCursorPosition(EditorPosition position) {
+    const auto line = std::clamp(position.line, 0, std::max(document_->lines() - 1, 0));
+    const auto column = std::clamp(position.column, 0, document_->lineLength(line));
+    view_->setCursorPosition(KTextEditor::Cursor(line, column));
+}
+
+int KTextEditorAdapter::firstVisibleLine() const { return view_->firstDisplayedLine(); }
+
+void KTextEditorAdapter::scrollToLine(int line) {
+    const auto clamped = std::clamp(line, 0, std::max(document_->lines() - 1, 0));
+    view_->setScrollPosition(KTextEditor::Cursor(clamped, 0));
+}
+
+int KTextEditorAdapter::lineCount() const { return document_->lines(); }
+
 EditorMode KTextEditorAdapter::mode() const noexcept {
     switch (view_->viewMode()) {
     case KTextEditor::View::ViModeNormal:

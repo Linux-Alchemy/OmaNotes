@@ -250,6 +250,39 @@ QModelIndex FileTreeModel::indexForNode(Node* node) const {
     return createIndex(static_cast<int>(std::distance(siblings.begin(), found)), 0, node);
 }
 
+QModelIndex FileTreeModel::indexForPath(const std::filesystem::path& path) {
+    std::error_code error;
+    const auto canonical = std::filesystem::canonical(path, error);
+    if (error || !workspace_.contains(canonical)) {
+        return {};
+    }
+    const auto relative = canonical.lexically_relative(root_->path);
+    if (relative.empty() || relative.begin()->string() == "..") {
+        return {};
+    }
+    QModelIndex current;
+    auto walked = root_->path;
+    for (const auto& part : relative) {
+        walked /= part;
+        if (canFetchMore(current)) {
+            fetchMore(current);
+        }
+        QModelIndex next;
+        for (int row = 0; row < rowCount(current); ++row) {
+            const auto candidate = index(row, 0, current);
+            if (pathForIndex(candidate) == walked) {
+                next = candidate;
+                break;
+            }
+        }
+        if (!next.isValid()) {
+            return {};
+        }
+        current = next;
+    }
+    return current;
+}
+
 void FileTreeModel::noteFileCreated(const std::filesystem::path& path) {
     std::error_code error;
     const auto canonical = std::filesystem::canonical(path, error);

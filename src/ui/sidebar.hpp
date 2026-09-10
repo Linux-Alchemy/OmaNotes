@@ -4,6 +4,7 @@
 #include <QFrame>
 
 #include <filesystem>
+#include <optional>
 
 class QModelIndex;
 class QTreeView;
@@ -20,6 +21,11 @@ class Sidebar final : public QFrame {
 
     void focusTree();
     void noteFileCreated(const std::filesystem::path& path);
+    /// The file the tree's current row names, if any.
+    [[nodiscard]] std::optional<std::filesystem::path> selectedPath() const;
+    /// Make `path` the current row, expanding the directories above it.
+    /// Does nothing when the path is not in the tree.
+    void selectPath(const std::filesystem::path& path);
 
   signals:
     void fileActivated(const std::filesystem::path& path);

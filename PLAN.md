@@ -709,14 +709,14 @@ public:
 
 **Blocks:**
 
-- [ ] **7.4.1** — Capture final snapshot on clean close and debounced checkpoints during meaningful state changes.
-- [ ] **7.4.2** — Restore session before presenting the final window; honour `--fresh` without deleting state.
-- [ ] **7.4.3** — Apply explicit file arguments after restore so they open/focus predictably.
+- [x] **7.4.1** — Capture final snapshot on clean close and debounced checkpoints during meaningful state changes.
+- [x] **7.4.2** — Restore session before presenting the final window; honour `--fresh` without deleting state.
+- [x] **7.4.3** — Apply explicit file arguments after restore so they open/focus predictably.
   - Note (2026-09-09): once the editor adapter exposes cursor and scroll position for the
     snapshot, use the same accessor so `Ctrl+M` lands the reading view near the editor cursor
     and switching back returns there (Obsidian behaviour). Matt approved; bug fix that opens
     reading at the top shipped separately on `fix/reading-view-scroll-top`.
-- [ ] **7.4.4** — Verify: clean close, forced kill, missing files, changed roots, corrupt state, and concurrent-launch scenarios match the documented matrix.
+- [x] **7.4.4** — Verify: clean close, forced kill, missing files, changed roots, corrupt state, and concurrent-launch scenarios match the documented matrix.
 
 ### Phase 7 Checkpoint
 
@@ -1072,3 +1072,21 @@ Decision required: approve / request changes / stop and redesign
   simulation through the snapshot reference. The UI half of 7.3.3 (opening the restored
   buffer dirty, naming prompt, conflict flag) lands with the restorer in 7.4, whose files
   it lives in. Awaiting Matt's gate.
+
+- **2026-09-09:** Task 7.4 built on `task/7.4-session-restore` (blocks 7.4.1–7.4.4). Phase 7
+  becomes visible: `ApplicationController` (new, `src/app/`) restores the last desk for the
+  root before the window is shown, brings back unreferenced recovery records as dirty
+  buffers, opens or focuses the command-line file last, and shows the ADR 0010 parked-work
+  notice from snapshot metadata. It checkpoints dirty buffers and rewrites the snapshot two
+  seconds after the desk changes, on window deactivation, and on close; a record is removed
+  the moment its buffer is saved, reloaded, or closed. `SessionRestorer` (new,
+  `src/session/`) drives a `SessionHost` interface that `MainWindow` implements. `--fresh`
+  reads no snapshot and writes none. The editor adapter gained cursor/scroll accessors, the
+  sidebar selection round-trips, and `Space m` now opens reading near the editor cursor and
+  returns near where the reader stopped (proportional, per the 7.4.3 note). Fixed on the
+  way: a latent use-after-free at shutdown when the sidebar tree held focus (the
+  application-wide focus hook fired during child destruction). New `session-restore` suite
+  (13 scenarios: clean close, forced kill, missing file, other root + notice, corrupt state,
+  `--fresh`, requested file last, concurrent launches, orphan record, recovered note
+  changed on disk, reading-view cursor following, debounce). Phase 7 checkpoint awaits
+  Matt's hands-on gate.
