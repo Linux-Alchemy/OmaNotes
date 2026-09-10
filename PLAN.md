@@ -720,10 +720,10 @@ public:
 
 ### Phase 7 Checkpoint
 
-- [ ] Snapshot, recovery, migration, permissions, failure-injection, and sanitizer tests pass.
-- [ ] Structural state contains no note contents; dirty contents exist only in protected recovery records.
-- [ ] `--fresh` bypasses but does not destroy the last session.
-- [ ] **Matt gate:** arrange several buffers and sidebar state, leave dirty work, close/reopen, force-kill/reopen, and confirm it feels like returning to the same desk.
+- [x] Snapshot, recovery, migration, permissions, failure-injection, and sanitizer tests pass.
+- [x] Structural state contains no note contents; dirty contents exist only in protected recovery records.
+- [x] `--fresh` bypasses but does not destroy the last session.
+- [x] **Matt gate:** arrange several buffers and sidebar state, leave dirty work, close/reopen, force-kill/reopen, and confirm it feels like returning to the same desk.
 
 ## Phase 8: Hardening, Packaging, and First Usable Release
 
@@ -1090,3 +1090,18 @@ Decision required: approve / request changes / stop and redesign
   `--fresh`, requested file last, concurrent launches, orphan record, recovered note
   changed on disk, reading-view cursor following, debounce). Phase 7 checkpoint awaits
   Matt's hands-on gate.
+
+- **2026-09-10:** Phase 7 accepted. PR #28 merged after Matt's hands-on gate on the release
+  build: all six manual steps passed (restore of tabs, order, active tab, sidebar, reading
+  mode and an unsaved paragraph; `kill -9` recovery; recovery record cleared by `:w`;
+  `--fresh` leaving the prior session intact; reading view following the cursor; parked-work
+  notice from another root). Same-day evidence on the branch: 22/22 ctest, format-check,
+  clang-tidy and security-check clean. Rulings on the five judgement calls flagged in #28:
+  orphan recovery records restored as dirty buffers (not swept) — accepted; `[No Name]`
+  scratch as part of the desk — accepted in function, its form to be polished; the
+  shutdown use-after-free fix and the `SessionHost` interface — accepted as is. On closing
+  with dirty buffers: Omarchy's SUPER+w is a window kill with no chance to ask, so the
+  checkpoint-and-restore behaviour is right for that path, but a deliberate in-app quit
+  must bring the save prompt back. Two items parked on Matt's fine-tuning list, to be
+  worked before Phase 8: a proper in-app close command (with the prompt), and the
+  `[No Name]` polish.
