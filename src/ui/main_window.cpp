@@ -17,8 +17,10 @@
 #include <KTextEditor/View>
 #include <QAction>
 
+#include <QAbstractTextDocumentLayout>
 #include <QApplication>
 #include <QByteArray>
+#include <QCloseEvent>
 #include <QFile>
 #include <QFont>
 #include <QHBoxLayout>
@@ -26,11 +28,13 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QScrollBar>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QStringDecoder>
 #include <QStringView>
 #include <QStyle>
+#include <QTextDocument>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -150,6 +154,7 @@ MainWindow::MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, Q
     resize(1100, 720);
 
     auto* splitter = new QSplitter(Qt::Horizontal, this);
+    splitter_ = splitter;
     splitter->setObjectName(QStringLiteral("workspaceSplitter"));
     splitter->setAccessibleName(QStringLiteral("Workspace and editor panes"));
     splitter->setChildrenCollapsible(false);
@@ -172,6 +177,7 @@ MainWindow::MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, Q
     splitter->setSizes({240, 860});
 
     setCentralWidget(splitter);
+    connect(splitter, &QSplitter::splitterMoved, this, [this] { emit sessionStateChanged(); });
 
     readingView_ = new MarkdownView(editorStack_);
     editorStack_->addWidget(readingView_);
@@ -296,15 +302,231 @@ MainWindow::MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, Q
             [this](const std::filesystem::path&) { theme_->refresh(); });
     if (auto* application = qobject_cast<QApplication*>(QApplication::instance());
         application != nullptr) {
-        connect(application, &QApplication::focusChanged, this,
-                [this](QWidget*, QWidget*) { markActivePane(); });
+        focusConnection_ = connect(application, &QApplication::focusChanged, this,
+                                   [this](QWidget*, QWidget*) { markActivePane(); });
     }
     markActivePane();
 }
 
 MainWindow::~MainWindow() {
+    disconnect(focusConnection_);
     if (auto* application = QApplication::instance(); application != nullptr) {
         application->removeEventFilter(this);
+    }
+}
+
+const BufferRegistry& MainWindow::buffers() const noexcept { return buffers_; }
+
+void MainWindow::showStatus(const QString& message) { statusArea_->setText(message); }
+
+QString MainWindow::statusText() const { return statusArea_->text(); }
+
+bool MainWindow::event(QEvent* event) {
+    if (event->type() == QEvent::WindowDeactivate) {
+        emit windowDeactivated();
+    }
+    return QMainWindow::event(event);
+}
+
+void MainWindow::closeEvent(QCloseEvent* event) {
+    // No prompt for dirty buffers: their text is checkpointed on the way out
+    // and comes back dirty next time (docs/session-format.md).
+    emit aboutToClose();
+    QMainWindow::closeEvent(event);
+}
+
+namespace {
+
+std::optional<std::filesystem::path> relativeToRoot(const std::filesystem::path& root,
+                                                    const std::filesystem::path& absolute) {
+    auto relative = absolute.lexically_relative(root);
+    if (relative.empty() || relative.begin()->string() == "..") {
+        return std::nullopt;
+    }
+    return relative;
+}
+
+} // namespace
+
+SessionSnapshot MainWindow::captureSnapshot() const {
+    SessionSnapshot snapshot;
+    snapshot.workspaceRoot = launchRequest_.root;
+    snapshot.window = {std::max(size().width(), 1), std::max(size().height(), 1), isMaximized()};
+    snapshot.sidebar.visible = sidebar_->isVisible();
+    snapshot.sidebar.width = splitter_ != nullptr ? std::max(splitter_->sizes().value(0), 0) : 0;
+    if (const auto selected = sidebar_->selectedPath(); selected) {
+        snapshot.sidebar.selectedPath = relativeToRoot(launchRequest_.root, *selected);
+    }
+    for (const auto& state : buffers_.buffers()) {
+        BufferSnapshot buffer;
+        buffer.id = state.id;
+        if (state.path) {
+            buffer.path = relativeToRoot(launchRequest_.root, *state.path);
+            if (!buffer.path) {
+                continue;
+            }
+        }
+        buffer.viewMode = viewModeFor(state.id);
+        if (const auto editor = editors_.find(state.id); editor != editors_.end()) {
+            const auto position = editor->second->cursorPosition();
+            buffer.cursor = {std::max(position.line, 0), std::max(position.column, 0)};
+            buffer.scrollLine = std::max(editor->second->firstVisibleLine(), 0);
+            buffer.modified = editor->second->isModified();
+        }
+        snapshot.buffers.push_back(std::move(buffer));
+    }
+    if (const auto active = buffers_.activeId(); active) {
+        const auto listed = std::ranges::any_of(
+            snapshot.buffers, [&active](const auto& buffer) { return buffer.id == *active; });
+        if (listed) {
+            snapshot.activeBuffer = *active;
+        }
+    }
+    return snapshot;
+}
+
+std::optional<BufferRecovery> MainWindow::dirtyRecord(BufferId id) const {
+    const auto* state = buffers_.find(id);
+    const auto editor = editors_.find(id);
+    if (state == nullptr || editor == editors_.end() || !editor->second->isModified()) {
+        return std::nullopt;
+    }
+    BufferRecovery record;
+    record.contents = editor->second->text();
+    if (state->path) {
+        record.path = relativeToRoot(launchRequest_.root, *state->path);
+        if (!record.path) {
+            return std::nullopt;
+        }
+        if (const auto tracked = tracked_.find(id); tracked != tracked_.end()) {
+            record.baseRevision = tracked->second.known;
+        }
+    }
+    return record;
+}
+
+std::optional<BufferId> MainWindow::untouchedInitialBuffer() const {
+    if (buffers_.count() != 1) {
+        return std::nullopt;
+    }
+    const auto& only = buffers_.buffers().front();
+    const auto editor = editors_.find(only.id);
+    if (only.path || editor == editors_.end() || editor->second->isModified() ||
+        !editor->second->text().isEmpty()) {
+        return std::nullopt;
+    }
+    return only.id;
+}
+
+void MainWindow::closeIfUntouched(BufferId id) {
+    const auto* state = buffers_.find(id);
+    const auto editor = editors_.find(id);
+    if (state == nullptr || state->path || editor == editors_.end() ||
+        editor->second->isModified() || !editor->second->text().isEmpty() || buffers_.count() < 2) {
+        return;
+    }
+    const auto status = statusArea_->text();
+    closeBuffer(id, false);
+    statusArea_->setText(status);
+}
+
+void MainWindow::focusRequestedFile(const std::filesystem::path& path) { loadMarkdownFile(path); }
+
+void MainWindow::applyWindow(const WindowSnapshot& window) {
+    resize(std::max(window.width, minimumWidth()), std::max(window.height, minimumHeight()));
+    if (window.maximized) {
+        setWindowState(windowState() | Qt::WindowMaximized);
+    }
+}
+
+void MainWindow::applySidebar(const SidebarSnapshot& sidebar,
+                              const std::optional<std::filesystem::path>& selected) {
+    sidebar.visible ? sidebar_->show() : sidebar_->hide();
+    if (sidebar.width > 0 && splitter_ != nullptr) {
+        const auto total = std::max(splitter_->width(), sidebar.width + 1);
+        splitter_->setSizes({sidebar.width, total - sidebar.width});
+    }
+    if (selected) {
+        sidebar_->selectPath(*selected);
+    }
+}
+
+std::optional<BufferId> MainWindow::openNote(const std::filesystem::path& absolute) {
+    const auto status = statusArea_->text();
+    loadMarkdownFile(absolute);
+    const auto opened = buffers_.findByPath(absolute);
+    if (!opened) {
+        // loadMarkdownFile said why; the restorer will report it too.
+        return std::nullopt;
+    }
+    statusArea_->setText(status);
+    return opened;
+}
+
+BufferId MainWindow::openScratch() {
+    const auto id = buffers_.createScratch();
+    createEditorFor(id);
+    showBuffer(id);
+    return id;
+}
+
+std::optional<BufferId> MainWindow::openRecovered(const BufferRecovery& record,
+                                                  const RecoveryPlan& plan) {
+    BufferId id;
+    if (plan.target == RecoveryTarget::Scratch || !plan.resolved) {
+        id = buffers_.createScratch();
+    } else {
+        const auto opened = buffers_.open(*plan.resolved);
+        if (!opened) {
+            return std::nullopt;
+        }
+        id = *opened;
+    }
+    auto editor = editors_.find(id);
+    if (editor == editors_.end()) {
+        createEditorFor(id);
+        editor = editors_.find(id);
+    }
+    editor->second->setText(record.contents);
+    editor->second->markModified();
+    if (plan.resolved) {
+        // What the buffer last knew of the disk is what the record knew:
+        // if the note changed since, :w refuses exactly as after any
+        // external change (ADR 0006), and :w! or :e! settles it.
+        DiskNote note = DiskNote::InSync;
+        switch (plan.target) {
+        case RecoveryTarget::FileChangedOnDisk:
+            note = DiskNote::ChangedOnDisk;
+            break;
+        case RecoveryTarget::FileMissing:
+            note = DiskNote::Removed;
+            break;
+        case RecoveryTarget::Scratch:
+        case RecoveryTarget::File:
+            break;
+        }
+        tracked_[id] = TrackedFile{record.baseRevision.value_or(SavedRevision{}), note};
+        std::error_code error;
+        if (std::filesystem::exists(*plan.resolved, error)) {
+            watcher_->watch(*plan.resolved);
+        }
+    }
+    showBuffer(id);
+    return id;
+}
+
+void MainWindow::applyBufferView(BufferId id, ViewMode mode, CursorSnapshot cursor,
+                                 int scrollLine) {
+    viewModes_[id] = mode;
+    if (const auto editor = editors_.find(id); editor != editors_.end()) {
+        editor->second->setCursorPosition({cursor.line, cursor.column});
+        editor->second->scrollToLine(scrollLine);
+    }
+}
+
+void MainWindow::activateBuffer(BufferId id) {
+    if (buffers_.activate(id)) {
+        showBuffer(id);
     }
 }
 
@@ -607,6 +829,7 @@ void MainWindow::registerCommands() {
                     prefixRouter_->cancelPending();
                     sidebar_->show();
                     sidebar_->focusTree();
+                    emit sessionStateChanged();
                 },
                 QStringLiteral("Leave Insert mode to move to the sidebar")});
     routedOutsideLeader_.push_back(QStringLiteral("pane.sidebar"));
@@ -622,10 +845,12 @@ void MainWindow::registerCommands() {
                         if (context.focus == FocusContext::Sidebar) {
                             runCommand(QStringLiteral("pane.editor"));
                         }
+                        emit sessionStateChanged();
                         return;
                     }
                     sidebar_->show();
                     sidebar_->focusTree();
+                    emit sessionStateChanged();
                 },
                 {}},
                {QStringLiteral("e")});
@@ -807,6 +1032,7 @@ void MainWindow::closeBuffer(BufferId id, bool discardChanges) {
     if (const auto active = buffers_.activeId(); active.has_value()) {
         showBuffer(*active);
     }
+    emit bufferResolved(id);
     statusArea_->setText(discardChanges ? QStringLiteral("Closed %1, discarding changes").arg(name)
                                         : QStringLiteral("Closed %1").arg(name));
 }
@@ -937,6 +1163,7 @@ QString MainWindow::reloadActiveBuffer(bool discardEdits) {
     trackFile(activeId, path, QByteArrayView(*bytes));
     buffers_.setModified(activeId, false);
     syncBufferStrip();
+    emit bufferResolved(activeId);
     statusArea_->setText(QStringLiteral("Reloaded %1 from disk").arg(displayName(path)));
     return {};
 }
@@ -1034,6 +1261,7 @@ EditorAdapter& MainWindow::createEditorFor(BufferId id) {
         buffers_.setModified(id, modified);
         syncBufferStrip();
         refreshEditorStatus();
+        emit sessionStateChanged();
     });
     return editor;
 }
@@ -1051,6 +1279,7 @@ void MainWindow::showBuffer(BufferId id) {
         syncBufferStrip();
         refreshEditorStatus();
         readingView_->setFocus(Qt::OtherFocusReason);
+        emit sessionStateChanged();
         return;
     }
     editorStack_->setCurrentWidget(editor->second->widget());
@@ -1059,6 +1288,7 @@ void MainWindow::showBuffer(BufferId id) {
     if (editor->second->widget() != nullptr) {
         editor->second->widget()->setFocus(Qt::OtherFocusReason);
     }
+    emit sessionStateChanged();
 }
 
 void MainWindow::toggleReadingView() {
@@ -1066,8 +1296,29 @@ void MainWindow::toggleReadingView() {
     if (!active.has_value()) {
         return;
     }
-    viewModes_[*active] = toggled(viewModeFor(*active));
+    auto* editor = activeEditor();
+    const auto lastLine = editor != nullptr ? std::max(editor->lineCount() - 1, 1) : 1;
+    auto* bar = readingView_->verticalScrollBar();
+    // Obsidian's courtesy: reading opens near where the cursor was, and
+    // writing comes back near where the reader stopped. Source lines and
+    // rendered blocks do not map one to one, so this is proportional, not exact.
+    if (viewModeFor(*active) == ViewMode::Writing) {
+        viewModes_[*active] = ViewMode::Reading;
+        showBuffer(*active);
+        if (editor != nullptr) {
+            (void)readingView_->document()->documentLayout()->documentSize();
+            const auto fraction = static_cast<double>(editor->cursorPosition().line) / lastLine;
+            bar->setValue(static_cast<int>(fraction * bar->maximum()));
+        }
+        return;
+    }
+    const auto fraction =
+        bar->maximum() > 0 ? static_cast<double>(bar->value()) / bar->maximum() : 0.0;
+    viewModes_[*active] = ViewMode::Writing;
     showBuffer(*active);
+    if (editor != nullptr && fraction > 0.0) {
+        editor->scrollToLine(static_cast<int>(fraction * lastLine));
+    }
 }
 
 ViewMode MainWindow::viewModeFor(BufferId id) const {
@@ -1350,6 +1601,7 @@ QString MainWindow::saveTo(const std::filesystem::path& requested, bool force) {
     // A note the user just wrote should be visible where they expect to find
     // it, without relaunching.
     sidebar_->noteFileCreated(*written);
+    emit bufferResolved(activeId);
     statusArea_->setText(QStringLiteral("Wrote %1").arg(displayName(*written)));
     return {};
 }

@@ -59,6 +59,26 @@ void Sidebar::focusTree() {
 
 void Sidebar::noteFileCreated(const std::filesystem::path& path) { model_->noteFileCreated(path); }
 
+std::optional<std::filesystem::path> Sidebar::selectedPath() const {
+    const auto current = tree_->currentIndex();
+    if (!current.isValid() || model_->isDirectory(current)) {
+        return std::nullopt;
+    }
+    return model_->pathForIndex(current);
+}
+
+void Sidebar::selectPath(const std::filesystem::path& path) {
+    const auto index = model_->indexForPath(path);
+    if (!index.isValid()) {
+        return;
+    }
+    for (auto parent = index.parent(); parent.isValid(); parent = parent.parent()) {
+        tree_->expand(parent);
+    }
+    tree_->setCurrentIndex(index);
+    tree_->scrollTo(index);
+}
+
 bool Sidebar::eventFilter(QObject* watched, QEvent* event) {
     if (watched == tree_ && event->type() == QEvent::KeyPress) {
         const auto& keyEvent = *static_cast<QKeyEvent*>(event);

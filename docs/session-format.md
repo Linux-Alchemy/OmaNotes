@@ -98,11 +98,20 @@ directory are refused, never followed.
 
 ### Checkpoint cadence
 
-Wired in Task 7.4. A dirty buffer is checkpointed two seconds after its last
-change, when the window loses focus, and on a clean close. A buffer that
-returns to clean (saved, or edited back to its saved text) has its record
-removed at that moment. The cadence is a ceiling on loss, not a guarantee of
-zero loss: the last two seconds before a power cut are not promised.
+A dirty buffer is checkpointed two seconds after the last change to the
+desk, when the window loses focus, and on a clean close. Every checkpoint
+also rewrites the structural snapshot, so the desk on disk is never more than
+two seconds behind. The cadence is a ceiling on loss, not a guarantee of zero
+loss: the last two seconds before a power cut are not promised.
+
+Closing the window with dirty buffers does not prompt. The text is
+checkpointed and the desk is snapshotted; the next launch restores both,
+dirty, exactly as left. Unsaved is not the same as lost.
+
+`--fresh` opens the workspace without reading the snapshot and without
+writing one at close, so the last real session survives untouched behind a
+throwaway one. Dirty buffers in a `--fresh` session are still checkpointed;
+they come back as orphans on the next normal launch.
 
 ### Retention and cleanup
 
@@ -113,10 +122,12 @@ zero loss: the last two seconds before a power cut are not promised.
 - **Restore:** a record is removed only once the restored buffer is saved or
   discarded, never merely because it was loaded. A crash during restore must
   not eat the only copy.
-- **Orphans:** after a successful restore, any record in this workspace's
-  directory that the snapshot no longer references is removed. An orphan is
-  a record whose buffer was already resolved; it holds nothing the user
-  still has.
+- **Orphans:** a record in this workspace's directory that the snapshot no
+  longer references is unsaved work whose bookkeeping was lost (a second
+  instance's close, a crash between checkpoint and snapshot). It is not
+  deleted; it is restored as a dirty buffer on the next launch and reported,
+  the way Neovim announces a swap file. Text is only ever removed by a save
+  or a discard.
 - **Other workspaces:** never touched. A workspace that has moved or been
   deleted keeps its records until the user removes
   `~/.local/state/omanotes/sessions/<id>/` by hand. Deleting unsaved work

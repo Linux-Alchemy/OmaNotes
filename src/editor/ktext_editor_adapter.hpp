@@ -25,6 +25,12 @@ class KTextEditorAdapter final : public EditorAdapter {
     void loadText(const QString& text) override;
     [[nodiscard]] bool isModified() const noexcept override;
     void markSaved() override;
+    void markModified() override;
+    [[nodiscard]] EditorPosition cursorPosition() const override;
+    void setCursorPosition(EditorPosition position) override;
+    [[nodiscard]] int firstVisibleLine() const override;
+    void scrollToLine(int line) override;
+    [[nodiscard]] int lineCount() const override;
     [[nodiscard]] EditorMode mode() const noexcept override;
     [[nodiscard]] QString modeName() const override;
 

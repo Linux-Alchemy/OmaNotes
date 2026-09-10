@@ -1,4 +1,6 @@
+#include "app/application_controller.hpp"
 #include "app/launch_request.hpp"
+#include "session/session_store.hpp"
 #include "ui/main_window.hpp"
 
 #include <QApplication>
@@ -57,7 +59,12 @@ int main(int argc, char* argv[]) {
         return 2;
     }
 
-    omanotes::MainWindow window(std::move(*launchRequest));
+    omanotes::MainWindow window(*launchRequest);
+    // The last desk comes back before the window is first shown, so the user
+    // never sees an empty window rearrange itself (docs/session-format.md).
+    omanotes::ApplicationController session(window, std::move(*launchRequest),
+                                            omanotes::SessionStore::defaultDirectory());
+    session.start();
     window.show();
 
     if (smokeTestRequested(argc, argv)) {
