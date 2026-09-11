@@ -98,6 +98,12 @@ replaceFileAtomically(const std::filesystem::path& destination, QByteArrayView c
 /// leaves the original file exactly as it was and removes the temporary.
 class AtomicFileWriter final {
   public:
+    /// `faults` is the test-only seam shared with the state stores; null in
+    /// production. It exists so the note save path's failure handling is
+    /// tested rather than trusted (threat-model finding F-19).
+    explicit AtomicFileWriter(const AtomicWriteFaults* faults = nullptr) noexcept
+        : faults_(faults) {}
+
     /// Write `contents` to `target`, which must resolve inside `root`.
     ///
     /// A symlink target is written *through*: the link itself is preserved and
@@ -106,6 +112,9 @@ class AtomicFileWriter final {
     [[nodiscard]] std::expected<std::filesystem::path, SaveError>
     write(const std::filesystem::path& target, QByteArrayView contents, const WorkspaceRoot& root,
           const WritePrecondition& precondition = {}) const;
+
+  private:
+    const AtomicWriteFaults* faults_;
 };
 
 } // namespace omanotes

@@ -55,6 +55,7 @@ class AtomicSaveTest final : public QObject {
     void refusesADirectoryTarget();
     void leavesTheOriginalIntactWhenTheWriteCannotStart();
     void refusesToReplaceAFileThatChangedSinceItWasChecked();
+    void everyInjectedFailureLeavesTheNoteIntact();
 };
 
 void AtomicSaveTest::writesANewFileAndLeavesNoTemporary() {
@@ -284,6 +285,53 @@ void AtomicSaveTest::refusesToReplaceAFileThatChangedSinceItWasChecked() {
     QVERIFY(forced.has_value());
     QCOMPARE(readFile(note), QByteArray("# Forced\n"));
     QCOMPARE(strayTemporaries(root), 0);
+}
+
+void AtomicSaveTest::everyInjectedFailureLeavesTheNoteIntact() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    const QByteArray original("# Keep me\n");
+    writeFile(note, original);
+    const auto workspace = omanotes::WorkspaceRoot::resolve(root);
+    QVERIFY(workspace.has_value());
+
+    // The same five failures the state stores are tested against, now
+    // through the note save path itself (threat-model finding F-19).
+    struct Case {
+        const char* name;
+        omanotes::AtomicWriteFaults faults;
+        omanotes::SaveErrorCode expected;
+    };
+    const Case cases[] = {
+        {"full disk from the first byte",
+         {std::size_t{0}, ENOSPC, false, false},
+         omanotes::SaveErrorCode::WriteFailed},
+        {"partial write then ENOSPC",
+         {std::size_t{3}, ENOSPC, false, false},
+         omanotes::SaveErrorCode::WriteFailed},
+        {"I/O error mid-write",
+         {std::size_t{5}, EIO, false, false},
+         omanotes::SaveErrorCode::WriteFailed},
+        {"failed fsync", {std::nullopt, ENOSPC, true, false}, omanotes::SaveErrorCode::SyncFailed},
+        {"failed rename",
+         {std::nullopt, ENOSPC, false, true},
+         omanotes::SaveErrorCode::ReplaceFailed},
+    };
+    for (const auto& scenario : cases) {
+        const omanotes::AtomicFileWriter writer(&scenario.faults);
+        const auto written = writer.write(note, QByteArrayView("# Replacement text\n"), *workspace);
+        QVERIFY2(!written.has_value(), scenario.name);
+        QVERIFY2(written.error().code == scenario.expected, scenario.name);
+        QVERIFY2(readFile(note) == original, scenario.name);
+        QVERIFY2(strayTemporaries(root) == 0, scenario.name);
+    }
+
+    // And with no faults the same write lands, so the seam is inert by default.
+    const omanotes::AtomicFileWriter writer;
+    QVERIFY(writer.write(note, QByteArrayView("# Replacement text\n"), *workspace).has_value());
+    QCOMPARE(readFile(note), QByteArray("# Replacement text\n"));
 }
 
 QTEST_MAIN(AtomicSaveTest)

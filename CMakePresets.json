@@ -13,6 +13,18 @@
       }
     },
     {
+      "name": "fuzz",
+      "displayName": "Clang libFuzzer harnesses for the parsers",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/fuzz",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_COMPILER": "/usr/bin/clang++",
+        "OMANOTES_ENABLE_SANITIZERS": "ON",
+        "OMANOTES_ENABLE_FUZZERS": "ON"
+      }
+    },
+    {
       "name": "release",
       "displayName": "Clang hardened release build",
       "generator": "Ninja",
@@ -26,6 +38,7 @@
   ],
   "buildPresets": [
     { "name": "dev", "configurePreset": "dev" },
+    { "name": "fuzz", "configurePreset": "fuzz", "targets": ["fuzzers"] },
     { "name": "release", "configurePreset": "release" }
   ],
   "testPresets": [
