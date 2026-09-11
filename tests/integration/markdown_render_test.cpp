@@ -5,6 +5,8 @@
 #include <QScrollBar>
 #include <QStackedWidget>
 #include <QTemporaryDir>
+#include <QTextBlock>
+#include <QTextFragment>
 #include <QUrl>
 #include <QtTest>
 
@@ -63,6 +65,7 @@ class MarkdownRenderTest final : public QObject {
     void refusesRemoteImagesWithoutFetching();
     void refusesTraversalAndAbsoluteImagePaths();
     void classifiesLinkSchemesPerPolicy();
+    void rendersTheHostileSchemesFixtureRefusingEveryLink();
     void refusesSymlinkEscape();
     void refusesOversizedImages();
     void survivesMalformedInput();
@@ -156,7 +159,8 @@ void MarkdownRenderTest::classifiesLinkSchemesPerPolicy() {
           "data:text/html,<script>alert('data')</script>", "vscode://payload/open",
           "ssh://evil.example/", "magnet:?xt=urn:btih:payload", "mailto:someone@example.com",
           "file:///etc/passwd", "//evil.example/x", "/etc/passwd", "../outside.md",
-          "missing-note.md", "not-a-note.txt"}) {
+          "missing-note.md", "not-a-note.txt", "omanotes-evil://do-things",
+          "java script:alert('ws')"}) {
         const auto action = classifyLink(QUrl(QString::fromUtf8(refused)), policy);
         QVERIFY2(action.kind == LinkActionKind::Refuse, refused);
         QVERIFY2(!action.reason.isEmpty(), refused);
@@ -164,6 +168,46 @@ void MarkdownRenderTest::classifiesLinkSchemesPerPolicy() {
 
     QCOMPARE(classifyLink(QUrl(QStringLiteral("#heading")), policy).kind,
              LinkActionKind::ScrollToAnchor);
+}
+
+void MarkdownRenderTest::rendersTheHostileSchemesFixtureRefusingEveryLink() {
+    // The fixture README promised this file was covered; until now only a
+    // hand-written list was (threat-model finding F-18). Render the file
+    // itself: every link but the https one is refused, and the data: image
+    // is a refusal too.
+    FixtureWorkspace workspace;
+    const auto policy = workspace.policy();
+    const auto source = readFixture(workspace.root() / "hostile-schemes.md");
+    QVERIFY(!source.isEmpty());
+    omanotes::MarkdownView view;
+    view.render(source, policy);
+    QVERIFY2(view.refusedResources().size() >= 1, "the data: image was not refused");
+
+    const auto document = view.document();
+    int links = 0;
+    int refused = 0;
+    int external = 0;
+    for (auto block = document->begin(); block != document->end(); block = block.next()) {
+        for (auto it = block.begin(); !it.atEnd(); ++it) {
+            const auto format = it.fragment().charFormat();
+            if (!format.isAnchor() || format.anchorHref().isEmpty()) {
+                continue;
+            }
+            ++links;
+            const auto action = omanotes::classifyLink(QUrl(format.anchorHref()), policy);
+            if (action.kind == omanotes::LinkActionKind::Refuse) {
+                ++refused;
+            } else if (action.kind == omanotes::LinkActionKind::OpenExternal) {
+                ++external;
+            }
+        }
+    }
+    // Eleven links are written; Qt's Markdown parser does not even produce an
+    // anchor for the whitespace game (`java script:`), and the data: link is
+    // one of the nine it does. Every anchor but the https control is refused.
+    QCOMPARE(links, 9);
+    QCOMPARE(external, 1);
+    QCOMPARE(refused, links - 1);
 }
 
 void MarkdownRenderTest::refusesSymlinkEscape() {
