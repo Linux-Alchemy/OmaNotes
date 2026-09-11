@@ -32,6 +32,10 @@ void releaseCanonicalViShortcuts(KTextEditor::View& view) {
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+B")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+F")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+R")));
+    // Kate binds Ctrl+D to Comment and Ctrl+U to Uppercase; in Vi they are
+    // half-page down and up (and, while inserting, dedent and delete-to-start).
+    releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+D")));
+    releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+U")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+V")));
     // Copy routes through the application's edit.copy command so Omarchy's
     // Super+C (delivered as Ctrl+Meta+C) can reach it; a widget-level QAction
@@ -135,12 +139,15 @@ QString KTextEditorAdapter::modeName() const { return view_->viewModeHuman(); }
 void KTextEditorAdapter::applyTheme(const ThemePalette& palette) {
     // The syntax theme supplies token colours in the right register; the
     // semantic grounds are overlaid so the editor sits in the same room as
-    // the rest of the window.
-    view_->setConfigValue(QStringLiteral("theme"), palette.dark ? QStringLiteral("Breeze Dark")
-                                                                : QStringLiteral("Breeze Light"));
+    // the rest of the window. The themes are OmaNotes' own copies of Breeze,
+    // bundled in themes/: identical but for a transparent CurrentLine, since
+    // the cursor says where you are and the bar is not wanted (Matt's call,
+    // 2026-09-10). KTextEditor exposes no other way to switch it off; the
+    // colour comes from the theme and there is no config key for it.
+    view_->setConfigValue(QStringLiteral("theme"), palette.dark ? QStringLiteral("OmaNotes Dark")
+                                                                : QStringLiteral("OmaNotes Light"));
     view_->setConfigValue(QStringLiteral("background-color"), palette.background);
     view_->setConfigValue(QStringLiteral("selection-color"), palette.selection);
-    view_->setConfigValue(QStringLiteral("current-line-color"), palette.surface);
     auto editorFont = view_->configValue(QStringLiteral("font")).value<QFont>();
     editorFont.setPointSizeF(palette.baseFontPointSize);
     view_->setConfigValue(QStringLiteral("font"), editorFont);

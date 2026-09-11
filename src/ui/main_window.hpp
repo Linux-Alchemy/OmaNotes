@@ -142,9 +142,15 @@ class MainWindow final : public QMainWindow, public SessionHost {
     /// Copy the editor's current selection to the system clipboard via the
     /// editor's own copy action.
     void copySelectionToClipboard();
-    /// Hand the editor a synthetic Ctrl+V so Vi enters visual block: the
-    /// real key now means paste, and KTextEditor's Vi mode hardcodes Ctrl+V.
+    /// Hand the editor a synthetic Ctrl+key that the event filter would
+    /// otherwise claim, so Vi sees it as its own.
+    void forwardControlKeyToVi(Qt::Key key);
+    /// Vi enters visual block on a synthetic Ctrl+V: the real key now means
+    /// paste, and KTextEditor's Vi mode hardcodes Ctrl+V.
     void enterVisualBlock();
+    /// Ctrl+D / Ctrl+U: Vi's own half page in the editor; the reading view,
+    /// which has no Vi, scrolls half its height.
+    void scrollHalfPage(int direction);
     void beginNaming();
     void cancelNaming();
     void commitNaming();
@@ -165,6 +171,17 @@ class MainWindow final : public QMainWindow, public SessionHost {
     /// through the atomic writer and nothing replaces a buffer unchecked.
     [[nodiscard]] bool interceptEditorFileCommand(QObject* watched, const QKeyEvent& event);
     QString saveActiveBufferOrReport(bool force = false);
+    /// Save every modified buffer that has a path, activating each in turn.
+    /// Returns the first failure's message, or empty. An unnamed modified
+    /// buffer fails: it needs `:w path.md` first.
+    QString saveAllModified(bool force);
+    /// `:q` and friends. With `discardChanges`, modified buffers are closed
+    /// without saving and the window closes; otherwise unsaved work brings
+    /// the quit prompt (Save / Discard / Cancel). SUPER+w never comes here:
+    /// the compositor's kill is handled by checkpoint and restore instead.
+    void quitApplication(bool discardChanges);
+    /// Close every modified buffer without saving, then the window.
+    void discardAllAndClose();
     /// Paint every region with the semantic palette: window chrome via one
     /// stylesheet, tree selection via palette groups (so the inactive
     /// selection dims), the reading view's colours, and each editor.
@@ -208,13 +225,14 @@ class MainWindow final : public QMainWindow, public SessionHost {
     MarkdownView* readingView_ = nullptr;
     std::map<BufferId, ViewMode> viewModes_;
     QMessageBox* closePrompt_ = nullptr;
-    /// True while enterVisualBlock's synthetic key is in flight, so the
+    /// True while forwardControlKeyToVi's synthetic key is in flight, so the
     /// event filter lets it through to Vi instead of re-intercepting it.
     bool forwardingKeyToVi_ = false;
     /// The application-wide focus hook; disconnected before children are
     /// destroyed, or a focus change during teardown reaches dead panes.
     QMetaObject::Connection focusConnection_;
     std::optional<BufferId> closePromptTarget_;
+    QMessageBox* quitPrompt_ = nullptr;
     std::optional<BufferId> closeAfterNaming_;
 };
 

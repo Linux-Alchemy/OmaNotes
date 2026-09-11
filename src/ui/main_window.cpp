@@ -17,6 +17,7 @@
 #include <KTextEditor/View>
 #include <QAction>
 
+#include <QAbstractItemView>
 #include <QAbstractTextDocumentLayout>
 #include <QApplication>
 #include <QByteArray>
@@ -28,6 +29,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QRegularExpression>
 #include <QScrollBar>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -126,17 +128,36 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
     namePrompt->setContentsMargins(10, 6, 10, 6);
     namePrompt->hide();
 
-    auto* stripRow = new QHBoxLayout();
+    // The strip is one band in the pane's own colour (Matt's call,
+    // 2026-09-10): tabs, the +, and the empty run after them all sit on the
+    // ground the editor sits on; the active tab is told by its text alone.
+    auto* bufferRow = new QWidget(writingArea);
+    bufferRow->setObjectName(QStringLiteral("bufferRow"));
+    bufferRow->setAttribute(Qt::WA_StyledBackground, true);
+    auto* stripRow = new QHBoxLayout(bufferRow);
     stripRow->setContentsMargins(0, 0, 0, 0);
     stripRow->setSpacing(0);
     stripRow->addWidget(buffers);
     stripRow->addWidget(newBuffer);
     stripRow->addStretch(1);
-    layout->addLayout(stripRow);
+    layout->addWidget(bufferRow);
     layout->addWidget(editors, 1);
     layout->addWidget(namePrompt);
     layout->addWidget(status);
     return writingArea;
+}
+
+/// KTextEditor reports its mode as "VI: NORMAL", "VI: VISUAL LINE" and so on.
+/// The status line drops the prefix and the shouting: "Normal", "Visual Line".
+QString humanModeName(QString modeName) {
+    static const auto viPrefix = QRegularExpression(QStringLiteral("^\\s*VI:\\s*"),
+                                                    QRegularExpression::CaseInsensitiveOption);
+    modeName.remove(viPrefix);
+    auto words = modeName.toLower().split(QLatin1Char(' '), Qt::SkipEmptyParts);
+    for (auto& word : words) {
+        word[0] = word[0].toUpper();
+    }
+    return words.join(QLatin1Char(' '));
 }
 
 } // namespace
@@ -221,11 +242,20 @@ MainWindow::MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, Q
     helpButton->setObjectName(QStringLiteral("helpButton"));
     helpButton->setAccessibleName(QStringLiteral("Show commands"));
     helpButton->setToolTip(QStringLiteral("Show commands (Space ?)"));
-    auto* statusLayout = new QHBoxLayout();
-    statusArea_->parentWidget()->layout()->removeWidget(statusArea_);
+    // Same for the status row: the mode, the ?, and the space between are
+    // one band in the pane's colour, and the ? sits flat on it.
+    auto* pane = statusArea_->parentWidget();
+    auto* paneLayout = qobject_cast<QVBoxLayout*>(pane->layout());
+    auto* statusRow = new QWidget(pane);
+    statusRow->setObjectName(QStringLiteral("statusRow"));
+    statusRow->setAttribute(Qt::WA_StyledBackground, true);
+    auto* statusLayout = new QHBoxLayout(statusRow);
+    statusLayout->setContentsMargins(0, 0, 0, 0);
+    statusLayout->setSpacing(0);
+    paneLayout->removeWidget(statusArea_);
     statusLayout->addWidget(statusArea_, 1);
     statusLayout->addWidget(helpButton);
-    qobject_cast<QVBoxLayout*>(statusArea_->parentWidget()->layout())->addLayout(statusLayout);
+    paneLayout->addWidget(statusRow);
     connect(helpButton, &QToolButton::clicked, this,
             [this] { runCommand(QStringLiteral("help.show")); });
     registerCommands();
@@ -235,7 +265,12 @@ MainWindow::MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, Q
     connect(prefixRouter_.get(), &PrefixRouter::feedbackChanged, statusArea_,
             [this](const QString& message) { statusArea_->setText(message); });
     connect(prefixRouter_.get(), &PrefixRouter::sequenceAccepted, this,
-            [this](const QString& commandId, const QString&) { runCommand(commandId); });
+            [this](const QString& commandId, const QString&) {
+                // The "Space …" feedback has served its purpose; the mode
+                // comes back, and the command may then say its own piece.
+                refreshEditorStatus();
+                runCommand(commandId);
+            });
     connect(bufferStrip_, &BufferStrip::bufferSelected, this, [this](BufferId id) {
         auto context = currentContext();
         context.targetBuffer = id;
@@ -606,14 +641,14 @@ void MainWindow::loadKeymap() {
     }
     const auto configured = Keymap::load(Keymap::configurationPath(), commands_, reserved);
     if (!configured) {
-        auto* warning = new QLabel(statusArea_->parentWidget());
+        auto* warning = new QLabel(writingArea_);
         warning->setObjectName(QStringLiteral("keymapWarning"));
         warning->setAccessibleName(QStringLiteral("Keymap configuration error"));
         warning->setTextFormat(Qt::PlainText);
         warning->setWordWrap(true);
         warning->setText(QStringLiteral("Default keys are active. %1: %2")
                              .arg(configured.error().location, configured.error().message));
-        qobject_cast<QVBoxLayout*>(statusArea_->parentWidget()->layout())->addWidget(warning);
+        qobject_cast<QVBoxLayout*>(writingArea_->layout())->addWidget(warning);
         qWarning("%s", qPrintable(warning->text()));
         return;
     }
@@ -750,6 +785,24 @@ void MainWindow::registerCommands() {
                 QStringLiteral("edit"), inNormalMode, [this](AppContext&) { enterVisualBlock(); },
                 QStringLiteral("Visual block starts from Normal mode")});
     routedOutsideLeader_.push_back(QStringLiteral("editor.visual-block"));
+    addCommand({QStringLiteral("view.half-page-down"), QStringLiteral("Half page down"),
+                QStringLiteral("view"), inNormalMode, [this](AppContext&) { scrollHalfPage(+1); },
+                QStringLiteral("Half-page scrolling starts from Normal mode")});
+    routedOutsideLeader_.push_back(QStringLiteral("view.half-page-down"));
+    addCommand({QStringLiteral("view.half-page-up"), QStringLiteral("Half page up"),
+                QStringLiteral("view"), inNormalMode, [this](AppContext&) { scrollHalfPage(-1); },
+                QStringLiteral("Half-page scrolling starts from Normal mode")});
+    routedOutsideLeader_.push_back(QStringLiteral("view.half-page-up"));
+    // Listed so the way out is discoverable, and worded as Matt asked
+    // (2026-09-10). The route is `:q`; choosing it here runs the same quit,
+    // prompt and all.
+    addCommand({QStringLiteral("app.quit"),
+                QStringLiteral("IYKYK"),
+                QStringLiteral("app"),
+                always,
+                [this](AppContext&) { quitApplication(false); },
+                {}});
+    routedOutsideLeader_.push_back(QStringLiteral("app.quit"));
 
     addCommand({QStringLiteral("file.open"), QStringLiteral("Open file"), QStringLiteral("file"),
                 [](const AppContext& context) { return context.targetPath.has_value(); },
@@ -780,7 +833,7 @@ void MainWindow::registerCommands() {
                {QStringLiteral("b d")});
     routedOutsideLeader_.push_back(QStringLiteral("buffer.close"));
     addCommand({QStringLiteral("buffer.close.discard"),
-                QStringLiteral("Close buffer, discarding changes"),
+                QStringLiteral("Close buffer, discard"),
                 QStringLiteral("buffer"),
                 always,
                 [this](AppContext& context) {
@@ -887,7 +940,11 @@ void MainWindow::registerCommands() {
                 always,
                 [this](AppContext& context) {
                     helpContext_ = context;
-                    helpOverlay_->showCommands(commands_, context, keymap_.shortcutLabels());
+                    // `:q` is a Vi command line verb, not a key sequence, so
+                    // the keymap has no label for it; the help shows it anyway.
+                    auto routes = keymap_.shortcutLabels();
+                    routes.emplace(QStringLiteral("app.quit"), QStringLiteral(":q"));
+                    helpOverlay_->showCommands(commands_, context, routes);
                 },
                 {}},
                {QStringLiteral("?")});
@@ -1086,13 +1143,23 @@ bool MainWindow::interceptEditorFileCommand(QObject* watched, const QKeyEvent& e
         QStringLiteral("xa"),     QStringLiteral("xall"), QStringLiteral("exit"),
         QStringLiteral("saveas"), QStringLiteral("sav"),  QStringLiteral("update"),
         QStringLiteral("up")};
+    // Quitting too: Vi mode's own `:q` asks a host application this app never
+    // registers, so it would do nothing at all. `:q` is the way out of
+    // OmaNotes (Matt's call, 2026-09-10), with the save prompt when work is
+    // unsaved; `:q!` discards. Buffers here are Vim buffers, not windows, so
+    // `:q` and `:qa` mean the same thing.
+    static const QStringList kQuitVerbs = {QStringLiteral("q"),    QStringLiteral("q!"),
+                                           QStringLiteral("quit"), QStringLiteral("quit!"),
+                                           QStringLiteral("qa"),   QStringLiteral("qa!"),
+                                           QStringLiteral("qall"), QStringLiteral("qall!")};
     // Reloading goes the same way: the editor's own `:e` would replace the
     // buffer without consulting the revision the application is tracking.
     static const QStringList kEditVerbs = {QStringLiteral("e"), QStringLiteral("e!"),
                                            QStringLiteral("edit"), QStringLiteral("edit!")};
     const auto isWrite = kWriteVerbs.contains(verb);
     const auto isEdit = kEditVerbs.contains(verb);
-    if (!isWrite && !isEdit) {
+    const auto isQuit = kQuitVerbs.contains(verb);
+    if (!isWrite && !isEdit && !isQuit) {
         return false;
     }
 
@@ -1116,6 +1183,25 @@ bool MainWindow::interceptEditorFileCommand(QObject* watched, const QKeyEvent& e
     } else if (bare == QStringLiteral("w") || bare == QStringLiteral("write")) {
         failure = argument.isEmpty() ? saveActiveBufferOrReport(force)
                                      : saveTo(std::filesystem::path(argument.toStdString()), force);
+    } else if (isQuit) {
+        quitApplication(force);
+    } else if (bare == QStringLiteral("wq") || bare == QStringLiteral("x") ||
+               bare == QStringLiteral("exit")) {
+        // Vim's :wq writes this buffer and quits; other unsaved buffers still
+        // get their say through the prompt. :x is the same here: the only
+        // difference in Vim is skipping an unneeded write, which the saver
+        // already does.
+        failure = argument.isEmpty() ? saveActiveBufferOrReport(force)
+                                     : saveTo(std::filesystem::path(argument.toStdString()), force);
+        if (failure.isEmpty()) {
+            quitApplication(false);
+        }
+    } else if (bare == QStringLiteral("wqa") || bare == QStringLiteral("xa") ||
+               bare == QStringLiteral("xall")) {
+        failure = saveAllModified(force);
+        if (failure.isEmpty()) {
+            quitApplication(false);
+        }
     } else {
         failure = QStringLiteral("%1 is not available yet; use :w [path]").arg(verb);
     }
@@ -1123,6 +1209,101 @@ bool MainWindow::interceptEditorFileCommand(QObject* watched, const QKeyEvent& e
         statusArea_->setText(failure);
     }
     return true;
+}
+
+QString MainWindow::saveAllModified(bool force) {
+    for (const auto& buffer : buffers_.buffers()) {
+        if (!buffer.modified) {
+            continue;
+        }
+        if (buffers_.activate(buffer.id)) {
+            showBuffer(buffer.id);
+        }
+        if (!buffer.path.has_value()) {
+            return QStringLiteral("%1 has no file name; :w path.md names it")
+                .arg(buffer.displayName);
+        }
+        if (const auto failure = saveTo({}, force); !failure.isEmpty()) {
+            return failure;
+        }
+    }
+    return {};
+}
+
+void MainWindow::discardAllAndClose() {
+    std::vector<BufferId> modified;
+    for (const auto& buffer : buffers_.buffers()) {
+        if (buffer.modified) {
+            modified.push_back(buffer.id);
+        }
+    }
+    // Closing with discard drops each buffer's recovery record, so the
+    // decision sticks (docs/session-format.md, "Buffer discarded").
+    for (const auto id : modified) {
+        closeBuffer(id, true);
+    }
+    close();
+}
+
+void MainWindow::quitApplication(bool discardChanges) {
+    if (discardChanges) {
+        discardAllAndClose();
+        return;
+    }
+    QStringList unsaved;
+    for (const auto& buffer : buffers_.buffers()) {
+        if (buffer.modified) {
+            unsaved.append(buffer.displayName);
+        }
+    }
+    if (unsaved.isEmpty()) {
+        close();
+        return;
+    }
+    if (quitPrompt_ == nullptr) {
+        quitPrompt_ =
+            new QMessageBox(QMessageBox::Question, QString{}, QString{},
+                            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
+        quitPrompt_->setObjectName(QStringLiteral("quitPrompt"));
+        quitPrompt_->setDefaultButton(QMessageBox::Save);
+        for (auto* button : quitPrompt_->buttons()) {
+            button->setIcon(QIcon());
+        }
+        connect(quitPrompt_, &QMessageBox::finished, this, [this](int result) {
+            if (result == QMessageBox::Discard) {
+                discardAllAndClose();
+                return;
+            }
+            // Staying means back to the note, not to a dismissed dialog.
+            const auto backToEditor = [this] {
+                activateWindow();
+                if (auto* editor = activeEditor();
+                    editor != nullptr && editor->widget() != nullptr) {
+                    editor->widget()->setFocus(Qt::OtherFocusReason);
+                }
+            };
+            if (result != QMessageBox::Save) {
+                backToEditor();
+                return;
+            }
+            if (const auto failure = saveAllModified(false); !failure.isEmpty()) {
+                statusArea_->setText(failure);
+                backToEditor();
+                return;
+            }
+            close();
+        });
+    }
+    quitPrompt_->setWindowTitle(QStringLiteral("Unsaved changes"));
+    quitPrompt_->setText(unsaved.size() == 1
+                             ? QStringLiteral("%1 has unsaved changes.").arg(unsaved.first())
+                             : QStringLiteral("%1 buffers have unsaved changes: %2")
+                                   .arg(unsaved.size())
+                                   .arg(unsaved.join(QStringLiteral(", "))));
+    quitPrompt_->setInformativeText(
+        QStringLiteral("Save writes them inside the workspace and quits; Discard quits without "
+                       "saving; Cancel stays."));
+    quitPrompt_->open();
 }
 
 QString MainWindow::saveActiveBufferOrReport(bool force) {
@@ -1435,7 +1616,7 @@ void MainWindow::copySelectionToClipboard() {
     statusArea_->setText(QStringLiteral("Nothing is selected to copy"));
 }
 
-void MainWindow::enterVisualBlock() {
+void MainWindow::forwardControlKeyToVi(Qt::Key key) {
     auto* editor = activeEditor();
     if (editor == nullptr || editor->widget() == nullptr) {
         return;
@@ -1445,11 +1626,22 @@ void MainWindow::enterVisualBlock() {
         target = editor->widget();
     }
     forwardingKeyToVi_ = true;
-    QKeyEvent press(QEvent::KeyPress, Qt::Key_V, Qt::ControlModifier);
+    QKeyEvent press(QEvent::KeyPress, key, Qt::ControlModifier);
     QApplication::sendEvent(target, &press);
-    QKeyEvent release(QEvent::KeyRelease, Qt::Key_V, Qt::ControlModifier);
+    QKeyEvent release(QEvent::KeyRelease, key, Qt::ControlModifier);
     QApplication::sendEvent(target, &release);
     forwardingKeyToVi_ = false;
+}
+
+void MainWindow::enterVisualBlock() { forwardControlKeyToVi(Qt::Key_V); }
+
+void MainWindow::scrollHalfPage(int direction) {
+    if (editorStack_->currentWidget() == readingView_) {
+        auto* bar = readingView_->verticalScrollBar();
+        bar->setValue(bar->value() + direction * readingView_->viewport()->height() / 2);
+        return;
+    }
+    forwardControlKeyToVi(direction > 0 ? Qt::Key_D : Qt::Key_U);
 }
 
 void MainWindow::saveActiveBuffer() {
@@ -1613,11 +1805,8 @@ void MainWindow::refreshEditorStatus() {
     }
 
     const auto active = buffers_.activeId();
-    const auto* state = active.has_value() ? buffers_.find(*active) : nullptr;
-    const auto name = state != nullptr ? state->displayName : scratchDisplayName();
     const auto reading = active.has_value() && viewModeFor(*active) == ViewMode::Reading;
-    const auto modeName = reading ? QStringLiteral("READING") : editor->modeName().toUpper();
-    const auto modifiedMarker = editor->isModified() ? QStringLiteral(" [+]") : QString{};
+    const auto modeName = reading ? QStringLiteral("Reading") : humanModeName(editor->modeName());
     auto diskMarker = QString{};
     if (const auto tracked = active.has_value() ? tracked_.find(*active) : tracked_.end();
         tracked != tracked_.end()) {
@@ -1632,51 +1821,76 @@ void MainWindow::refreshEditorStatus() {
             break;
         }
     }
-    statusArea_->setText(
-        QStringLiteral("%1    %2%3%4").arg(modeName, name, modifiedMarker, diskMarker));
+    statusArea_->setText(QStringLiteral("%1%2").arg(modeName, diskMarker));
 }
 
 void MainWindow::applyTheme(const ThemePalette& palette) {
     const auto name = [](const QColor& colour) { return colour.name(QColor::HexRgb); };
-    // Every pane wears a permanent 2px top border so the accent mark on the
-    // focused one never shifts the layout, only the colour.
+    // Where you are is told by what is there, not by a mark on the frame
+    // (Matt's call, 2026-09-10): the sidebar's selected row is painted only
+    // while the sidebar has focus, and the editor has its cursor. The
+    // paneActive property is the window's own per-pane focus flag; Qt's
+    // :active pseudo-state follows the whole window, not the pane.
     setStyleSheet(QStringLiteral(R"(
-* { font-family: monospace; font-size: %11pt; }
+* { font-family: monospace; font-size: %9pt; }
+QScrollBar:vertical { width: 0px; }
+QScrollBar:horizontal { height: 0px; }
 QMainWindow#mainWindow { background-color: %1; }
 QSplitter#workspaceSplitter::handle { background-color: %2; }
-QFrame#sidebar { background-color: %3; border: none; border-top: 2px solid %3; }
-QFrame#sidebar[paneActive="true"] { border-top: 2px solid %4; }
-QFrame#sidebar QTreeView { background-color: %3; color: %5; border: none; }
-QFrame#sidebar QTreeView::item:selected:active { background-color: %6; color: %9; }
-QFrame#sidebar QTreeView::item:selected:!active { background-color: %8; color: %10; }
+QFrame#sidebar { background-color: %3; border: none; }
+QFrame#sidebar QTreeView { background-color: %3; color: %5; border: none; outline: none; }
+QFrame#sidebar QTreeView::item:selected { background-color: %3; color: %5; }
+QFrame#sidebar[paneActive="true"] QTreeView::item:selected { background-color: %6; color: %8; }
 QLabel#sidebarHeading { color: %7; }
-QTextBrowser#readingView { background-color: %1; border: none; font-size: %12pt; }
-QWidget#writingArea { background-color: %1; border-top: 2px solid %1; }
-QWidget#writingArea[paneActive="true"] { border-top: 2px solid %4; }
-QLabel#statusArea { background-color: %3; color: %5; }
-QLineEdit#namePrompt { background-color: %3; color: %5; selection-background-color: %6; selection-color: %9; }
-QTabBar#bufferStrip { background-color: %3; }
-QTabBar#bufferStrip::tab { background-color: %3; color: %7; padding: 5px 12px; border: none; }
+QTextBrowser#readingView { background-color: %1; border: none; font-size: %10pt; }
+QWidget#writingArea { background-color: %1; }
+QWidget#statusRow { background-color: %1; }
+QLabel#statusArea { background-color: %1; color: %5; }
+QLineEdit#namePrompt { background-color: %3; color: %5; selection-background-color: %6; selection-color: %8; }
+QWidget#bufferRow { background-color: %1; }
+QTabBar#bufferStrip { background-color: %1; }
+QTabBar#bufferStrip::tab { background-color: %1; color: %7; padding: 5px 12px; border: none; }
 QTabBar#bufferStrip::tab:selected { background-color: %1; color: %5; }
-QToolButton#newBufferButton { background-color: %3; color: %7; border: none; padding: 2px 8px; }
+QToolButton#newBufferButton { background-color: %1; color: %7; border: none; padding: 2px 8px; }
 QToolButton#tabCloseButton { background: transparent; color: %7; border: none; padding: 0px 2px; }
 QToolButton#tabCloseButton:hover { color: %4; }
+QToolButton#helpButton { background: transparent; color: %7; border: none; padding: 0px 6px; }
+QToolButton#helpButton:hover { color: %4; }
 QDialog#helpOverlay, QDialog#searchPalette, QMessageBox { background-color: %1; color: %5; }
 QDialog#helpOverlay QLabel, QDialog#searchPalette QLabel, QMessageBox QLabel { color: %5; }
 QTreeWidget#helpCommands, QListWidget#searchResults, QPlainTextEdit#searchPreview { background-color: %3; color: %5; border: none; }
-QTreeWidget#helpCommands::item:selected, QListWidget#searchResults::item:selected { background-color: %6; color: %9; }
-QLineEdit#searchQuery { background-color: %3; color: %5; border: 1px solid %2; padding: 4px 6px; selection-background-color: %6; selection-color: %9; }
+QTreeWidget#helpCommands::item:selected, QListWidget#searchResults::item:selected { background-color: %6; color: %8; }
+QTreeWidget#helpCommands QHeaderView { background-color: %3; border: none; }
+QTreeWidget#helpCommands QHeaderView::section { background-color: %3; color: %5; border: none; padding: 4px 6px; }
+QLineEdit#searchQuery { background-color: %3; color: %5; border: 1px solid %2; padding: 4px 6px; selection-background-color: %6; selection-color: %8; }
 QDialog QPushButton { background-color: %3; color: %5; border: 1px solid %2; padding: 4px 14px; }
 QDialog QPushButton:default { border: 1px solid %4; }
 QDialog QPushButton:hover { background-color: %2; }
+QLineEdit#commandtext { background-color: %1; color: %5; border: none; selection-background-color: %6; selection-color: %8; }
+QLabel#bartypeindicator, QLabel#commandresponsemessage, QLabel#waitingforregisterindicator { background-color: %1; color: %7; }
 )")
                       .arg(name(palette.background), name(palette.border), name(palette.surface),
                            name(palette.accent), name(palette.text), name(palette.selection),
-                           name(palette.mutedText), name(palette.inactiveSelection),
-                           name(palette.selectedText), name(palette.inactiveSelectedText),
+                           name(palette.mutedText), name(palette.selectedText),
                            QString::number(palette.baseFontPointSize),
                            QString::number(palette.baseFontPointSize + 1.0)));
     writingArea_->setAttribute(Qt::WA_StyledBackground, true);
+    // Vi's `:` command line is a child of the editor and takes the rules
+    // above, but its completion drop-down is a QCompleter popup with no
+    // parent at all, so no window stylesheet can reach it. Only an
+    // application-wide rule does; it is kept to that one widget's class,
+    // and the window's own id rules still win where they apply.
+    qApp->setStyleSheet(
+        QStringLiteral(
+            "QListView { background-color: %1; color: %2; border: 1px solid %3; outline: none; "
+            "font-family: monospace; font-size: %6pt; }\n"
+            "QListView::item:selected { background-color: %4; color: %5; }")
+            .arg(name(palette.surface), name(palette.text), name(palette.border),
+                 name(palette.selection), name(palette.selectedText),
+                 QString::number(palette.baseFontPointSize)));
+    // No scrollbars anywhere (Matt's call, 2026-09-10): the wheel, the keys
+    // and the trackpad still scroll; the bars are given zero size rather
+    // than a policy because KTextEditor owns its own and offers no switch.
 
     // Grounds and the tree's selected row live in the stylesheet above: with
     // a stylesheet active, Qt ignores QPalette for widget backgrounds and
@@ -1729,6 +1943,13 @@ void MainWindow::markActivePane() {
         pane->setProperty("paneActive", active);
         pane->style()->unpolish(pane);
         pane->style()->polish(pane);
+        // Rules on descendants keyed to the pane's property are re-evaluated
+        // only when those descendants are polished too.
+        for (auto* view : pane->findChildren<QAbstractItemView*>()) {
+            view->style()->unpolish(view);
+            view->style()->polish(view);
+            view->viewport()->update();
+        }
     };
     mark(sidebar_);
     mark(writingArea_);

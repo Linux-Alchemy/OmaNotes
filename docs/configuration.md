@@ -51,6 +51,8 @@ New combinations use `Ctrl+Alt+letter/digit` or
 | `edit.paste` | `Ctrl+V` (any mode; identical to Omarchy's Super+V) | — |
 | `edit.copy` | `Ctrl+C` (acts only over a selection) | — |
 | `editor.visual-block` | `Ctrl+Q` (Normal mode; Vi's visual block) | — |
+| `view.half-page-down` | `Ctrl+D` (Normal mode and the reading view; Vi's half page) | — |
+| `view.half-page-up` | `Ctrl+U` (Normal mode and the reading view; Vi's half page) | — |
 | `pane.sidebar` | `Ctrl+H` | — |
 | `pane.editor` | `Ctrl+L` in the sidebar | — |
 | `buffer.next` | `Shift+L` | `Shift+H` |
@@ -85,6 +87,8 @@ combinations reach Omanotes. Their configuration is not changed by this file.
 | `search.files` | Find Markdown files |
 | `search.text` | Search saved Markdown text |
 | `help.show` | Show contextual commands |
+| `app.quit` | Quit, asking about unsaved work; the route is `:q` (listed in help as "IYKYK") |
+| `view.half-page-down`, `view.half-page-up` | Scroll half a screen; Vi's `Ctrl+D`/`Ctrl+U`, also in the reading view |
 | `view.reading` | Reserved; disabled until Phase 6 |
 
 The registry's `file.open` and `buffer.show` require targets supplied by mouse

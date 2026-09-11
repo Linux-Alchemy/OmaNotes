@@ -30,6 +30,8 @@ class Keymap final {
     [[nodiscard]] static QString configurationPath();
     [[nodiscard]] QKeySequence sequenceFor(QStringView commandId) const;
     [[nodiscard]] QString commandFor(const QKeySequence& sequence) const;
+    /// Command id to the shortcut as the help shows it: `Ctrl+s` for the
+    /// unshifted key, `Shift+L` and `Ctrl+Shift+S` when Shift is pressed.
     [[nodiscard]] std::map<QString, QString> shortcutLabels() const;
     [[nodiscard]] std::expected<void, KeymapError> applyTo(CommandRegistry& commands) const;
 

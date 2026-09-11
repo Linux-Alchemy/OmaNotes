@@ -51,6 +51,7 @@ class KeymapTest final : public QObject {
     void refusesBadMappings();
     void refusesEditorActionCollisions();
     void loadsMissingAndMalformedFilesSafely();
+    void labelsShowTheUnshiftedLetterInLowerCase();
 };
 
 void KeymapTest::partialOverridesKeepDefaultsAndSupportSwaps() {
@@ -158,6 +159,23 @@ void KeymapTest::loadsMissingAndMalformedFilesSafely() {
     writeFile(path, "{}");
     QVERIFY(omanotes::Keymap::load(path, commands).has_value());
     QVERIFY(!omanotes::Keymap::load(temporary.path(), commands).has_value());
+}
+
+void KeymapTest::labelsShowTheUnshiftedLetterInLowerCase() {
+    auto commands = registry();
+    const auto keymap = omanotes::Keymap::fromConfig(
+        config(R"({"shortcuts":{"file.save":"Ctrl+Alt+Shift+S","search.files":"Ctrl+Alt+P"}})"),
+        commands);
+    QVERIFY(keymap.has_value());
+    const auto labels = keymap->shortcutLabels();
+    // Ctrl+s is the unshifted key; a capital would read as Ctrl+Shift+S.
+    QCOMPARE(labels.at(QStringLiteral("edit.copy")), QStringLiteral("Ctrl+c"));
+    QCOMPARE(labels.at(QStringLiteral("pane.sidebar")), QStringLiteral("Ctrl+h"));
+    QCOMPARE(labels.at(QStringLiteral("search.files")), QStringLiteral("Ctrl+Alt+p"));
+    // Shift really pressed keeps its capital.
+    QCOMPARE(labels.at(QStringLiteral("file.save")), QStringLiteral("Ctrl+Alt+Shift+S"));
+    QCOMPARE(labels.at(QStringLiteral("buffer.next")), QStringLiteral("Shift+L"));
+    QCOMPARE(labels.at(QStringLiteral("buffer.previous")), QStringLiteral("Shift+H"));
 }
 
 QTEST_MAIN(KeymapTest)

@@ -115,7 +115,7 @@ parseBufferRecovery(const QByteArray& bytes);
 /// How a restored buffer should come back. Every case is restored dirty;
 /// the difference is what saving it may do (ADR 0006).
 enum class RecoveryTarget : std::uint8_t {
-    /// No note: `[No Name]`, saving needs an explicit name.
+    /// No note: `Untitled`, saving needs an explicit name.
     Scratch,
     /// The note is as the checkpoint left it: `:w` writes as usual.
     File,

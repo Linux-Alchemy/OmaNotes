@@ -23,7 +23,7 @@ struct BufferState {
 };
 
 /// Label shown for a buffer that has no file on disk yet.
-inline QString scratchDisplayName() { return QStringLiteral("[No Name]"); }
+inline QString scratchDisplayName() { return QStringLiteral("Untitled"); }
 
 } // namespace omanotes
 

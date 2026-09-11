@@ -24,6 +24,7 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/app/prefix_router.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/editor_adapter.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.cpp"
+    "${CMAKE_SOURCE_DIR}/src/editor/themes/themes.qrc"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/save_command.cpp"
     "${CMAKE_SOURCE_DIR}/src/editor/save_command.hpp"
@@ -129,6 +130,7 @@ add_executable(
     unit/ktext_editor_adapter_test.cpp
     "${CMAKE_SOURCE_DIR}/src/editor/editor_adapter.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.cpp"
+    "${CMAKE_SOURCE_DIR}/src/editor/themes/themes.qrc"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
 )
 
@@ -217,6 +219,7 @@ add_executable(
     integration/vim_behaviour_test.cpp
     "${CMAKE_SOURCE_DIR}/src/editor/editor_adapter.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.cpp"
+    "${CMAKE_SOURCE_DIR}/src/editor/themes/themes.qrc"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
 )
 
@@ -415,6 +418,7 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/app/prefix_router.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/editor_adapter.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.cpp"
+    "${CMAKE_SOURCE_DIR}/src/editor/themes/themes.qrc"
     "${CMAKE_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
     "${CMAKE_SOURCE_DIR}/src/editor/save_command.cpp"
     "${CMAKE_SOURCE_DIR}/src/editor/save_command.hpp"

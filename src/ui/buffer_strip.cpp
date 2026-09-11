@@ -58,10 +58,10 @@ void BufferStrip::syncWith(const std::vector<BufferState>& buffers,
     for (std::size_t index = 0; index < buffers.size(); ++index) {
         const auto& buffer = buffers[index];
         const auto tab = static_cast<int>(index);
-        const auto label =
-            buffer.modified ? QStringLiteral("%1 [+]").arg(buffer.displayName) : buffer.displayName;
-        if (tabText(tab) != label) {
-            setTabText(tab, label);
+        // Unsaved work is not marked on the tab: the close prompt and the
+        // recovery record carry that state (Matt's call, 2026-09-10).
+        if (tabText(tab) != buffer.displayName) {
+            setTabText(tab, buffer.displayName);
         }
         setTabData(tab, QVariant::fromValue(buffer.id));
         setTabToolTip(tab, buffer.path.has_value() ? QString::fromStdString(buffer.path->string())

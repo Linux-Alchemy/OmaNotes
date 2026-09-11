@@ -19,6 +19,7 @@ add_executable(
     editor/editor_adapter.hpp
     editor/ktext_editor_adapter.cpp
     editor/ktext_editor_adapter.hpp
+    editor/themes/themes.qrc
     editor/save_command.cpp
     editor/save_command.hpp
     persistence/atomic_file_writer.cpp
