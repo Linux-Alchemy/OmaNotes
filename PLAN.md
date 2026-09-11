@@ -1163,14 +1163,13 @@ Decision required: approve / request changes / stop and redesign
   code or tests changed. Six assets, seven actors (the primary adversary is a writer inside the
   workspace, per the 2026-09-07 note), seven trust boundaries, five structural facts the model
   rests on (the editor never opens a file itself; one writer; nothing in the workspace is ever
-  deleted; no process or socket; canonical component-wise containment), and 46 threat rows in
+  deleted; no process or socket; canonical component-wise containment), and 47 threat rows in
   twelve areas, each with the mitigating code and the proving test by `file:line`, or a plain
   statement that neither exists. Two experiments recorded: `kate:` modelines are inert on the
   adapter's load path (seven variables unmoved through load, set, highlighting change, and
   modify-and-save; throwaway test, reverted), and KTextEditor persists Vi registers and macros
   to `~/.config/katevirc`. Twenty-eight findings for 8.1.3, one Blocking: the open, reload,
   and conflict-hash paths read by name after validation, follow symlinks, and have no size
-  cap, reachable with no user action through the watcher. Eight need Matt's ruling before code
+  cap, reachable with no user action through the watcher. Seven need Matt's ruling before code
   moves (katevirc, two-instance record adoption, CI, dangerous roots, read-only notes,
-  dependency policy, record retention, clipboard HTML). Awaiting Matt's gate on the document
-  before 8.1.2.
+  dependency policy, record retention). Awaiting Matt's gate on the document before 8.1.2.
