@@ -32,6 +32,10 @@ void releaseCanonicalViShortcuts(KTextEditor::View& view) {
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+B")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+F")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+R")));
+    // Kate binds Ctrl+D to Comment and Ctrl+U to Uppercase; in Vi they are
+    // half-page down and up (and, while inserting, dedent and delete-to-start).
+    releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+D")));
+    releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+U")));
     releaseShortcutToVi(view, QKeySequence(QStringLiteral("Ctrl+V")));
     // Copy routes through the application's edit.copy command so Omarchy's
     // Super+C (delivered as Ctrl+Meta+C) can reach it; a widget-level QAction

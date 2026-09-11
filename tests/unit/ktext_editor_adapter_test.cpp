@@ -55,6 +55,7 @@ void KTextEditorAdapterTest::configuresMarkdownWritingView() {
     const auto releasedSequences = {
         QKeySequence(QStringLiteral("Ctrl+H")),      QKeySequence(QStringLiteral("Ctrl+B")),
         QKeySequence(QStringLiteral("Ctrl+F")),      QKeySequence(QStringLiteral("Ctrl+R")),
+        QKeySequence(QStringLiteral("Ctrl+D")),      QKeySequence(QStringLiteral("Ctrl+U")),
         QKeySequence(QStringLiteral("Ctrl+V")),      QKeySequence(QStringLiteral("Ctrl+S")),
         QKeySequence(QStringLiteral("Ctrl+Shift+S"))};
     for (const auto& sequence : releasedSequences) {

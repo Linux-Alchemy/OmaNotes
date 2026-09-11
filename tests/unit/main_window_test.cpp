@@ -29,6 +29,7 @@
 #include <QtTest>
 
 #include <filesystem>
+#include <map>
 #include <utility>
 
 namespace {
@@ -180,6 +181,7 @@ class MainWindowTest final : public QObject {
     void leaderOverridesWinOverDirectShiftKeys();
     void closesCleanly();
     void scrollbarsAreNeverShown();
+    void halfPageKeysScrollWritingAndReading();
 };
 
 void MainWindowTest::hasRequiredRegions() {
@@ -1091,10 +1093,10 @@ void MainWindowTest::everyCommandHasOneImplementationAndARoute() {
          {"file.save", "file.open", "buffer.new", "buffer.close", "buffer.close.discard",
           "buffer.next", "buffer.previous", "buffer.show", "pane.sidebar", "pane.editor",
           "search.files", "search.text", "help.show", "view.reading", "edit.paste", "edit.copy",
-          "editor.visual-block"}) {
+          "editor.visual-block", "view.half-page-down", "view.half-page-up"}) {
         QVERIFY2(commands.find(QString::fromLatin1(id)) != nullptr, id);
     }
-    QCOMPARE(commands.commands().size(), std::size_t{18});
+    QCOMPARE(commands.commands().size(), std::size_t{20});
 }
 
 void MainWindowTest::leaderSequencesRunRegisteredCommands() {
@@ -1532,6 +1534,79 @@ void MainWindowTest::scrollbarsAreNeverShown() {
                       Qt::NoScrollPhase, false);
     QApplication::sendEvent(reading->viewport(), &wheel);
     QTRY_VERIFY(reading->verticalScrollBar()->value() > before);
+}
+
+void MainWindowTest::halfPageKeysScrollWritingAndReading() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "long.md";
+    QByteArray body("# Long\n\n");
+    for (int line = 0; line < 400; ++line) {
+        body += "a line of body text\n";
+    }
+    writeFile(note, body);
+    omanotes::MainWindow window({root, note, false});
+    window.resize(600, 300);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    auto* editor = activeEditor(window);
+    QVERIFY(editor != nullptr);
+    QTRY_VERIFY(editor->document()->lines() > 300);
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QCOMPARE(editor->cursorPosition(), KTextEditor::Cursor(0, 0));
+
+    // Normal mode: Ctrl+D and Ctrl+U are Vi's half page, not Kate's Comment
+    // and Uppercase, so the cursor moves and the text does not.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_D, Qt::ControlModifier);
+    QTRY_VERIFY(editor->cursorPosition().line() > 0);
+    const auto afterDown = editor->cursorPosition().line();
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_D, Qt::ControlModifier);
+    QTRY_VERIFY(editor->cursorPosition().line() > afterDown);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_U, Qt::ControlModifier);
+    QTRY_COMPARE(editor->cursorPosition().line(), afterDown);
+    QCOMPARE(editor->document()->text(), QString::fromUtf8(body));
+    QVERIFY(!editor->document()->isModified());
+
+    // Insert mode keeps Vi's own meaning (dedent; nothing to dedent here)
+    // rather than commenting the line.
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("i"));
+    QTRY_COMPARE(editor->viewMode(), KTextEditor::View::ViModeInsert);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_D, Qt::ControlModifier);
+    QTest::qWait(50);
+    QCOMPARE(editor->document()->text(), QString::fromUtf8(body));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QTRY_COMPARE(editor->viewMode(), KTextEditor::View::ViModeNormal);
+
+    // The reading view has no Vi; the same keys scroll it half a screen.
+    auto* reading = window.findChild<QTextBrowser*>(QStringLiteral("readingView"));
+    QVERIFY(reading != nullptr);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("m"));
+    QTRY_VERIFY(reading->isVisible());
+    QTRY_VERIFY(reading->verticalScrollBar()->maximum() > 0);
+    const auto top = reading->verticalScrollBar()->value();
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_D, Qt::ControlModifier);
+    QTRY_VERIFY(reading->verticalScrollBar()->value() > top);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_U, Qt::ControlModifier);
+    QTRY_COMPARE(reading->verticalScrollBar()->value(), top);
+
+    // Both are in the help with their keys.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("?"));
+    auto* help = window.findChild<QDialog*>(QStringLiteral("helpOverlay"));
+    QTRY_VERIFY(help->isVisible());
+    auto* commands = help->findChild<QTreeWidget*>(QStringLiteral("helpCommands"));
+    std::map<QString, QString> keysById;
+    for (int row = 0; row < commands->topLevelItemCount(); ++row) {
+        auto* item = commands->topLevelItem(row);
+        keysById[item->data(0, Qt::UserRole).toString()] = item->text(2);
+    }
+    QCOMPARE(keysById[QStringLiteral("view.half-page-down")], QStringLiteral("Ctrl+D"));
+    QCOMPARE(keysById[QStringLiteral("view.half-page-up")], QStringLiteral("Ctrl+U"));
+    QTest::keyClick(commands, Qt::Key_Escape);
+    QTRY_VERIFY(!help->isVisible());
 }
 
 void MainWindowTest::readingViewTogglesAndPreservesState() {

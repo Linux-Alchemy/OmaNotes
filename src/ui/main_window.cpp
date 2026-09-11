@@ -764,6 +764,14 @@ void MainWindow::registerCommands() {
                 QStringLiteral("edit"), inNormalMode, [this](AppContext&) { enterVisualBlock(); },
                 QStringLiteral("Visual block starts from Normal mode")});
     routedOutsideLeader_.push_back(QStringLiteral("editor.visual-block"));
+    addCommand({QStringLiteral("view.half-page-down"), QStringLiteral("Half page down"),
+                QStringLiteral("view"), inNormalMode, [this](AppContext&) { scrollHalfPage(+1); },
+                QStringLiteral("Half-page scrolling starts from Normal mode")});
+    routedOutsideLeader_.push_back(QStringLiteral("view.half-page-down"));
+    addCommand({QStringLiteral("view.half-page-up"), QStringLiteral("Half page up"),
+                QStringLiteral("view"), inNormalMode, [this](AppContext&) { scrollHalfPage(-1); },
+                QStringLiteral("Half-page scrolling starts from Normal mode")});
+    routedOutsideLeader_.push_back(QStringLiteral("view.half-page-up"));
 
     addCommand({QStringLiteral("file.open"), QStringLiteral("Open file"), QStringLiteral("file"),
                 [](const AppContext& context) { return context.targetPath.has_value(); },
@@ -1449,7 +1457,7 @@ void MainWindow::copySelectionToClipboard() {
     statusArea_->setText(QStringLiteral("Nothing is selected to copy"));
 }
 
-void MainWindow::enterVisualBlock() {
+void MainWindow::forwardControlKeyToVi(Qt::Key key) {
     auto* editor = activeEditor();
     if (editor == nullptr || editor->widget() == nullptr) {
         return;
@@ -1459,11 +1467,22 @@ void MainWindow::enterVisualBlock() {
         target = editor->widget();
     }
     forwardingKeyToVi_ = true;
-    QKeyEvent press(QEvent::KeyPress, Qt::Key_V, Qt::ControlModifier);
+    QKeyEvent press(QEvent::KeyPress, key, Qt::ControlModifier);
     QApplication::sendEvent(target, &press);
-    QKeyEvent release(QEvent::KeyRelease, Qt::Key_V, Qt::ControlModifier);
+    QKeyEvent release(QEvent::KeyRelease, key, Qt::ControlModifier);
     QApplication::sendEvent(target, &release);
     forwardingKeyToVi_ = false;
+}
+
+void MainWindow::enterVisualBlock() { forwardControlKeyToVi(Qt::Key_V); }
+
+void MainWindow::scrollHalfPage(int direction) {
+    if (editorStack_->currentWidget() == readingView_) {
+        auto* bar = readingView_->verticalScrollBar();
+        bar->setValue(bar->value() + direction * readingView_->viewport()->height() / 2);
+        return;
+    }
+    forwardControlKeyToVi(direction > 0 ? Qt::Key_D : Qt::Key_U);
 }
 
 void MainWindow::saveActiveBuffer() {
