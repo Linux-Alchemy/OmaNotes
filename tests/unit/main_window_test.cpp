@@ -160,6 +160,7 @@ class MainWindowTest final : public QObject {
     void doesNotLetNormalModeWriteShortcutsReachTheEditorsWriter();
     void reloadsACleanBufferWhenItsFileChangesOnDisk();
     void refusesToOpenAnOversizedNote();
+    void showsUntrustedNamesAsPlainText();
     void keepsTheBufferWhenItsNoteIsSwappedForASymlink();
     void keepsTheBufferWhenItsNoteGrowsPastTheLimit();
     void keepsEditsAndRefusesPlainWriteWhenFileChangedUnderneath();
@@ -866,6 +867,45 @@ void MainWindowTest::reloadsACleanBufferWhenItsFileChangesOnDisk() {
     QVERIFY(!editor->document()->isModified());
     QVERIFY2(status->text().contains(QStringLiteral("Reloaded note.md")),
              qPrintable(status->text()));
+}
+
+void MainWindowTest::showsUntrustedNamesAsPlainText() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto tricky = root / "<img src=x><b>bold.md";
+    writeFile(tricky, "# Tricky\n");
+
+    omanotes::MainWindow window({root, tricky, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* heading = window.findChild<QLabel*>(QStringLiteral("sidebarHeading"));
+    auto* searchStatus = window.findChild<QLabel*>(QStringLiteral("searchStatus"));
+    QVERIFY(status != nullptr && heading != nullptr && searchStatus != nullptr);
+
+    // Every label that shows a file name, a directory name, a link target or
+    // a path is plain text: markup in a name is displayed, never rendered,
+    // and never made to load an image (docs/threat-model.md, F-3).
+    QCOMPARE(status->textFormat(), Qt::PlainText);
+    QCOMPARE(heading->textFormat(), Qt::PlainText);
+    QCOMPARE(searchStatus->textFormat(), Qt::PlainText);
+
+    auto* editor = activeEditor(window);
+    QVERIFY(editor != nullptr);
+    editor->document()->setText(QStringLiteral("edit"));
+    QTRY_VERIFY(editor->document()->isModified());
+    auto* strip = window.findChild<QTabBar*>(QStringLiteral("bufferStrip"));
+    QVERIFY(strip != nullptr);
+    auto* close = closeButtonFor(*strip, strip->currentIndex());
+    QVERIFY(close != nullptr);
+    QTest::mouseClick(close, Qt::LeftButton);
+    auto* prompt = window.findChild<QMessageBox*>(QStringLiteral("closeBufferPrompt"));
+    QVERIFY(prompt != nullptr);
+    QTRY_VERIFY(prompt->isVisible());
+    QCOMPARE(prompt->textFormat(), Qt::PlainText);
+    QVERIFY(prompt->text().contains(QStringLiteral("<img src=x><b>bold")));
+    QTest::mouseClick(prompt->button(QMessageBox::Cancel), Qt::LeftButton);
+    QTRY_VERIFY(!prompt->isVisible());
 }
 
 void MainWindowTest::refusesToOpenAnOversizedNote() {

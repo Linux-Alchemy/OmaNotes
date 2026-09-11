@@ -2,6 +2,7 @@ add_executable(
     omanotes_ui_tests
     unit/main_window_test.cpp
     "${CMAKE_SOURCE_DIR}/src/app/application_controller.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/launch_request.cpp"
     "${CMAKE_SOURCE_DIR}/src/session/instance_lock.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/application_controller.hpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_restorer.cpp"
@@ -416,6 +417,7 @@ add_executable(
     omanotes_session_restore_tests
     integration/session_restore_test.cpp
     "${CMAKE_SOURCE_DIR}/src/app/application_controller.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/launch_request.cpp"
     "${CMAKE_SOURCE_DIR}/src/session/instance_lock.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/application_controller.hpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_restorer.cpp"

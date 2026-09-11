@@ -53,9 +53,29 @@ bool isSymlink(const std::filesystem::path& path) {
     return std::filesystem::is_symlink(std::filesystem::symlink_status(path, error)) && !error;
 }
 
-std::expected<void, RecoveryError> ensureDirectory(const std::filesystem::path& directory) {
+/// The recovery directory sits at `<omanotes>/sessions/<id>/recovery`. None
+/// of those three levels may be a symlink either: a redirected `<id>` would
+/// send plaintext records wherever the link points. Checked, never created
+/// or re-moded here; the session store owns the chain above.
+std::expected<void, RecoveryError> refuseSymlinkedChain(const std::filesystem::path& directory) {
     if (isSymlink(directory)) {
         return storeFailure(directory, QStringLiteral("Recovery directory is a symlink; refusing"));
+    }
+    auto level = directory;
+    for (int depth = 0; depth < 3 && level.has_parent_path(); ++depth) {
+        level = level.parent_path();
+        if (isSymlink(level)) {
+            return storeFailure(
+                level,
+                QStringLiteral("A directory above the recovery store is a symlink; refusing"));
+        }
+    }
+    return {};
+}
+
+std::expected<void, RecoveryError> ensureDirectory(const std::filesystem::path& directory) {
+    if (auto chain = refuseSymlinkedChain(directory); !chain) {
+        return chain;
     }
     std::error_code error;
     if (!std::filesystem::exists(directory, error)) {
@@ -323,9 +343,8 @@ std::expected<std::vector<RecoveryId>, RecoveryError> RecoveryStore::list() cons
     if (!std::filesystem::exists(directory_, error)) {
         return ids;
     }
-    if (isSymlink(directory_)) {
-        return storeFailure(directory_,
-                            QStringLiteral("Recovery directory is a symlink; refusing"));
+    if (auto chain = refuseSymlinkedChain(directory_); !chain) {
+        return std::unexpected(chain.error());
     }
     for (const auto& entry : std::filesystem::directory_iterator(directory_, error)) {
         std::error_code ignored;

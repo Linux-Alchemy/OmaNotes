@@ -40,6 +40,7 @@ class LaunchRequestTest final : public QObject {
     void rejectsInvalidArgumentsAndMissingPaths();
     void canonicalizesRootSymlinksAndRejectsFileEscapes();
     void rejectsUnreadableRootsAndFiles();
+    void noticesOnlyTheWidestRoots();
 };
 
 void LaunchRequestTest::resolvesApprovedLaunchTable() {
@@ -182,6 +183,25 @@ void LaunchRequestTest::rejectsUnreadableRootsAndFiles() {
     std::filesystem::permissions(root, std::filesystem::perms::owner_all);
     QVERIFY(!unreadableRoot.has_value());
     QCOMPARE(unreadableRoot.error().code, omanotes::LaunchErrorCode::InvalidWorkspace);
+}
+
+void LaunchRequestTest::noticesOnlyTheWidestRoots() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto home = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto notes = home / "Notes";
+    std::filesystem::create_directory(notes);
+
+    const auto atRoot = omanotes::wideRootNotice("/", home).value_or(std::string{});
+    QVERIFY(atRoot.find("filesystem root") != std::string::npos);
+
+    const auto atHome = omanotes::wideRootNotice(home, home).value_or(std::string{});
+    QVERIFY(atHome.find("home directory") != std::string::npos);
+
+    // Anything narrower, including a directory just under home, is a
+    // perfectly ordinary workspace and gets no lecture.
+    QVERIFY(!omanotes::wideRootNotice(notes, home).has_value());
+    QVERIFY(!omanotes::wideRootNotice(notes, {}).has_value());
 }
 
 QTEST_MAIN(LaunchRequestTest)

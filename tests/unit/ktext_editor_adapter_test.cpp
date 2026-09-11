@@ -26,6 +26,8 @@ class KTextEditorAdapterTest final : public QObject {
     void roundTripsTextAndTracksModification();
     void loadsFileTextAsCleanMemoryOnlyContent();
     void reportsViModeTransitions();
+    void neverGivesTheDocumentAUrl();
+    void ignoresModelinesInNoteText();
 };
 
 void KTextEditorAdapterTest::ownsEditorLifetime() {
@@ -136,6 +138,65 @@ void KTextEditorAdapterTest::reportsViModeTransitions() {
     QTRY_VERIFY(adapter.modeName().contains(QStringLiteral("NORMAL"), Qt::CaseInsensitive));
     QCOMPARE(adapter.mode(), omanotes::EditorMode::Normal);
     QVERIFY(modeSpy.count() >= 2);
+}
+
+void KTextEditorAdapterTest::neverGivesTheDocumentAUrl() {
+    // Load-bearing for the threat model (S1): KTextEditor's swap files,
+    // backup files, encoding sniffing and disk reload all key off the
+    // document's URL. The adapter feeds text and never a URL, so none of
+    // them has anything to act on. A future `openUrl` call must fail here.
+    QWidget parent;
+    omanotes::KTextEditorAdapter adapter(&parent);
+    auto* view = qobject_cast<KTextEditor::View*>(adapter.widget());
+    QVERIFY(view != nullptr);
+    auto* document = view->document();
+    if (document == nullptr) {
+        QFAIL("the view has no document");
+    }
+    QVERIFY(document->url().isEmpty());
+    adapter.loadText(QStringLiteral("# Loaded\n"));
+    adapter.setText(QStringLiteral("# Set\n"));
+    adapter.markModified();
+    adapter.markSaved();
+    QVERIFY(document->url().isEmpty());
+}
+
+void KTextEditorAdapterTest::ignoresModelinesInNoteText() {
+    // `kate:` variable lines are read by KTextEditor when it opens a file
+    // itself. On this adapter's load path they are inert (verified by
+    // experiment on 2026-09-11, docs/threat-model.md T-E4); this pins it.
+    QWidget parent;
+    omanotes::KTextEditorAdapter adapter(&parent);
+    auto* view = qobject_cast<KTextEditor::View*>(adapter.widget());
+    QVERIFY(view != nullptr);
+    auto* document = view->document();
+    if (document == nullptr) {
+        QFAIL("the view has no document");
+    }
+    const auto indentWidth = document->configValue(QStringLiteral("indent-width"));
+    const auto tabWidth = document->configValue(QStringLiteral("tab-width"));
+    const auto replaceTabs = document->configValue(QStringLiteral("replace-tabs"));
+    const auto wordWrap = view->configValue(QStringLiteral("dynamic-word-wrap"));
+    const auto lineNumbers = view->configValue(QStringLiteral("line-numbers"));
+
+    const auto hostile = QStringLiteral(
+        "<!-- kate: indent-width 7; tab-width 9; replace-tabs off; dynamic-word-wrap off; "
+        "line-numbers on; remove-trailing-spaces all; hl C++; -->\n"
+        "body\n");
+    adapter.loadText(hostile);
+    adapter.setText(hostile);
+    document->setHighlightingMode(QStringLiteral("Markdown"));
+    adapter.loadText(QStringLiteral("body\n\n\n<!-- kate: indent-width 5; -->\n"));
+    adapter.markModified();
+    adapter.markSaved();
+    QTest::qWait(50);
+
+    QCOMPARE(document->configValue(QStringLiteral("indent-width")), indentWidth);
+    QCOMPARE(document->configValue(QStringLiteral("tab-width")), tabWidth);
+    QCOMPARE(document->configValue(QStringLiteral("replace-tabs")), replaceTabs);
+    QCOMPARE(view->configValue(QStringLiteral("dynamic-word-wrap")), wordWrap);
+    QCOMPARE(view->configValue(QStringLiteral("line-numbers")), lineNumbers);
+    QCOMPARE(document->highlightingMode(), QStringLiteral("Markdown"));
 }
 
 QTEST_MAIN(KTextEditorAdapterTest)
