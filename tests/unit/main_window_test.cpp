@@ -17,6 +17,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QPointer>
 #include <QScrollBar>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -1371,7 +1372,11 @@ void MainWindowTest::closesBuffersFromTheLeaderAndGuardsUnsavedWork() {
     QCOMPARE(strip->tabText(0), QStringLiteral("closing.md"));
 
     // Space b D discards. The last buffer closing leaves a scratch buffer to
-    // type in, with its own editor, and nothing reaches the disk.
+    // type in, with its own editor, and nothing reaches the disk. The guard
+    // proves the old editor was destroyed; comparing addresses would not,
+    // because a release-build allocator may hand the scratch editor the
+    // address the old one just vacated (8.1.4).
+    QPointer<KTextEditor::View> closedEditor(editor);
     QTest::keyClick(target, Qt::Key_Space);
     QTest::keyClicks(target, QStringLiteral("bD"));
     QTRY_COMPARE(status->text(), QStringLiteral("Closed closing.md, discarding changes"));
@@ -1380,8 +1385,9 @@ void MainWindowTest::closesBuffersFromTheLeaderAndGuardsUnsavedWork() {
     // One editor per open buffer plus the permanent reading view.
     QCOMPARE(stack->count(), 2);
     QCOMPARE(readFile(note), QByteArray("keep me\n"));
+    QTRY_VERIFY(closedEditor.isNull());
     auto* scratch = activeEditor(window);
-    QVERIFY(scratch != nullptr && scratch != editor);
+    QVERIFY(scratch != nullptr);
     QVERIFY(scratch->document()->text().isEmpty());
 
     // Clean: Space b d closes outright. With two buffers, the neighbour shows.
