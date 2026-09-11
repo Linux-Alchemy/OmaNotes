@@ -1,0 +1,52 @@
+# Maintainer: Linux-Alchemy <https://github.com/Linux-Alchemy/OmaNotes>
+#
+# Builds the tip of main from a fresh clone of the repository, never from a
+# working tree (ADR 0013). The check step runs the release test suite and the
+# hardening check against the binary that will be packaged; skip it with
+# `makepkg --nocheck` if you must. Usage, upgrade, and removal are in
+# docs/packaging.md.
+
+pkgname=omanotes-git
+pkgver=0.1.0.r0.g0000000
+pkgrel=1
+pkgdesc="Keyboard-first Markdown note editor for Omarchy, built on KTextEditor's Vi mode"
+arch=(x86_64)
+url="https://github.com/Linux-Alchemy/OmaNotes"
+license=(MIT)
+depends=(qt6-base ktexteditor hicolor-icon-theme)
+makedepends=(git cmake ninja clang extra-cmake-modules)
+provides=(omanotes)
+conflicts=(omanotes)
+source=("omanotes::git+https://github.com/Linux-Alchemy/OmaNotes.git")
+sha256sums=(SKIP)
+
+pkgver() {
+    cd omanotes
+    # The version is single-sourced from CMakeLists.txt; the revision count and
+    # short hash say which commit of main this is, the usual -git convention.
+    local base
+    base="$(sed -n 's/^[[:space:]]*VERSION[[:space:]]\+\([0-9.]\+\)[[:space:]]*$/\1/p' CMakeLists.txt | head -n 1)"
+    printf '%s.r%s.g%s' "${base}" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+    cd omanotes
+    cmake --preset release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DOMANOTES_LICENSE_DIR="share/licenses/${pkgname}"
+    cmake --build --preset release
+}
+
+check() {
+    cd omanotes
+    # Offscreen so no display is needed; the tests isolate their own XDG
+    # directories under the build tree, so nothing in $HOME is touched.
+    export QT_QPA_PLATFORM=offscreen QT_STYLE_OVERRIDE=Fusion
+    ctest --preset release --output-on-failure
+    cmake --build --preset release --target security-check
+}
+
+package() {
+    cd omanotes
+    DESTDIR="${pkgdir}" cmake --install build/release
+}

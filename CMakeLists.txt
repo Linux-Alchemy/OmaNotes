@@ -32,6 +32,22 @@ if(OMANOTES_ENABLE_FUZZERS)
     add_subdirectory(fuzz)
 endif()
 
+# What an install ships, and nothing else: the binary, the desktop entry
+# whose name matches the Wayland app_id set in main.cpp, the icon, and the
+# licence. Tests, fuzzers, and build output are never installed (ADR 0013).
+# The licence directory is a cache variable so an Arch package can point it
+# at /usr/share/licenses/<pkgname>, which is where pacman policy wants it.
+include(GNUInstallDirs)
+set(OMANOTES_LICENSE_DIR
+    "${CMAKE_INSTALL_DATADIR}/licenses/omanotes"
+    CACHE STRING "Where LICENSE is installed, relative to the install prefix"
+)
+install(TARGETS omanotes RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(FILES packaging/linux/OmaNotes.desktop DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
+install(FILES packaging/linux/OmaNotes.svg
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps")
+install(FILES LICENSE DESTINATION "${OMANOTES_LICENSE_DIR}")
+
 find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format REQUIRED)
 find_program(RUN_CLANG_TIDY_EXECUTABLE NAMES run-clang-tidy REQUIRED)
 
