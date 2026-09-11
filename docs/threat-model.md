@@ -2,9 +2,10 @@
 
 > **Block:** 8.1.1. **Status:** draft for Matt's gate, 2026-09-11.
 > **Audited tip:** `main` at `479fb3c` (PR #32 merged). Line numbers refer to that tip.
-> **Amended 2026-09-11:** findings F-1 and F-7 closed on `task/8.1.3-high-severity`; the rows
-> they cover (T-N4, T-N6, T-P6, T-W2) carry their new status. Other line numbers are from the
-> audited tip and drift by the size of that change.
+> **Amended 2026-09-11:** findings F-1 and F-7 closed on `task/8.1.3-high-severity` (#35).
+> Second pass the same day: F-2, F-3, F-4, F-6, F-8, F-10, F-13 closed across #36, #37, #38, #39;
+> F-5 and F-9 accepted by Matt's ruling and recorded below. Rows carry their new status; line
+> numbers elsewhere are from the audited tip and drift by the size of those changes.
 > **Rule of the document:** every mitigation names the code that does it and the test that
 > proves it. A row with no test says so. A threat with no mitigation is listed, not omitted.
 
@@ -113,7 +114,8 @@ silently would reopen several rows at once.
   (`launch_request.cpp:67-78`). `/` and `$HOME` are accepted like any directory. The sidebar
   and search are lazy and capped (T-D1), so this is not a crash, but it is the widest possible
   read scope handed over by one argument.
-- Residue: no test, no warning. Finding F-13.
+- Closed as ruled (F-13, #36): a status-line notice for `/` and the home directory, nothing
+  narrower. Test: `noticesOnlyTheWidestRoots` (`tests/unit/launch_request_test.cpp`).
 
 **T-R3. Smuggle options past argument validation.**
 - Status: **Partial.**
@@ -144,7 +146,9 @@ elsewhere after launch).
   `src/app/application_controller.cpp:211` dereferences the result of `WorkspaceRoot::resolve`
   without checking it, which is undefined behaviour if it failed (`:64` does check the same
   thing in `start()`).
-- Residue: untested. Finding F-10 (the UB) and F-13 (the drift).
+- Closed in part (F-10, #36): the notice returns nothing on a failed resolution and a startup
+  exception exits with a message. Test: `parkedWorkNoticeSurvivesAVanishedRoot`. The drift
+  itself remains; F-13's ruling took the notice, not the pinning.
 
 ### 6.2 Reading notes (B2, B3)
 
@@ -280,7 +284,8 @@ elsewhere after launch).
   the same shape. A rich-text `QLabel` honours `<img src="/local/path">`, so a note or
   directory name can spoof the status line or probe local files. The program already knows the
   fix: the keymap warning is set to plain text (`:674`), and nothing else is.
-- Impact: spoofing (A6) and a local-file probe from a file name (A4). Finding F-3.
+- Closed (F-3, #36): the status line, sidebar heading, search status and both close prompts are
+  `Qt::PlainText`. Test: `showsUntrustedNamesAsPlainText` (`tests/unit/main_window_test.cpp`).
 
 **T-U2. Error text discloses filesystem structure outside the root.**
 - Status: **Unmitigated, low impact.**
@@ -357,11 +362,11 @@ elsewhere after launch).
 - Proof: `tests/unit/conflict_detector_test.cpp:38-100`; main-window tests
   `keepsEditsAndRefusesPlainWriteWhenFileChangedUnderneath`,
   `refusesToOverwriteExternalChangesEvenBeforeTheWatcherNotices`.
-- Gap: the comparison happens at `:1769` and the rename at `atomic_file_writer.cpp:165`; a
-  write that lands between them is lost silently. ADR 0006 says the comparison is "at the
-  moment of writing"; it is at the moment of deciding. Fully closing this needs a
-  rename-if-unchanged step or an inode recheck; the honest minimum is to correct the ADR.
-  Finding F-2.
+- Closed (F-2, #39): the writer takes a `WritePrecondition` (absent, or a content hash) and
+  re-checks it after the new bytes are durable and immediately before the rename; a change in
+  between is refused as `ChangedSinceRead` with nothing replaced. ADR 0006 now states the two
+  comparisons and names the instant that remains open. Test:
+  `refusesToReplaceAFileThatChangedSinceItWasChecked` (`tests/integration/atomic_save_test.cpp`).
 
 **T-S4. The path is swapped between containment check and write.**
 - Status: **Unmitigated.**
@@ -369,7 +374,10 @@ elsewhere after launch).
   `mkstemp` and `rename` resolve the path by name again. Replacing a directory component with a
   symlink in that window defeats the check. No `openat`, directory fd, or `O_NOFOLLOW` is used
   on the write path.
-- Impact: requires P2 to win a race against the user's own save. Finding F-2.
+- Impact: requires P2 to win a race against the user's own save. Narrowed by F-2's recheck
+  (#39), which reads the destination through the bounded reader just before the rename, so a
+  swap to a symlink or a non-regular file in the window is refused too. The directory-component
+  swap between that check and the rename is the residue; recorded, not claimed away.
 
 **T-S5. Properties of the original file are lost by the rename.**
 - Status: **Partial, undocumented.**
@@ -437,7 +445,9 @@ elsewhere after launch).
 - Gap 1: `RecoveryStore` checks the recovery directory but not its ancestors, and creates the
   parent with `create_directories` (`:62`), which follows a symlink; `SessionStore` checks every
   level (`session_store.cpp:128`). A symlinked `sessions/<id>/` sends plaintext note text
-  outside the state directory. Untested. Finding F-4.
+  outside the state directory. Closed (F-4, #36): three levels above the recovery directory are
+  refused as symlinks on write and on list, without being created or re-moded. Test:
+  `refusesASymlinkedDirectoryAboveTheStore` (`tests/integration/recovery_store_test.cpp`).
 - Gap 2: a well-formed record planted by P5 is restored as a dirty buffer with the planter's
   text and the planter's in-root path; the status line reports a recovery but nothing marks
   the buffer as recovered from disk rather than typed, and `:w` writes it where the planter
@@ -496,7 +506,9 @@ elsewhere after launch).
   belong to the Kate application, not the component. So no shell is reachable today, but by a
   property of upstream, not by a boundary this program drew. No test asserts any refusal;
   `vim_behaviour_test.cpp:205-215` proves pass-through works.
-- Finding F-6.
+- Partial, tests added (F-6, #36): the `:` pass-through is unchanged and still has no deny-list;
+  the properties it rests on are pinned by `neverGivesTheDocumentAUrl` and
+  `ignoresModelinesInNoteText` (`tests/unit/ktext_editor_adapter_test.cpp`).
 
 **T-E2. KTextEditor's JavaScript engine runs on content.**
 - Status: **Inert.**
@@ -514,6 +526,7 @@ elsewhere after launch).
 
 **T-E4. A `kate:` modeline in a note changes editor behaviour.**
 - Status: **Inert, verified by experiment 2026-09-11.**
+- Pinned by test since #36 (`ignoresModelinesInNoteText`).
 - Detail: a note beginning `<!-- kate: indent-width 7; tab-width 9; replace-tabs on;
   dynamic-word-wrap off; line-numbers on; remove-trailing-spaces all; hl C++; -->` was fed
   through the adapter's `loadText` and `setText`, followed by a highlighting-mode change and a
@@ -530,7 +543,9 @@ elsewhere after launch).
   and in the test sandbox (`build/dev/tests/xdg-config/katevirc`). Same user, `0600`, so the
   exposure is equal to the recovery records the user already accepted; the difference is that
   nobody has been told.
-- Finding F-5.
+- Accepted (F-5, Matt's ruling 2026-09-11): documented in `docs/session-format.md` beside the
+  recovery-record statement. Same user, same mode, same class of exposure as records; the
+  difference was that nobody had been told, and now they have.
 
 **T-E6. Encoding sniffing or mixed encodings corrupt a note.**
 - Status: **Mitigated.**
@@ -572,12 +587,17 @@ elsewhere after launch).
   is the sanitizer Debug build, not the release artefact. `cert-*` is off in clang-tidy
   despite raw POSIX I/O in the persistence layer. The format-check list is hand-maintained and
   already omits at least five compiled sources. LeakSanitizer is disabled and leak checks are
-  manual. Findings F-8, F-19.
+  manual. F-8 closed (#37): `-fstack-clash-protection`, `-fcf-protection=full`,
+  `_GLIBCXX_ASSERTIONS`, `_FORTIFY_SOURCE=3` outside Debug; the script verifies stack protector,
+  full RELRO, CET marks and fortified calls, and the docs run it on the release preset. F-19
+  remains.
 
 **T-B2. Controls are advisory.**
 - Status: **Unmitigated.**
 - Detail: there is no CI; `.github/` holds only the PR template. Every gate runs when a
-  person types it. The PR template's boxes are self-attested. Finding F-9.
+  person types it. The PR template's boxes are self-attested.
+- Accepted (F-9, Matt's ruling 2026-09-11): manual gating is the process for this project.
+  Every PR records the commands and their output; the reviewer runs what he wants to see again.
 
 **T-B3. A vulnerable dependency ships unnoticed.**
 - Status: **Unmitigated.**
@@ -636,18 +656,18 @@ unless Matt defers with a recorded reason; **Low** may be deferred to the limita
 | Id | Severity | Finding | Threats | Smallest decision |
 | --- | --- | --- | --- | --- |
 | F-1 | ~~Blocking~~ **Closed 2026-09-11** | Open and reload read by name after validation, follow symlinks, and have no size cap; the watcher makes this reachable with no user action. | T-N4, T-N6, T-W2 | Done: `readNoteFile` (`src/persistence/note_reader.cpp`) with `O_NOFOLLOW`, regular-file check on the descriptor, 16 MiB cap matching the recovery ceiling; used by open, both reloads, and the conflict hash; reloads re-validate the path first. |
-| F-2 | Should-fix | Save-time and path-resolution races between check and rename; ADR 0006 overstates the guarantee. | T-S3, T-S4 | Approve either an inode/hash recheck immediately before rename, or correct ADR 0006 and record the window as accepted. |
-| F-3 | Should-fix | Status line, sidebar heading, search status, and buffer prompts render untrusted names as rich text. | T-U1 | Approve `Qt::PlainText` on each, with a test that a `<b>`-named file shows its angle brackets. |
-| F-4 | Should-fix | `RecoveryStore` does not refuse symlinked ancestor directories; `SessionStore` does. | T-P5 | Approve mirroring the session store's per-level check, with a test. |
-| F-5 | Decide | KTextEditor persists yanked text and macros to `~/.config/katevirc`. | T-E5 | Rule: accept and document beside the recovery-record statement, or task 8.1.3 to find a KTextEditor setting that disables it (may not exist). |
-| F-6 | Should-fix | Editor boundary properties are inert rather than mitigated: modelines, swap and backup files, JS engine, `:` pass-through with no deny-list. | T-E1–T-E4 | Approve regression tests pinning S1 (no URL, modelines inert, no swap file written), and rule on whether `set-*` and `reload` should be intercepted. |
+| F-2 | **Closed 2026-09-11** (#39) | Save-time and path-resolution races between check and rename; ADR 0006 overstated the guarantee. | T-S3, T-S4 | Done, both: a content or absence precondition re-checked just before the rename, and ADR 0006 corrected to name the residue. |
+| F-3 | **Closed 2026-09-11** (#36) | Status line, sidebar heading, search status, and buffer prompts rendered untrusted names as rich text. | T-U1 | Done: plain text on each, tested with a markup-named note. |
+| F-4 | **Closed 2026-09-11** (#36) | `RecoveryStore` did not refuse symlinked ancestor directories. | T-P5 | Done: three levels checked on write and list, tested with a symlinked `sessions/<id>`. |
+| F-5 | **Accepted 2026-09-11** | KTextEditor persists yanked text and macros to `~/.config/katevirc`. | T-E5 | Matt's ruling: document. Recorded in `docs/session-format.md`, "Sensitive content". |
+| F-6 | **Closed 2026-09-11** (#36), pass-through ruling open | Editor boundary properties were inert rather than tested. | T-E1–T-E4 | Done: tests pin no-URL and modelines-inert. Whether `set-*` and `reload` should be intercepted is not ruled; the `:` line stays as it is. |
 | F-7 | ~~Decide~~ **Closed 2026-09-11** | Two instances on one root adopt each other's live recovery records and overwrite them. | T-P6 | Done, ADR 0012: per-root `flock`; the holder owns recovery, everyone else restores structure only and never touches existing records. |
-| F-8 | Should-fix | Hardening flags absent (`_FORTIFY_SOURCE`, `_GLIBCXX_ASSERTIONS`, stack-clash, CET) and unchecked; the check runs on the dev binary. | T-B1 | Approve adding the flags to the release preset, extending `security-check.sh` to test them, and pointing the docs at the release binary. |
-| F-9 | Decide | No CI; every gate is manual. | T-B2 | Rule whether Phase 8 adds a GitHub Actions workflow running the six gates on pull requests, or records manual gating as the accepted process. |
-| F-10 | Should-fix | Unchecked dereference of a failed root resolution in `application_controller.cpp:211`; uncaught throw from the tree model at startup. | T-R5 | Approve the check and a graceful exit message, with a test. |
+| F-8 | **Closed 2026-09-11** (#37) | Hardening flags were absent and unchecked; the check ran on the dev binary. | T-B1 | Done: flags on every target, script checks each and says what a sanitizer build cannot show, docs run it on release. |
+| F-9 | **Accepted 2026-09-11** | No CI; every gate is manual. | T-B2 | Matt's ruling: no CI. Manual gating with recorded output is the process. |
+| F-10 | **Closed 2026-09-11** (#36) | Unchecked dereference of a failed root resolution; uncaught throw at startup. | T-R5 | Done: the notice returns nothing, startup exceptions exit 2 with a message. The handler itself is untested (needs an untimeable race). |
 | F-11 | Low | Directory-fsync failure after rename reported as failure while bytes are live; stale revision causes a false conflict. | T-S2 | Approve treating it as success-with-warning and updating the header and ADR 0005. |
 | F-12 | Low | Existence oracle in save-target errors; absolute paths in error text. | T-U2 | Approve reordering containment before the directory check and trimming paths to root-relative in messages. |
-| F-13 | Decide | Any directory, including `/` and `$HOME`, becomes the root on one argument; root identity can drift after launch. | T-R2, T-R5 | Rule whether to warn or refuse on `/` and `$HOME`, and whether the root should be pinned by directory fd. |
+| F-13 | **Closed as ruled 2026-09-11** (#36) | Any directory becomes the root on one argument; root identity can drift after launch. | T-R2, T-R5 | Matt's ruling: notice, not refusal. Done for `/` and home. Pinning the root by descriptor was not asked for and is not done. |
 | F-14 | Low | Symlink handling differs by layer; owner, ACLs, xattrs, hard links not preserved; hidden `.md` searchable but not listed. | T-N7, T-S5 | Approve recording all of it in ADR 0005 and `docs/search.md`. |
 | F-15 | Decide | Read-only notes are overwritten (Vim refuses with E45). | T-S5 | Rule: refuse without `!`, or accept. |
 | F-15b | Low | A planted recovery record restores with no provenance mark. | T-P5 | Approve a "recovered" mark in the tab or status until first save, or accept. |
