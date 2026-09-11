@@ -50,7 +50,9 @@ notes are ordinary Markdown files it has never heard of, and the state under
 Delete those two directories yourself if you want a clean slate.
 
 **Working state:** makepkg leaves `src/`, `pkg/`, a bare clone, and the built package in
-`packaging/arch/`. They are gitignored. `makepkg -c` cleans up after itself.
+`packaging/arch/`. They are gitignored. `makepkg -c` cleans up after itself. makepkg also
+rewrites the `pkgver=` line of the PKGBUILD in place, which is normal for `-git` packages; if a
+later `git pull` complains about it, `git checkout packaging/arch/PKGBUILD` first.
 
 A `-debug` companion package with the symbols is produced alongside; that is the default on
 Arch and is optional to install.
