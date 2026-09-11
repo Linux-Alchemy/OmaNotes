@@ -246,7 +246,7 @@ AtomicFileWriter::write(const std::filesystem::path& target, QByteArrayView cont
     }
 
     if (auto replaced = replaceFileAtomically(*destination, contents, modeFor(*destination),
-                                              nullptr, precondition);
+                                              faults_, precondition);
         !replaced) {
         return std::unexpected(replaced.error());
     }
