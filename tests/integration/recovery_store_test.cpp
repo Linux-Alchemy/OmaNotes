@@ -106,6 +106,7 @@ class RecoveryStoreTest final : public QObject {
     void refusesOversizedBuffersWithoutWriting();
     void idsNeverBecomePaths();
     void refusesSymlinksAndLeavesTargetsAlone();
+    void refusesASymlinkedDirectoryAboveTheStore();
     void refusesBadRecordsAndLeavesThemAsFound();
     void plansRestoreAgainstTheLiveDisk();
     void restoreNeverWritesTheWorkspace();
@@ -367,6 +368,35 @@ void RecoveryStoreTest::refusesSymlinksAndLeavesTargetsAlone() {
     QVERIFY(!store.checkpoint(fixture.dirtyNote()).has_value());
     QVERIFY(!store.list().has_value());
     QCOMPARE(entriesIn(pathFor(elsewhere.path())), 1);
+}
+
+void RecoveryStoreTest::refusesASymlinkedDirectoryAboveTheStore() {
+    Fixture fixture;
+    QVERIFY(fixture.valid());
+    QTemporaryDir elsewhere;
+    QVERIFY(elsewhere.isValid());
+    const auto decoy = pathFor(elsewhere.path()) / "decoy";
+    std::filesystem::create_directories(decoy);
+
+    // `sessions/abc` is a symlink to somewhere else entirely. The session
+    // store refuses that on its own files; the recovery store must too, or
+    // plaintext records follow the link out of the state directory.
+    const auto workspaceLevel = fixture.recovery.parent_path();
+    std::filesystem::create_directories(workspaceLevel.parent_path());
+    std::filesystem::create_symlink(decoy, workspaceLevel);
+    const omanotes::RecoveryStore store(fixture.recovery);
+
+    const auto written = store.checkpoint(fixture.dirtyNote());
+    QVERIFY(!written.has_value());
+    QVERIFY2(written.error().message.contains(QStringLiteral("symlink")),
+             qPrintable(written.error().message));
+    QCOMPARE(entriesIn(decoy), 0);
+
+    // Listing through the link is refused as well, so a planted record on
+    // the far side is never read.
+    std::filesystem::create_directories(decoy / "recovery");
+    writeFile(decoy / "recovery" / "5f2b3c4d-0000-4000-8000-000000000001.json", "{}");
+    QVERIFY(!store.list().has_value());
 }
 
 void RecoveryStoreTest::refusesBadRecordsAndLeavesThemAsFound() {

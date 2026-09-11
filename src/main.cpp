@@ -9,6 +9,7 @@
 #include <QTimer>
 
 #include <algorithm>
+#include <exception>
 #include <filesystem>
 #include <iostream>
 #include <span>
@@ -59,17 +60,25 @@ int main(int argc, char* argv[]) {
         return 2;
     }
 
-    omanotes::MainWindow window(*launchRequest);
-    // The last desk comes back before the window is first shown, so the user
-    // never sees an empty window rearrange itself (docs/session-format.md).
-    omanotes::ApplicationController session(window, std::move(*launchRequest),
-                                            omanotes::SessionStore::defaultDirectory());
-    session.start();
-    window.show();
+    // The workspace was readable a moment ago; if it stopped being so
+    // between then and the tree being built, say so rather than abort.
+    try {
+        omanotes::MainWindow window(*launchRequest);
+        // The last desk comes back before the window is first shown, so the
+        // user never sees an empty window rearrange itself
+        // (docs/session-format.md).
+        omanotes::ApplicationController session(window, std::move(*launchRequest),
+                                                omanotes::SessionStore::defaultDirectory());
+        session.start();
+        window.show();
 
-    if (smokeTestRequested(argc, argv)) {
-        QTimer::singleShot(0, &application, &QCoreApplication::quit);
+        if (smokeTestRequested(argc, argv)) {
+            QTimer::singleShot(0, &application, &QCoreApplication::quit);
+        }
+
+        return application.exec();
+    } catch (const std::exception& failure) {
+        std::cerr << "OmaNotes could not start: " << failure.what() << '\n';
+        return 2;
     }
-
-    return application.exec();
 }

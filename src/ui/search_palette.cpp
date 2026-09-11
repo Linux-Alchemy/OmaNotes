@@ -40,6 +40,7 @@ SearchPalette::SearchPalette(std::filesystem::path root, QWidget* parent)
     layout->addWidget(splitter, 1);
     status_ = new QLabel(this);
     status_->setObjectName(QStringLiteral("searchStatus"));
+    status_->setTextFormat(Qt::PlainText);
     layout->addWidget(status_);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Open | QDialogButtonBox::Cancel, this);
     buttons->button(QDialogButtonBox::Open)->setDefault(false);

@@ -87,6 +87,14 @@ void ApplicationController::start() {
         }
     }
     const bool adoptRecords = holdsInstanceLock();
+    if (root) {
+        if (const auto wide = wideRootNotice(
+                root->path(),
+                std::filesystem::path(QFile::encodeName(QDir::homePath()).toStdString()));
+            wide) {
+            status << QString::fromStdString(*wide);
+        }
+    }
 
     if (root && !request_.bypassRestore) {
         const auto loaded = sessions_.load(*root);
@@ -240,8 +248,13 @@ bool ApplicationController::holdsInstanceLock() const noexcept {
 QString ApplicationController::parkedWorkNotice() const {
     const auto own = SessionStore::workspaceId(request_.root);
     std::error_code error;
-    const auto sessions =
-        sessions_.fileFor(*WorkspaceRoot::resolve(request_.root)).parent_path().parent_path();
+    // The root can have vanished since launch; the notice is a courtesy and
+    // must not be the thing that brings the window down.
+    const auto root = resolveRoot();
+    if (!root) {
+        return {};
+    }
+    const auto sessions = sessions_.fileFor(*root).parent_path().parent_path();
     if (!std::filesystem::is_directory(sessions, error)) {
         return {};
     }

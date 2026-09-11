@@ -28,6 +28,8 @@ Sidebar::Sidebar(const std::filesystem::path& root, QWidget* parent)
     auto* heading =
         new QLabel(QFile::decodeName(QByteArray::fromStdString(root.filename().native())), this);
     heading->setObjectName(QStringLiteral("sidebarHeading"));
+    // The directory name is whatever the user, or a script, called it.
+    heading->setTextFormat(Qt::PlainText);
 
     tree_->setObjectName(QStringLiteral("fileTree"));
     tree_->setAccessibleName(QStringLiteral("Workspace file tree"));

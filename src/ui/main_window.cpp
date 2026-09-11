@@ -127,6 +127,10 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
 
     status = new QLabel(writingArea);
     status->setObjectName(QStringLiteral("statusArea"));
+    // File names, link targets and paths land here verbatim. Plain text, so
+    // a name that looks like markup is shown, not rendered
+    // (docs/threat-model.md, F-3).
+    status->setTextFormat(Qt::PlainText);
     status->setAccessibleName(QStringLiteral("Editor status"));
     status->setContentsMargins(10, 6, 10, 6);
     // A long message must wrap here, not raise this pane's minimum width —
@@ -1037,6 +1041,7 @@ void MainWindow::confirmCloseBuffer(BufferId id) {
             new QMessageBox(QMessageBox::Question, QString{}, QString{},
                             QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
         closePrompt_->setObjectName(QStringLiteral("closeBufferPrompt"));
+        closePrompt_->setTextFormat(Qt::PlainText);
         closePrompt_->setDefaultButton(QMessageBox::Save);
         // Plain text, no platform-theme stock icons on the buttons.
         for (auto* button : closePrompt_->buttons()) {
@@ -1294,6 +1299,7 @@ void MainWindow::quitApplication(bool discardChanges) {
             new QMessageBox(QMessageBox::Question, QString{}, QString{},
                             QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
         quitPrompt_->setObjectName(QStringLiteral("quitPrompt"));
+        quitPrompt_->setTextFormat(Qt::PlainText);
         quitPrompt_->setDefaultButton(QMessageBox::Save);
         for (auto* button : quitPrompt_->buttons()) {
             button->setIcon(QIcon());

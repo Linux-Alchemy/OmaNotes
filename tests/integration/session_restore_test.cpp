@@ -182,6 +182,7 @@ class SessionRestoreTest final : public QObject {
     void concurrentLaunchesLastCloseWinsWithoutCorruption();
     void secondInstanceLeavesTheFirstsRecordsAlone();
     void theLockFollowsTheLiveInstance();
+    void parkedWorkNoticeSurvivesAVanishedRoot();
     void orphanRecordComesBackDirty();
     void recoveredNoteChangedOnDiskRefusesPlainWrite();
     void readingViewFollowsTheCursor();
@@ -487,6 +488,21 @@ void SessionRestoreTest::theLockFollowsTheLiveInstance() {
     Launch three(workspace);
     QVERIFY(three.controller->holdsInstanceLock());
     three.close();
+}
+
+void SessionRestoreTest::parkedWorkNoticeSurvivesAVanishedRoot() {
+    Workspace workspace;
+    QVERIFY(workspace.valid());
+    Launch launch(workspace);
+    QVERIFY(launch.controller->parkedWorkNotice().isEmpty());
+
+    // The workspace directory disappears under a running window. The notice
+    // is a courtesy built from other roots' metadata; it must come back
+    // empty, not dereference a failed resolution.
+    std::filesystem::remove_all(workspace.root);
+    QVERIFY(launch.controller->parkedWorkNotice().isEmpty());
+    std::filesystem::create_directories(workspace.root);
+    launch.close();
 }
 
 void SessionRestoreTest::orphanRecordComesBackDirty() {
