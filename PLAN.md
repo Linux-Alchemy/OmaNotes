@@ -1132,3 +1132,15 @@ Decision required: approve / request changes / stop and redesign
   nothing); the leader's "Space …" feedback outlived the sequence it announced; focus is
   returned to the editor after the quit prompt. Left alone by choice: the block cursor in
   Normal mode, hard-coded in KTextEditor's Vi mode. Awaiting Matt's gate.
+
+- **2026-09-10:** Fine-tuning pass accepted. PR #30 merged after Matt's hands-on gate; each of
+  its twenty-one commits had been hand-tested as it landed. Both items parked at the Phase 7
+  gate are closed: the deliberate in-app quit with its save prompt (`:q` and family) and the
+  `Untitled` polish. The block cursor in Normal mode stays, by Matt's choice. Housekeeping on
+  2026-09-11: the repository directory was renamed from `omanotes` to `OmaNotes`, which left both
+  build trees pointing at a source path that no longer existed; `build/dev` and `build/release`
+  were reconfigured with `cmake --preset <name> --fresh`. Evidence on the merged tip `97418a6` at
+  the new path: 22/22 ctest under sanitizers, format-check, clang-tidy and security-check clean,
+  release build current. Remote branches from squash-merged PRs were deleted; the parked
+  `experiment/phase-3-general-purpose` branch and its tag remain on `origin`. Matt is taking a
+  further hands-on pass over his fine-tuning list before Phase 8 opens.
