@@ -34,6 +34,8 @@ HelpOverlay::HelpOverlay(QWidget* parent) : QDialog(parent) {
     // The platform theme staples a stock icon onto standard buttons; plain
     // text keeps them in the app's own register.
     buttons->button(QDialogButtonBox::Close)->setIcon(QIcon());
+    // No accelerator underline either: "Close", not "&Close".
+    buttons->button(QDialogButtonBox::Close)->setText(QStringLiteral("Close"));
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     connect(list_, &QTreeWidget::itemActivated, this, [this] { chooseCurrent(); });
@@ -60,6 +62,11 @@ void HelpOverlay::showCommands(const CommandRegistry& commands, const AppContext
     list_->setColumnWidth(0, list_->columnWidth(0) + 32);
     list_->resizeColumnToContents(1);
     list_->setColumnWidth(1, list_->columnWidth(1) + 24);
+    // The dialog is as wide as its two columns, no wider.
+    const auto contentWidth =
+        list_->columnWidth(0) + list_->columnWidth(1) + 2 * list_->frameWidth();
+    const auto margins = layout()->contentsMargins();
+    setFixedWidth(contentWidth + margins.left() + margins.right());
     if (list_->topLevelItemCount() > 0) {
         list_->setCurrentItem(list_->topLevelItem(0));
     }
