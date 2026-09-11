@@ -793,6 +793,16 @@ void MainWindow::registerCommands() {
                 QStringLiteral("view"), inNormalMode, [this](AppContext&) { scrollHalfPage(-1); },
                 QStringLiteral("Half-page scrolling starts from Normal mode")});
     routedOutsideLeader_.push_back(QStringLiteral("view.half-page-up"));
+    // Listed so the way out is discoverable, and worded as Matt asked
+    // (2026-09-10). The route is `:q`; choosing it here runs the same quit,
+    // prompt and all.
+    addCommand({QStringLiteral("app.quit"),
+                QStringLiteral("IYKYK"),
+                QStringLiteral("app"),
+                always,
+                [this](AppContext&) { quitApplication(false); },
+                {}});
+    routedOutsideLeader_.push_back(QStringLiteral("app.quit"));
 
     addCommand({QStringLiteral("file.open"), QStringLiteral("Open file"), QStringLiteral("file"),
                 [](const AppContext& context) { return context.targetPath.has_value(); },
@@ -930,7 +940,11 @@ void MainWindow::registerCommands() {
                 always,
                 [this](AppContext& context) {
                     helpContext_ = context;
-                    helpOverlay_->showCommands(commands_, context, keymap_.shortcutLabels());
+                    // `:q` is a Vi command line verb, not a key sequence, so
+                    // the keymap has no label for it; the help shows it anyway.
+                    auto routes = keymap_.shortcutLabels();
+                    routes.emplace(QStringLiteral("app.quit"), QStringLiteral(":q"));
+                    helpOverlay_->showCommands(commands_, context, routes);
                 },
                 {}},
                {QStringLiteral("?")});

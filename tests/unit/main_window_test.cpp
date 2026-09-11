@@ -1098,14 +1098,29 @@ void MainWindowTest::everyCommandHasOneImplementationAndARoute() {
     QVERIFY2(findings.empty(), qPrintable(report));
 
     const auto& commands = window.commands();
-    for (const auto* id :
-         {"file.save", "file.open", "buffer.new", "buffer.close", "buffer.close.discard",
-          "buffer.next", "buffer.previous", "buffer.show", "pane.sidebar", "pane.editor",
-          "search.files", "search.text", "help.show", "view.reading", "edit.paste", "edit.copy",
-          "editor.visual-block", "view.half-page-down", "view.half-page-up"}) {
+    for (const auto* id : {"file.save",
+                           "file.open",
+                           "buffer.new",
+                           "buffer.close",
+                           "buffer.close.discard",
+                           "buffer.next",
+                           "buffer.previous",
+                           "buffer.show",
+                           "pane.sidebar",
+                           "pane.editor",
+                           "search.files",
+                           "search.text",
+                           "help.show",
+                           "view.reading",
+                           "edit.paste",
+                           "edit.copy",
+                           "editor.visual-block",
+                           "view.half-page-down",
+                           "view.half-page-up",
+                           "app.quit"}) {
         QVERIFY2(commands.find(QString::fromLatin1(id)) != nullptr, id);
     }
-    QCOMPARE(commands.commands().size(), std::size_t{20});
+    QCOMPARE(commands.commands().size(), std::size_t{21});
 }
 
 void MainWindowTest::leaderSequencesRunRegisteredCommands() {
@@ -1617,6 +1632,17 @@ void MainWindowTest::halfPageKeysScrollWritingAndReading() {
     QCOMPARE(keysById[QStringLiteral("view.half-page-up")], QStringLiteral("Ctrl+u"));
     QCOMPARE(keysById[QStringLiteral("file.save")], QStringLiteral("Ctrl+s"));
     QCOMPARE(keysById[QStringLiteral("pane.editor")], QStringLiteral("Ctrl+l (sidebar)"));
+    // The way out is listed, labelled as Matt asked, with its Vi route.
+    QCOMPARE(keysById[QStringLiteral("app.quit")], QStringLiteral(":q"));
+    QTreeWidgetItem* quit = nullptr;
+    for (int row = 0; row < commands->topLevelItemCount(); ++row) {
+        if (commands->topLevelItem(row)->data(0, Qt::UserRole).toString() ==
+            QStringLiteral("app.quit")) {
+            quit = commands->topLevelItem(row);
+        }
+    }
+    QVERIFY(quit != nullptr);
+    QCOMPARE(quit->text(1), QStringLiteral("IYKYK"));
     QTest::keyClick(commands, Qt::Key_Escape);
     QTRY_VERIFY(!help->isVisible());
 }
