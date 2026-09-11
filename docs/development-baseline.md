@@ -53,10 +53,12 @@ cmake --build --preset dev
 ctest --preset dev --output-on-failure
 cmake --build --preset dev --target format-check
 cmake --build --preset dev --target clang-tidy
-cmake --build --preset dev --target security-check
+cmake --preset release
+cmake --build --preset release
+cmake --build --preset release --target security-check
 ```
 
-The development preset uses Clang, strict warnings, AddressSanitizer, and UndefinedBehaviorSanitizer. The release preset retains compiler and linker hardening without sanitizers.
+The development preset uses Clang, strict warnings, AddressSanitizer, and UndefinedBehaviorSanitizer. The release preset carries the same hardening without sanitizers, and it is the binary the security check is evidence for: PIE, full RELRO, non-executable stack, no RPATH, stack protector, stack clash protection, CET marks, `_GLIBCXX_ASSERTIONS`, and `_FORTIFY_SOURCE=3` (`cmake/Warnings.cmake`). Run against the dev binary the check verifies everything except fortification, which is off without optimisation, and says so.
 
 CTest disables LeakSanitizer because the Codex command sandbox traces child
 processes, which LeakSanitizer cannot inspect safely. AddressSanitizer and
