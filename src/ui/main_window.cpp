@@ -1391,6 +1391,12 @@ std::optional<QString> MainWindow::revalidateTrackedPath(const std::filesystem::
     // A buffer's path was canonical and inside the root when it was opened.
     // Before reading it again, it has to still be: a directory on the way
     // swapped for a symlink would otherwise be followed by name.
+    // Look at the name itself before resolving through it: a dangling link
+    // would otherwise be reported as a missing file, which hides the swap.
+    std::error_code error;
+    if (std::filesystem::is_symlink(std::filesystem::symlink_status(path, error)) && !error) {
+        return QStringLiteral("%1 is a symlink now; refusing to read it").arg(displayName(path));
+    }
     const auto workspace = WorkspaceRoot::resolve(launchRequest_.root);
     if (!workspace) {
         return QString::fromStdString(workspace.error().message);

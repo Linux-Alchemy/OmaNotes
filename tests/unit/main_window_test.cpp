@@ -925,6 +925,15 @@ void MainWindowTest::keepsTheBufferWhenItsNoteIsSwappedForASymlink() {
                  qPrintable(status->text()));
     QVERIFY(!status->text().contains(QStringLiteral("Reloaded")));
     QCOMPARE(editor->document()->text(), QStringLiteral("# Original\n"));
+
+    // A dangling link is still a link: the reload names it as one rather
+    // than reporting the note missing (Matt's gate finding, 2026-09-11).
+    std::filesystem::remove(note);
+    std::filesystem::create_symlink(root / "nowhere.md", note);
+    typeViCommand(*editor, QStringLiteral("e!"));
+    QTRY_VERIFY2(status->text().contains(QStringLiteral("note.md is a symlink now")),
+                 qPrintable(status->text()));
+    QCOMPARE(editor->document()->text(), QStringLiteral("# Original\n"));
 }
 
 void MainWindowTest::keepsTheBufferWhenItsNoteGrowsPastTheLimit() {
