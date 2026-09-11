@@ -54,14 +54,15 @@ DocumentStore::resolveTarget(const std::filesystem::path& requested) const {
 }
 
 std::expected<std::filesystem::path, SaveError>
-DocumentStore::save(const std::filesystem::path& requested, const QString& text) const {
+DocumentStore::save(const std::filesystem::path& requested, const QString& text,
+                    const WritePrecondition& precondition) const {
     const auto target = resolveTarget(requested);
     if (!target) {
         return std::unexpected(target.error());
     }
 
     const auto encoded = text.toUtf8();
-    return writer_.write(*target, QByteArrayView(encoded), root_);
+    return writer_.write(*target, QByteArrayView(encoded), root_, precondition);
 }
 
 } // namespace omanotes

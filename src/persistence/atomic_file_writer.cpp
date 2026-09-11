@@ -1,6 +1,9 @@
 #include "persistence/atomic_file_writer.hpp"
 
+#include "persistence/note_reader.hpp"
 #include "workspace/workspace_root.hpp"
+
+#include <QCryptographicHash>
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -88,9 +91,45 @@ std::expected<void, SaveError> flushDirectory(const std::filesystem::path& direc
 
 std::string atomicTemporaryPrefix() { return ".omanotes-"; }
 
+/// Does the destination still satisfy the precondition? Reads through the
+/// bounded reader: a destination that became a symlink, a pipe, or too large
+/// to hash cannot be shown to match, so it does not.
+std::optional<std::string> preconditionFailure(const std::filesystem::path& destination,
+                                               const WritePrecondition& precondition) {
+    if (precondition.kind == WritePrecondition::Kind::Any) {
+        return std::nullopt;
+    }
+    const auto bytes = readNoteFile(destination);
+    const auto missing = !bytes && bytes.error().code == NoteReadErrorCode::Missing;
+    switch (precondition.kind) {
+    case WritePrecondition::Kind::Any:
+        return std::nullopt;
+    case WritePrecondition::Kind::Absent:
+        if (missing) {
+            return std::nullopt;
+        }
+        return "The file appeared on disk while the save was in progress";
+    case WritePrecondition::Kind::Matches:
+        if (missing) {
+            return "The file was removed while the save was in progress";
+        }
+        if (!bytes) {
+            return "The file could not be re-read before replacing it: " +
+                   bytes.error().message.toStdString();
+        }
+        if (QCryptographicHash::hash(QByteArrayView(*bytes), QCryptographicHash::Sha256) !=
+            precondition.contentHash) {
+            return "The file changed on disk while the save was in progress";
+        }
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+
 std::expected<void, SaveError> replaceFileAtomically(const std::filesystem::path& destination,
                                                      QByteArrayView contents, mode_t mode,
-                                                     const AtomicWriteFaults* faults) {
+                                                     const AtomicWriteFaults* faults,
+                                                     const WritePrecondition& precondition) {
     const auto directory = destination.parent_path();
     const auto pattern =
         (directory / (atomicTemporaryPrefix() + destination.filename().string() + "-XXXXXX"))
@@ -158,6 +197,13 @@ std::expected<void, SaveError> replaceFileAtomically(const std::filesystem::path
     }
     descriptor = -1;
 
+    // The last look before the rename: the bytes are durable, so this is
+    // as late as the comparison can be made without a rename-if-unchanged
+    // primitive the filesystem does not offer.
+    if (const auto changed = preconditionFailure(destination, precondition); changed) {
+        return abandon(SaveErrorCode::ChangedSinceRead, *changed);
+    }
+
     std::error_code error;
     if (faults != nullptr && faults->failRename) {
         error = std::make_error_code(std::errc::io_error);
@@ -174,7 +220,7 @@ std::expected<void, SaveError> replaceFileAtomically(const std::filesystem::path
 
 std::expected<std::filesystem::path, SaveError>
 AtomicFileWriter::write(const std::filesystem::path& target, QByteArrayView contents,
-                        const WorkspaceRoot& root) const {
+                        const WorkspaceRoot& root, const WritePrecondition& precondition) const {
     if (target.empty() || !target.has_filename() || target.parent_path().empty()) {
         return std::unexpected(SaveError{SaveErrorCode::InvalidTarget, "No file was named"});
     }
@@ -199,7 +245,8 @@ AtomicFileWriter::write(const std::filesystem::path& target, QByteArrayView cont
         return std::unexpected(SaveError{SaveErrorCode::InvalidTarget, "That path is a directory"});
     }
 
-    if (auto replaced = replaceFileAtomically(*destination, contents, modeFor(*destination));
+    if (auto replaced = replaceFileAtomically(*destination, contents, modeFor(*destination),
+                                              nullptr, precondition);
         !replaced) {
         return std::unexpected(replaced.error());
     }
