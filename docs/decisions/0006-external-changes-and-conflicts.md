@@ -36,10 +36,16 @@ the workspace root, the atomic writer, or the revision the application is tracki
 
 ### The save is the guarantee; the watcher is a courtesy
 
-Every save compares the disk against the content the buffer last loaded or wrote, at the moment
-of writing. That check does not depend on the file watcher having fired. The watcher exists so
-that changes are noticed promptly and clean buffers refresh on their own, but a watcher can lag
-or be starved, and the safety property must not rest on it.
+Every save compares the disk against the content the buffer last loaded or wrote, twice: once
+when the save is decided, and once more inside the atomic writer after the new bytes are durable
+and immediately before the rename (`WritePrecondition`, added 2026-09-11 for threat-model finding
+F-2). A change that lands between those two points is refused with "changed on disk while the
+save was in progress" and nothing is replaced. What remains open is the instant between the
+second comparison and the rename itself; Linux offers no rename-if-unchanged primitive, so that
+window is accepted and recorded rather than claimed away. Neither check depends on the file
+watcher having fired. The watcher exists so that changes are noticed promptly and clean buffers
+refresh on their own, but a watcher can lag or be starved, and the safety property must not rest
+on it.
 
 ### Identity is a content hash, not a timestamp
 
