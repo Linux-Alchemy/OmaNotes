@@ -1144,3 +1144,17 @@ Decision required: approve / request changes / stop and redesign
   release build current. Remote branches from squash-merged PRs were deleted; the parked
   `experiment/phase-3-general-purpose` branch and its tag remain on `origin`. Matt is taking a
   further hands-on pass over his fine-tuning list before Phase 8 opens.
+
+- **2026-09-11:** Sidebar mouse route, on `polish/sidebar-mouse-toggle`, PR #32, merged after
+  Matt's hands-on gate. His finding: opening the sidebar was the one core action the mouse could
+  not do. A flat glyph at the head of the buffer strip runs the existing `pane.sidebar.toggle`
+  command, so focus rules and the session snapshot are unchanged; it takes no focus and wears
+  the pane colour like the `+` and the `?`. Glyph settled at the gate in three steps: `≡`
+  rejected as a web hamburger, `»` chosen, then made to turn to `«` while the tree is out, with
+  the tooltip following ("Show sidebar (Space e)" / "Hide sidebar (Space e)"). Every show and
+  hide of the sidebar now passes through one helper, `setSidebarShown`, which also sets the
+  glyph, so it cannot drift from the tree's state across the toggle, `Ctrl+H` and session
+  restore. New test `mouseTogglesTheSidebar`; `themeDressesEveryRegion` asserts the glyph's
+  stylesheet rule. Evidence on the branch tip `4c1db0b`: 22/22 ctest under sanitizers,
+  format-check, clang-tidy and security-check clean, release build current. No PLAN.md block;
+  logged as a fine-tuning item. The fine-tuning list is otherwise clear; Phase 8 is next.
