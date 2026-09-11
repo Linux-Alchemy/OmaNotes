@@ -1800,6 +1800,14 @@ void MainWindowTest::themeDressesEveryRegion() {
     // The help glyph sits flat in the status row, not in a stock button box.
     QVERIFY(window.styleSheet().contains(
         QStringLiteral("QToolButton#helpButton { background: transparent")));
+    // Each bar is one band: the run after the tabs and the ground under the
+    // ? share the strip's and the status row's colour (Matt's gate finding).
+    QVERIFY(window.findChild<QWidget*>(QStringLiteral("bufferRow")) != nullptr);
+    QVERIFY(window.findChild<QWidget*>(QStringLiteral("statusRow")) != nullptr);
+    QVERIFY(window.styleSheet().contains(
+        QStringLiteral("QWidget#bufferRow { background-color: #181826")));
+    QVERIFY(window.styleSheet().contains(
+        QStringLiteral("QWidget#statusRow { background-color: #181826")));
 
     // The dialogs are separate windows the scoped rules used to miss: the
     // help overlay, the search palette, and the close prompt all theme.

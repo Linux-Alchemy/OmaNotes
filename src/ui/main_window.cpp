@@ -127,13 +127,18 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
     namePrompt->setContentsMargins(10, 6, 10, 6);
     namePrompt->hide();
 
-    auto* stripRow = new QHBoxLayout();
+    // The strip is one band: the tabs, the +, and the empty run after them
+    // share a ground, so nothing in the row sits on a different colour.
+    auto* bufferRow = new QWidget(writingArea);
+    bufferRow->setObjectName(QStringLiteral("bufferRow"));
+    bufferRow->setAttribute(Qt::WA_StyledBackground, true);
+    auto* stripRow = new QHBoxLayout(bufferRow);
     stripRow->setContentsMargins(0, 0, 0, 0);
     stripRow->setSpacing(0);
     stripRow->addWidget(buffers);
     stripRow->addWidget(newBuffer);
     stripRow->addStretch(1);
-    layout->addLayout(stripRow);
+    layout->addWidget(bufferRow);
     layout->addWidget(editors, 1);
     layout->addWidget(namePrompt);
     layout->addWidget(status);
@@ -235,11 +240,20 @@ MainWindow::MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, Q
     helpButton->setObjectName(QStringLiteral("helpButton"));
     helpButton->setAccessibleName(QStringLiteral("Show commands"));
     helpButton->setToolTip(QStringLiteral("Show commands (Space ?)"));
-    auto* statusLayout = new QHBoxLayout();
-    statusArea_->parentWidget()->layout()->removeWidget(statusArea_);
+    // Same for the status row: the mode, the ?, and the space between are
+    // one band, and the ? sits flat on it.
+    auto* pane = statusArea_->parentWidget();
+    auto* paneLayout = qobject_cast<QVBoxLayout*>(pane->layout());
+    auto* statusRow = new QWidget(pane);
+    statusRow->setObjectName(QStringLiteral("statusRow"));
+    statusRow->setAttribute(Qt::WA_StyledBackground, true);
+    auto* statusLayout = new QHBoxLayout(statusRow);
+    statusLayout->setContentsMargins(0, 0, 0, 0);
+    statusLayout->setSpacing(0);
+    paneLayout->removeWidget(statusArea_);
     statusLayout->addWidget(statusArea_, 1);
     statusLayout->addWidget(helpButton);
-    qobject_cast<QVBoxLayout*>(statusArea_->parentWidget()->layout())->addLayout(statusLayout);
+    paneLayout->addWidget(statusRow);
     connect(helpButton, &QToolButton::clicked, this,
             [this] { runCommand(QStringLiteral("help.show")); });
     registerCommands();
@@ -620,14 +634,14 @@ void MainWindow::loadKeymap() {
     }
     const auto configured = Keymap::load(Keymap::configurationPath(), commands_, reserved);
     if (!configured) {
-        auto* warning = new QLabel(statusArea_->parentWidget());
+        auto* warning = new QLabel(writingArea_);
         warning->setObjectName(QStringLiteral("keymapWarning"));
         warning->setAccessibleName(QStringLiteral("Keymap configuration error"));
         warning->setTextFormat(Qt::PlainText);
         warning->setWordWrap(true);
         warning->setText(QStringLiteral("Default keys are active. %1: %2")
                              .arg(configured.error().location, configured.error().message));
-        qobject_cast<QVBoxLayout*>(statusArea_->parentWidget()->layout())->addWidget(warning);
+        qobject_cast<QVBoxLayout*>(writingArea_->layout())->addWidget(warning);
         qWarning("%s", qPrintable(warning->text()));
         return;
     }
@@ -1684,8 +1698,10 @@ QLabel#sidebarHeading { color: %7; }
 QTextBrowser#readingView { background-color: %1; border: none; font-size: %12pt; }
 QWidget#writingArea { background-color: %1; border-top: 2px solid %1; }
 QWidget#writingArea[paneActive="true"] { border-top: 2px solid %4; }
+QWidget#statusRow { background-color: %3; }
 QLabel#statusArea { background-color: %3; color: %5; }
 QLineEdit#namePrompt { background-color: %3; color: %5; selection-background-color: %6; selection-color: %9; }
+QWidget#bufferRow { background-color: %3; }
 QTabBar#bufferStrip { background-color: %3; }
 QTabBar#bufferStrip::tab { background-color: %3; color: %7; padding: 5px 12px; border: none; }
 QTabBar#bufferStrip::tab:selected { background-color: %1; color: %5; }
