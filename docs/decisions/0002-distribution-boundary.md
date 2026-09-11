@@ -1,6 +1,6 @@
 # ADR 0002: Native Package and Companion Plugin Boundary
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR 0013 (2026-09-11). The AUR and Omarchy Package Repository routes and the companion plugin are deferred, not rejected; the repository-focus and no-automatic-publication rules carry forward.
 - **Date:** 2026-08-29
 
 ## Context
