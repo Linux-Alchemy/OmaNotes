@@ -1821,6 +1821,12 @@ void MainWindowTest::themeDressesEveryRegion() {
         QStringLiteral("QLabel#statusArea { background-color: #101018")));
     QVERIFY(window.styleSheet().contains(
         QStringLiteral("QTabBar#bufferStrip::tab { background-color: #101018")));
+    // Vi's `:` line is a child of the editor and wears the pane colour with
+    // no frame; its completion drop-down has no parent, so its rule lives on
+    // the application (Matt's gate finding, 2026-09-10).
+    QVERIFY(window.styleSheet().contains(
+        QStringLiteral("QLineEdit#commandtext { background-color: #101018")));
+    QVERIFY(qApp->styleSheet().contains(QStringLiteral("QListView { background-color: #181826")));
 
     // The dialogs are separate windows the scoped rules used to miss: the
     // help overlay, the search palette, and the close prompt all theme.

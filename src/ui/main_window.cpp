@@ -1843,6 +1843,8 @@ QLineEdit#searchQuery { background-color: %3; color: %5; border: 1px solid %2; p
 QDialog QPushButton { background-color: %3; color: %5; border: 1px solid %2; padding: 4px 14px; }
 QDialog QPushButton:default { border: 1px solid %4; }
 QDialog QPushButton:hover { background-color: %2; }
+QLineEdit#commandtext { background-color: %1; color: %5; border: none; selection-background-color: %6; selection-color: %9; }
+QLabel#bartypeindicator, QLabel#commandresponsemessage, QLabel#waitingforregisterindicator { background-color: %1; color: %7; }
 )")
                       .arg(name(palette.background), name(palette.border), name(palette.surface),
                            name(palette.accent), name(palette.text), name(palette.selection),
@@ -1851,6 +1853,19 @@ QDialog QPushButton:hover { background-color: %2; }
                            QString::number(palette.baseFontPointSize),
                            QString::number(palette.baseFontPointSize + 1.0)));
     writingArea_->setAttribute(Qt::WA_StyledBackground, true);
+    // Vi's `:` command line is a child of the editor and takes the rules
+    // above, but its completion drop-down is a QCompleter popup with no
+    // parent at all, so no window stylesheet can reach it. Only an
+    // application-wide rule does; it is kept to that one widget's class,
+    // and the window's own id rules still win where they apply.
+    qApp->setStyleSheet(
+        QStringLiteral(
+            "QListView { background-color: %1; color: %2; border: 1px solid %3; outline: none; "
+            "font-family: monospace; font-size: %6pt; }\n"
+            "QListView::item:selected { background-color: %4; color: %5; }")
+            .arg(name(palette.surface), name(palette.text), name(palette.border),
+                 name(palette.selection), name(palette.selectedText),
+                 QString::number(palette.baseFontPointSize)));
     // No scrollbars anywhere (Matt's call, 2026-09-10): the wheel, the keys
     // and the trackpad still scroll; the bars are given zero size rather
     // than a policy because KTextEditor owns its own and offers no switch.
