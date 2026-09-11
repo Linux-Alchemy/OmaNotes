@@ -743,7 +743,7 @@ public:
 
 **Blocks:**
 
-- [ ] **8.1.1** — Write and review the threat model with assets, trust boundaries, threats, and mitigations.
+- [x] **8.1.1** — Write and review the threat model with assets, trust boundaries, threats, and mitigations. Evidence: `docs/threat-model.md` (Change Log 2026-09-11).
 - [ ] **8.1.2** — Run compiler hardening, sanitizers, static analysis, dependency review, and fuzz/property tests for parsers where justified.
 - [ ] **8.1.3** — Resolve every release-blocking finding or record Matt's explicit deferral with impact.
 - [ ] **8.1.4** — Verify: clean release and hardened debug builds pass the complete test matrix.
@@ -1158,3 +1158,19 @@ Decision required: approve / request changes / stop and redesign
   stylesheet rule. Evidence on the branch tip `4c1db0b`: 22/22 ctest under sanitizers,
   format-check, clang-tidy and security-check clean, release build current. No PLAN.md block;
   logged as a fine-tuning item. The fine-tuning list is otherwise clear; Phase 8 is next.
+
+- **2026-09-11:** Block 8.1.1 built on `task/8.1.1-threat-model`: `docs/threat-model.md`, no
+  code or tests changed. Six assets, seven actors (the primary adversary is a writer inside the
+  workspace, per the 2026-09-07 note), seven trust boundaries, five structural facts the model
+  rests on (the editor never opens a file itself; one writer; nothing in the workspace is ever
+  deleted; no process or socket; canonical component-wise containment), and 46 threat rows in
+  twelve areas, each with the mitigating code and the proving test by `file:line`, or a plain
+  statement that neither exists. Two experiments recorded: `kate:` modelines are inert on the
+  adapter's load path (seven variables unmoved through load, set, highlighting change, and
+  modify-and-save; throwaway test, reverted), and KTextEditor persists Vi registers and macros
+  to `~/.config/katevirc`. Twenty-eight findings for 8.1.3, one Blocking: the open, reload,
+  and conflict-hash paths read by name after validation, follow symlinks, and have no size
+  cap, reachable with no user action through the watcher. Eight need Matt's ruling before code
+  moves (katevirc, two-instance record adoption, CI, dangerous roots, read-only notes,
+  dependency policy, record retention, clipboard HTML). Awaiting Matt's gate on the document
+  before 8.1.2.
