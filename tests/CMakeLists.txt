@@ -2,6 +2,7 @@ add_executable(
     omanotes_ui_tests
     unit/main_window_test.cpp
     "${CMAKE_SOURCE_DIR}/src/app/application_controller.cpp"
+    "${CMAKE_SOURCE_DIR}/src/session/instance_lock.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/application_controller.hpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_restorer.cpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_restorer.hpp"
@@ -31,6 +32,7 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.hpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/conflict_detector.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/note_reader.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/conflict_detector.hpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/document_store.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/document_store.hpp"
@@ -236,6 +238,7 @@ add_executable(
     omanotes_conflict_tests
     unit/conflict_detector_test.cpp
     "${CMAKE_SOURCE_DIR}/src/persistence/conflict_detector.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/note_reader.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/conflict_detector.hpp"
 )
 
@@ -247,6 +250,22 @@ omanotes_enable_hardening(omanotes_conflict_tests)
 omanotes_enable_sanitizers(omanotes_conflict_tests)
 
 add_test(NAME conflict-detector COMMAND omanotes_conflict_tests)
+
+add_executable(
+    omanotes_note_reader_tests
+    unit/note_reader_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/persistence/note_reader.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/note_reader.hpp"
+)
+
+target_link_libraries(omanotes_note_reader_tests PRIVATE Qt6::Test)
+target_include_directories(omanotes_note_reader_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+
+omanotes_enable_warnings(omanotes_note_reader_tests)
+omanotes_enable_hardening(omanotes_note_reader_tests)
+omanotes_enable_sanitizers(omanotes_note_reader_tests)
+
+add_test(NAME note-reader COMMAND omanotes_note_reader_tests)
 
 add_executable(
     omanotes_watcher_tests
@@ -375,6 +394,7 @@ add_executable(omanotes_recovery_store_tests
     "${CMAKE_SOURCE_DIR}/src/persistence/recovery_store.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/recovery_store.hpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/conflict_detector.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/note_reader.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/conflict_detector.hpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.hpp"
@@ -396,6 +416,7 @@ add_executable(
     omanotes_session_restore_tests
     integration/session_restore_test.cpp
     "${CMAKE_SOURCE_DIR}/src/app/application_controller.cpp"
+    "${CMAKE_SOURCE_DIR}/src/session/instance_lock.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/application_controller.hpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_restorer.cpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_restorer.hpp"
@@ -425,6 +446,7 @@ add_executable(
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.hpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/conflict_detector.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/note_reader.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/conflict_detector.hpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/document_store.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/document_store.hpp"
@@ -478,5 +500,6 @@ set_tests_properties(
     keymap markdown-render workspace-search atomic-save buffer-registry command-registry conflict-detector document-store editor-adapter file-tree-model
     file-watcher launch-process launch-request prefix-router ui-structure process-startup
     vim-behaviour theme-adapter session-snapshot session-store recovery-store session-restore
+    note-reader
     PROPERTIES ENVIRONMENT "${OMANOTES_TEST_ENVIRONMENT}"
 )

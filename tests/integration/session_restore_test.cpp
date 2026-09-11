@@ -180,6 +180,8 @@ class SessionRestoreTest final : public QObject {
     void freshBypassesWithoutDestroyingTheSession();
     void requestedFileIsFocusedLast();
     void concurrentLaunchesLastCloseWinsWithoutCorruption();
+    void secondInstanceLeavesTheFirstsRecordsAlone();
+    void theLockFollowsTheLiveInstance();
     void orphanRecordComesBackDirty();
     void recoveredNoteChangedOnDiskRefusesPlainWrite();
     void readingViewFollowsTheCursor();
@@ -404,6 +406,87 @@ void SessionRestoreTest::concurrentLaunchesLastCloseWinsWithoutCorruption() {
     QCOMPARE(after.names(),
              (QStringList{omanotes::scratchDisplayName(), "shared.md", "second.md"}));
     after.close();
+}
+
+void SessionRestoreTest::secondInstanceLeavesTheFirstsRecordsAlone() {
+    Workspace workspace;
+    QVERIFY(workspace.valid());
+    writeFile(workspace.note("draft.md"), "# Draft\n");
+    writeFile(workspace.note("other.md"), "# Other\n");
+
+    // The first window owns the workspace: it holds the lock and protects
+    // its unsaved text in a record.
+    Launch one(workspace);
+    QVERIFY(one.controller->holdsInstanceLock());
+    one.openFromSidebar(workspace.note("draft.md"));
+    typeInto(*one.window, QStringLiteral("first instance text "));
+    one.controller->checkpointNow();
+    QCOMPARE(workspace.recoveryRecords(), 1);
+    std::filesystem::path firstRecord;
+    for (const auto& entry : std::filesystem::directory_iterator(workspace.recoveryDirectory())) {
+        firstRecord = entry.path();
+    }
+    const auto firstBytes = readFile(firstRecord);
+    QVERIFY(firstBytes.contains("first instance text"));
+
+    // A second window on the same root does not hold the lock. It sees the
+    // desk, but the first window's unsaved text stays with the first window:
+    // draft.md comes back clean and no record id is adopted.
+    Launch two(workspace);
+    QVERIFY(!two.controller->holdsInstanceLock());
+    QVERIFY2(status(*two.window).contains(QStringLiteral("Another OmaNotes has this workspace")),
+             qPrintable(status(*two.window)));
+    QVERIFY2(status(*two.window).contains(QStringLiteral("held by another OmaNotes")),
+             qPrintable(status(*two.window)));
+    QVERIFY(two.controller->recoveryIds().empty());
+    QVERIFY(two.names().contains(QStringLiteral("draft.md")));
+    two.openFromSidebar(workspace.note("draft.md"));
+    QVERIFY(
+        !activeView(*two.window)->document()->text().contains(QStringLiteral("first instance")));
+    QVERIFY(!activeView(*two.window)->document()->isModified());
+
+    // The second window's own unsaved text gets its own record; the first
+    // window's record is byte-for-byte untouched.
+    two.openFromSidebar(workspace.note("other.md"));
+    typeInto(*two.window, QStringLiteral("second instance text "));
+    two.controller->checkpointNow();
+    QCOMPARE(workspace.recoveryRecords(), 2);
+    QCOMPARE(readFile(firstRecord), firstBytes);
+    one.controller->checkpointNow();
+    QCOMPARE(readFile(firstRecord), firstBytes);
+
+    two.close();
+    one.close();
+    QCOMPARE(workspace.recoveryRecords(), 2);
+
+    // With both gone, the next launch holds the lock and brings back both
+    // texts: one referenced by the last snapshot, one as an orphan.
+    Launch three(workspace);
+    QVERIFY(three.controller->holdsInstanceLock());
+    QVERIFY2(status(*three.window).contains(QStringLiteral("recovered 2 with unsaved changes")),
+             qPrintable(status(*three.window)));
+    QCOMPARE(three.controller->recoveryIds().size(), std::size_t{2});
+    three.close();
+}
+
+void SessionRestoreTest::theLockFollowsTheLiveInstance() {
+    Workspace workspace;
+    QVERIFY(workspace.valid());
+    {
+        Launch one(workspace);
+        QVERIFY(one.controller->holdsInstanceLock());
+        // A clean close releases it.
+        one.close();
+    }
+    {
+        Launch two(workspace);
+        QVERIFY(two.controller->holdsInstanceLock());
+        // So does a kill: the kernel drops the lock with the descriptor.
+        two.kill();
+    }
+    Launch three(workspace);
+    QVERIFY(three.controller->holdsInstanceLock());
+    three.close();
 }
 
 void SessionRestoreTest::orphanRecordComesBackDirty() {

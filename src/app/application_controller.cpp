@@ -61,6 +61,33 @@ void ApplicationController::start() {
     const auto root = resolveRoot();
     QStringList status;
 
+    // ADR 0012: only the instance holding the workspace's lock may read or
+    // take over recovery records. Any other outcome, contention or failure,
+    // means "leave every record alone".
+    if (root) {
+        if (const auto prepared = sessions_.ensureDirectoryFor(*root); !prepared) {
+            status << QStringLiteral("Session directory unavailable (%1); unsaved work from "
+                                     "earlier sessions is not adopted")
+                          .arg(prepared.error().describe());
+        } else {
+            lock_.emplace(InstanceLock::acquire(sessions_.lockFileFor(*root)));
+            switch (lock_->state()) {
+            case InstanceLock::State::Held:
+                break;
+            case InstanceLock::State::HeldElsewhere:
+                status << QStringLiteral("Another OmaNotes has this workspace open; its unsaved "
+                                         "work stays with it");
+                break;
+            case InstanceLock::State::Failed:
+                status << QStringLiteral("Could not take the workspace lock (%1); unsaved work "
+                                         "from earlier sessions is not adopted")
+                              .arg(lock_->error());
+                break;
+            }
+        }
+    }
+    const bool adoptRecords = holdsInstanceLock();
+
     if (root && !request_.bypassRestore) {
         const auto loaded = sessions_.load(*root);
         if (!loaded) {
@@ -74,7 +101,7 @@ void ApplicationController::start() {
                           .arg(loaded.error().describe(), kept);
         } else if (loaded->has_value()) {
             const auto initial = window_.untouchedInitialBuffer();
-            lastReport_ = restorer_.restore(**loaded, *root, recovery_, window_);
+            lastReport_ = restorer_.restore(**loaded, *root, recovery_, window_, adoptRecords);
             recoveryIds_ = lastReport_.recoveryIds;
             if (initial && (lastReport_.restored > 0 || lastReport_.recovered > 0)) {
                 window_.closeIfUntouched(*initial);
@@ -82,9 +109,11 @@ void ApplicationController::start() {
         }
     }
 
-    if (root && !request_.bypassRestore) {
+    if (root && !request_.bypassRestore && adoptRecords) {
         // Records nothing references are unsaved text with lost bookkeeping;
         // they come back as dirty buffers rather than being tidied away.
+        // Only the lock holder does this: to anyone else, an unreferenced
+        // record may be another live window's text.
         if (const auto present = recovery_.list(); present) {
             std::vector<RecoveryId> orphans;
             for (const auto& id : *present) {
@@ -202,6 +231,10 @@ const RestoreReport& ApplicationController::lastReport() const noexcept { return
 
 const std::map<BufferId, RecoveryId>& ApplicationController::recoveryIds() const noexcept {
     return recoveryIds_;
+}
+
+bool ApplicationController::holdsInstanceLock() const noexcept {
+    return lock_.has_value() && lock_->held();
 }
 
 QString ApplicationController::parkedWorkNotice() const {

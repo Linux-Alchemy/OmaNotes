@@ -1,4 +1,5 @@
 #include "persistence/conflict_detector.hpp"
+#include "persistence/note_reader.hpp"
 
 #include <QFile>
 #include <QTemporaryDir>
@@ -33,6 +34,7 @@ class ConflictDetectorTest final : public QObject {
     void unreadableFileNeverReplacesTheBuffer();
     void readsRevisionsFromDisk();
     void touchWithoutContentChangeIsUnchanged();
+    void symlinkedOrOversizedFileIsUnreadableNotReloaded();
 };
 
 void ConflictDetectorTest::identicalContentIsUnchangedRegardlessOfModifiedFlag() {
@@ -97,6 +99,29 @@ void ConflictDetectorTest::touchWithoutContentChangeIsUnchanged() {
     writeFile(note, "# Note\n");
     QCOMPARE(classifyExternalChange(known, DiskRevision::read(note), true),
              ExternalChangeAction::Unchanged);
+}
+
+void ConflictDetectorTest::symlinkedOrOversizedFileIsUnreadableNotReloaded() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = pathFor(temporary.path());
+    const auto known = SavedRevision::of("# Note\n");
+
+    // A note swapped for a symlink after it was opened is not followed by
+    // the hash either: the disk is "unreadable", so a clean buffer is kept
+    // and the user is told, rather than the link's target being loaded.
+    writeFile(root / "target.md", "# Elsewhere\n");
+    std::filesystem::create_symlink(root / "target.md", root / "note.md");
+    const auto linked = DiskRevision::read(root / "note.md");
+    QCOMPARE(linked.state, DiskRevision::State::Unreadable);
+    QCOMPARE(classifyExternalChange(known, linked, false), ExternalChangeAction::PromptConflict);
+
+    // Past the note limit the same applies: nothing is read into memory.
+    writeFile(root / "huge.md",
+              QByteArray(static_cast<qsizetype>(omanotes::kNoteMaxBytes) + 1, 'x'));
+    const auto huge = DiskRevision::read(root / "huge.md");
+    QCOMPARE(huge.state, DiskRevision::State::Unreadable);
+    QCOMPARE(classifyExternalChange(known, huge, false), ExternalChangeAction::PromptConflict);
 }
 
 QTEST_MAIN(ConflictDetectorTest)

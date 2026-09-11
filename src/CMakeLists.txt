@@ -26,10 +26,14 @@ add_executable(
     persistence/atomic_file_writer.hpp
     persistence/conflict_detector.cpp
     persistence/conflict_detector.hpp
+    persistence/note_reader.cpp
+    persistence/note_reader.hpp
     persistence/document_store.cpp
     persistence/recovery_store.cpp
     persistence/recovery_store.hpp
     persistence/document_store.hpp
+    session/instance_lock.cpp
+    session/instance_lock.hpp
     session/session_restorer.cpp
     session/session_restorer.hpp
     session/session_snapshot.cpp
