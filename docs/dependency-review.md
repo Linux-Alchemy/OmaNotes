@@ -50,9 +50,9 @@ There is no automated feed. The route is:
 
 1. Arch's security tracker, <https://security.archlinux.org>, filtered to `qt6-base`,
    `qt6-declarative`, `ktexteditor`, `kio`, `kauth`, and `clang`.
-2. `arch-audit`, when installed, lists installed packages with open CVEs in one command. It
-   is not installed on the baseline machine today; installing it is a one-line decision for
-   Matt, not a project dependency.
+2. `arch-audit` would list installed packages with open CVEs in one command. Matt ruled it
+   out on 2026-09-11: the tracker plus the update cadence is enough for a single-user desktop
+   application, and it is not to become a project dependency.
 3. Omarchy's own update cadence rolls all 138 objects; after an update, the six gates run
    and the security check confirms the release binary still carries its hardening.
 
