@@ -144,7 +144,10 @@ void KTextEditorAdapter::applyTheme(const ThemePalette& palette) {
                                                                 : QStringLiteral("Breeze Light"));
     view_->setConfigValue(QStringLiteral("background-color"), palette.background);
     view_->setConfigValue(QStringLiteral("selection-color"), palette.selection);
-    view_->setConfigValue(QStringLiteral("current-line-color"), palette.surface);
+    // No current-line bar (Matt's call, 2026-09-10): the cursor says where
+    // you are. KTextEditor has no public switch for the highlight, so it is
+    // painted in the ground colour, which is the same as not painting it.
+    view_->setConfigValue(QStringLiteral("current-line-color"), palette.background);
     auto editorFont = view_->configValue(QStringLiteral("font")).value<QFont>();
     editorFont.setPointSizeF(palette.baseFontPointSize);
     view_->setConfigValue(QStringLiteral("font"), editorFont);
