@@ -153,7 +153,7 @@ The first usable milestone should provide:
 - Herdr-inspired, versioned session snapshot and restore with separate dirty-buffer recovery.
 - Theme integration sufficient to feel at home on Omarchy.
 - A small documented CLI surface for predictable launch context and, where justified, agent interaction.
-- Arch packaging suitable for evaluation on Omarchy, eventual AUR/Omarchy Package Repository submission, and an optional separately packaged QML companion plugin when it provides meaningful shell integration.
+- Arch packaging installable on Omarchy from the GitHub repository. AUR/Omarchy Package Repository submission and an optional separately packaged QML companion plugin are deferred until wanted (ADR 0013, 2026-09-11).
 
 ## Explicit non-goals for the initial release
 
@@ -173,13 +173,13 @@ The first usable milestone should provide:
 
 These are expected design checkpoints rather than permission to expand scope:
 
-1. Confirm `Omanotes` as the final public name after availability checks.
+1. Confirm `Omanotes` as the final public name after availability checks. *Deferred with any future submission (ADR 0013); no collision in the official Arch repositories as of 2026-09-11.*
 2. Select the default application leader after testing KTextEditor's canonical Vim commands; Space is the current recommendation.
 3. Define the minimum supported KTextEditor, Qt, and Omarchy versions from the target packaging environment.
 4. Confirm whether KTextEditor's Vi behaviour passes the agreed motion, operator, visual-mode, register, search, repeat, and mapping acceptance suite.
 5. Confirm that Qt's Markdown renderer meets the desired reading-view appearance and safety requirements.
-6. Define any useful QML companion-plugin scope before proposing a separate repository for `omarchyplugins.com`; the native application itself ships as an Arch package.
-7. Select the public licence before the first public release.
+6. Define any useful QML companion-plugin scope before proposing a separate repository for `omarchyplugins.com`; the native application itself ships as an Arch package. *Deferred (ADR 0013).*
+7. Select the public licence before the first public release. *Resolved: MIT (ADR 0014, 2026-09-11).*
 
 ## Success definition
 

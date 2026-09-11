@@ -731,9 +731,9 @@ public:
 
 ## Phase 8: Hardening, Packaging, and First Usable Release
 
-**Phase goal:** Turn the accepted application into an auditable Omarchy package suitable for daily use and eventual publication.
+**Phase goal:** Turn the accepted application into an auditable package that installs on Omarchy from the GitHub repository, for daily use by Matt and by anyone who clones it (ADR 0013; amended 2026-09-11, see Change Log).
 
-**User-visible result:** Install, launch from Omarchy, use daily, uninstall cleanly, and inspect documented architecture/security decisions.
+**User-visible result:** Clone, build the package, install, launch from Omarchy, use daily, uninstall cleanly, and inspect documented architecture/security decisions.
 
 **Phase constraint:** No new product features. Findings may fix existing behaviour but cannot smuggle in scope.
 
@@ -752,20 +752,20 @@ public:
 - [x] **8.1.3** — Resolve every release-blocking finding or record Matt's explicit deferral with impact. Evidence: F-1 (the one Blocking row) closed in #35; the moderate tier closed in #36–#39 or accepted; the sixteen Low rows deferred by Matt on 2026-09-11 with the impact stated in `docs/threat-model.md`, section 9 (Change Log 2026-09-11).
 - [x] **8.1.4** — Verify: clean release and hardened debug builds pass the complete test matrix. Evidence: both presets built from empty directories with zero warnings; 24/24 ctest on each; format-check, clang-tidy, and security-check on both binaries clean; the fuzz preset builds. One release-only test failure found and fixed (Change Log 2026-09-11).
 
-### Task 8.2: Package for Omarchy evaluation
+### Task 8.2: Package for installation from the GitHub repository
 
-**Files:** `packaging/arch/PKGBUILD`, `packaging/linux/*.desktop`, `packaging/linux/*.metainfo.xml`, icons, `docs/packaging.md`
+**Files:** `LICENSE`, `packaging/arch/PKGBUILD`, `packaging/linux/*.desktop`, icons, CMake install rules, `docs/packaging.md`
 
-**What it does:** Package only built artefacts and declared runtime dependencies, integrate XDG desktop metadata, and provide reproducible install/uninstall instructions.
+**What it does:** Package only built artefacts and declared runtime dependencies, integrate XDG desktop metadata so the application appears in Omarchy's launcher, and provide reproducible install, upgrade, and uninstall instructions that work from a fresh clone of the repository. A PKGBUILD is the primary route and `cmake --install` the fallback; both install the same files (ADR 0013).
 
-**Don't touch:** System config, user themes, automatic repository publication.
+**Don't touch:** System config, user themes, AUR or Omarchy Package Repository submission, prebuilt binaries, automatic publication of any kind.
 
 **Blocks:**
 
-- [ ] **8.2.1** — Revalidate the Omarchy Package Repository/AUR route, companion-plugin marketplace contract, and naming availability before release work.
-- [ ] **8.2.2** — Build a clean Arch package in an isolated packaging environment.
-- [ ] **8.2.3** — Install, launch, upgrade, and uninstall on the target Omarchy system without orphaning user-authored notes.
-- [ ] **8.2.4** — Verify: package metadata, dependency list, file ownership, desktop launch, CLI launch, and removal checks pass.
+- [x] **8.2.1** — Record the licence and the distribution route. Evidence: MIT, `LICENSE` at the root (ADR 0014); the GitHub repository is the distribution, PKGBUILD primary, `cmake --install` fallback, AUR/Package Repository/companion plugin deferred (ADR 0013, superseding ADR 0002); `omanotes` has no collision in the official Arch repositories (Change Log 2026-09-11).
+- [ ] **8.2.2** — Add CMake install rules (binary, desktop entry, icon, licence) and a PKGBUILD that builds the release configuration from a clean clone of the repository, never the working tree; lint the package.
+- [ ] **8.2.3** — Install, launch from the Omarchy launcher and from the CLI, upgrade, and uninstall on the target Omarchy system without orphaning user-authored notes or XDG state.
+- [ ] **8.2.4** — Verify: package metadata, dependency list, file ownership, licence placement, desktop launch, CLI launch, and removal checks pass, and the documented path works from a fresh clone.
 
 ### Task 8.3: Explain the system to its orchestrator and contributors
 
@@ -779,7 +779,7 @@ public:
 
 - [ ] **8.3.1** — Document user installation, key language, launch contract, recovery, and troubleshooting.
 - [ ] **8.3.2** — Document the component/data flow for design-level understanding without requiring C++ fluency.
-- [ ] **8.3.3** — Record remaining limitations, licence, name status, and publication checklist.
+- [ ] **8.3.3** — Record remaining limitations, the licence, and the steps to cut a tagged source release on GitHub; the AUR and plugin routes stay recorded as deferred (ADR 0013).
 - [ ] **8.3.4** — Verify: a clean checkout follows the documented build/test/package path without tribal knowledge.
 
 ### Phase 8 Checkpoint
@@ -787,8 +787,8 @@ public:
 - [ ] Complete clean-room build, test, hardening, and package evidence is attached to the phase report.
 - [ ] Install/upgrade/uninstall preserve notes and handle XDG state as documented.
 - [ ] Architecture and security documents match the shipped code.
-- [ ] **Matt gate:** use the packaged build for an agreed daily-use trial and approve any public-release step separately.
-- [ ] No direct push to `main`, release, public-repository change, or plugin-board submission occurs without explicit approval. Approved work may be pushed to a review branch solely to open its pull request.
+- [ ] **Matt gate:** use the package built from the repository for an agreed daily-use trial and approve any tagged release separately.
+- [ ] No direct push to `main`, tagged release, AUR or Omarchy Package Repository submission, or plugin-board submission occurs without explicit approval. Approved work may be pushed to a review branch solely to open its pull request.
 
 ## Quick Reference: Phase Boundaries
 
@@ -801,7 +801,7 @@ public:
 | 5 | Commands, complete navigation, find/help | Shell commands, plugins |
 | 6 | Secure reading view and Omarchy appearance | WYSIWYG, remote content |
 | 7 | Versioned snapshot and dirty recovery | Process resurrection, cloud sync |
-| 8 | Audit, docs, Arch/Omarchy package | New features or publication without approval |
+| 8 | Audit, docs, GitHub-installable Arch package | New features; AUR, Package Repository, or plugin publication |
 
 ## Orchestrator Review Template
 
@@ -1260,3 +1260,17 @@ Decision required: approve / request changes / stop and redesign
   No product code changed. Second sanitizer-only assumption found in the tests this phase (after
   the `..` substring check in 8.1.2); whether the release preset joins the routine gate is for
   the pause Matt asked for before Task 8.2.
+
+- **2026-09-11:** Phase 8 amended at Matt's pause after Task 8.1, on `docs/8.2-github-distribution`.
+  The end goal is restated: OmaNotes is for Matt's daily use, lives on his public GitHub
+  repository, and must be installable by anyone who clones it; AUR, Omarchy Package Repository,
+  and companion-plugin publication are deferred, not rejected (ADR 0013, superseding ADR 0002).
+  Licence chosen: MIT, `LICENSE` at the root (ADR 0014, closing outline question 7). Task 8.2
+  reworded with its addresses preserved: 8.2.1 becomes the decision block and is ticked by this
+  entry; 8.2.2 asks for install rules and a PKGBUILD built from a clean clone instead of an
+  isolated packaging environment; 8.2.3 and 8.2.4 keep their substance with the launcher and
+  licence placement named. 8.3.3 drops the publication checklist for the tagged-release steps.
+  The phase goal, checkpoint, and quick-reference row say GitHub rather than AUR. The outline's
+  initial-scope line and open questions 1, 6, and 7 are annotated to match. The README stays
+  in 8.3, written when the application is complete, at Matt's direction. Found on the way: the
+  repository had been public with no licence file, which is all rights reserved.

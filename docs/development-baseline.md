@@ -69,4 +69,4 @@ the traced harness during the manual checkpoint.
 
 ## Distribution constraint
 
-Omanotes is a native desktop application and will follow Arch package conventions, with AUR and the Omarchy Package Repository as intended distribution routes. Omarchy shell plugins are QML repositories loaded into the long-running Quickshell process; they do not install native packages. Any future `omarchyplugins.com` entry must therefore be a separate, useful QML companion plugin that documents Omanotes as an external dependency.
+Omanotes is a native desktop application and follows Arch package conventions. Distribution is the public GitHub repository: a PKGBUILD built from a clean clone, with `cmake --install` as the fallback (ADR 0013). AUR and Omarchy Package Repository submission are deferred. Omarchy shell plugins are QML repositories loaded into the long-running Quickshell process; they do not install native packages. Any future `omarchyplugins.com` entry must therefore be a separate, useful QML companion plugin that documents Omanotes as an external dependency.
