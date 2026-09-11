@@ -84,4 +84,17 @@ resolveLaunchRequest(std::span<const std::string_view> arguments,
     return LaunchRequest{currentRoot->path(), *file, bypassRestore};
 }
 
+std::optional<std::string> wideRootNotice(const std::filesystem::path& canonicalRoot,
+                                          const std::filesystem::path& home) {
+    if (canonicalRoot == canonicalRoot.root_path()) {
+        return "Workspace is the filesystem root; every Markdown file on the system is in scope";
+    }
+    std::error_code error;
+    const auto canonicalHome = std::filesystem::weakly_canonical(home, error);
+    if (!error && !home.empty() && canonicalRoot == canonicalHome) {
+        return "Workspace is your home directory; every Markdown file beneath it is in scope";
+    }
+    return std::nullopt;
+}
+
 } // namespace omanotes
