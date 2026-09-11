@@ -271,6 +271,28 @@ omanotes_enable_sanitizers(omanotes_note_reader_tests)
 add_test(NAME note-reader COMMAND omanotes_note_reader_tests)
 
 add_executable(
+    omanotes_parser_property_tests
+    property/parser_property_test.cpp
+    "${CMAKE_SOURCE_DIR}/src/app/keymap.cpp"
+    "${CMAKE_SOURCE_DIR}/src/core/command_registry.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/conflict_detector.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/note_reader.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/recovery_store.cpp"
+    "${CMAKE_SOURCE_DIR}/src/session/session_snapshot.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/markdown_view.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/theme_adapter.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/file_watcher.cpp"
+    "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.cpp"
+)
+target_include_directories(omanotes_parser_property_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(omanotes_parser_property_tests PRIVATE Qt6::Test Qt6::Widgets)
+omanotes_enable_warnings(omanotes_parser_property_tests)
+omanotes_enable_hardening(omanotes_parser_property_tests)
+omanotes_enable_sanitizers(omanotes_parser_property_tests)
+add_test(NAME parser-properties COMMAND omanotes_parser_property_tests)
+
+add_executable(
     omanotes_watcher_tests
     unit/file_watcher_test.cpp
     "${CMAKE_SOURCE_DIR}/src/workspace/file_watcher.cpp"
@@ -505,6 +527,9 @@ set_tests_properties(
     keymap markdown-render workspace-search atomic-save buffer-registry command-registry conflict-detector document-store editor-adapter file-tree-model
     file-watcher launch-process launch-request prefix-router ui-structure process-startup
     vim-behaviour theme-adapter session-snapshot session-store recovery-store session-restore
-    note-reader
+    note-reader parser-properties
     PROPERTIES ENVIRONMENT "${OMANOTES_TEST_ENVIRONMENT}"
+    # A hang is a failure, not a wait: every suite finishes in well under a
+    # minute on the baseline machine (threat-model finding F-18).
+    TIMEOUT 600
 )
