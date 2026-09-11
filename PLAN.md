@@ -1173,3 +1173,23 @@ Decision required: approve / request changes / stop and redesign
   cap, reachable with no user action through the watcher. Seven need Matt's ruling before code
   moves (katevirc, two-instance record adoption, CI, dangerous roots, read-only notes,
   dependency policy, record retention). Awaiting Matt's gate on the document before 8.1.2.
+
+- **2026-09-11:** Findings F-1 and F-7 closed on `task/8.1.3-high-severity` (8.1.3 work, the
+  two rows the threat model rated High; stacked on the 8.1.1 branch so the document's rows
+  could be updated in the same change). F-1: `readNoteFile` (`src/persistence/note_reader.cpp`)
+  is the one reader for every note read after validation: `O_NOFOLLOW` on the final component,
+  regular-file check on the open descriptor, 16 MiB cap matching the recovery ceiling; used by
+  the open, the explicit reload, the watcher's reload, and the conflict hash, and both reloads
+  re-validate the tracked path first. A note that is now a symlink, a pipe, a directory, or
+  too large is refused with a message and the buffer is kept. Found on the way: the watcher
+  handler looked buffers up through a canonicalising lookup, so a swapped note made its own
+  buffer unfindable and the swap went unreported; it now matches the exact tracked path.
+  F-7, ADR 0012: a per-root `flock` on `sessions/<id>/instance.lock`; only the holder
+  restores, adopts, or checkpoints into existing recovery records, and any other instance
+  restores structure only, reopens dirty notes clean, says how many are held by another
+  OmaNotes, and writes only its own new records. No record-format change. New `note-reader`
+  suite (5 cases: limit inclusive, over limit, symlink, directory and pipe without blocking,
+  missing versus unreadable); `conflict-detector` gains the symlink and oversize cases; the
+  window suite gains oversized open refused, symlink swap kept and reported, growth past the
+  limit kept; `session-restore` gains the second-instance scenario and the lock following
+  clean close and kill. Awaiting Matt's gate.

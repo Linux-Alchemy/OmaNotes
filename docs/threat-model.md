@@ -2,6 +2,9 @@
 
 > **Block:** 8.1.1. **Status:** draft for Matt's gate, 2026-09-11.
 > **Audited tip:** `main` at `479fb3c` (PR #32 merged). Line numbers refer to that tip.
+> **Amended 2026-09-11:** findings F-1 and F-7 closed on `task/8.1.3-high-severity`; the rows
+> they cover (T-N4, T-N6, T-P6, T-W2) carry their new status. Other line numbers are from the
+> audited tip and drift by the size of that change.
 > **Rule of the document:** every mitigation names the code that does it and the test that
 > proves it. A row with no test says so. A threat with no mitigation is listed, not omitted.
 
@@ -175,8 +178,17 @@ elsewhere after launch).
   opened; the guarantee is by construction. Residue noted in F-18.
 
 **T-N4. A huge or pathological note exhausts memory or hangs the UI.**
-- Status: **Unmitigated on the open path; mitigated in search.**
-- Detail: `readNoteBytes` (`main_window.cpp:66-77`) reads the entire file with no size cap,
+- Status: **Mitigated for size (F-1 closed); Partial for render time.**
+- Mitigation (2026-09-11): every read of a note goes through `readNoteFile`
+  (`src/persistence/note_reader.cpp`), which checks the size on the open descriptor and
+  stops reading at 16 MiB, the recovery ceiling. The open, the explicit reload, the watcher's
+  reload, and the conflict hash all use it. A file that grows past the limit is refused and
+  a clean buffer is kept with a message. Tests: `refusesAFileOverTheLimit`
+  (`tests/unit/note_reader_test.cpp`), `refusesToOpenAnOversizedNote` and
+  `keepsTheBufferWhenItsNoteGrowsPastTheLimit` (`tests/unit/main_window_test.cpp`),
+  `symlinkedOrOversizedFileIsUnreadableNotReloaded` (`tests/unit/conflict_detector_test.cpp`).
+- Residue: no render timeout or node bound below the size cap (F-17 territory).
+- Original detail: `readNoteBytes` (`main_window.cpp:66-77`) read the entire file with no size cap,
   into a `std::string`, then a `QByteArray`, then a `QString`, on the UI thread, and hands it
   to the editor and to `setMarkdown` with no size, node, depth, or time bound. The content hash
   for conflict detection reads the whole file too (`src/persistence/conflict_detector.cpp:26`)
@@ -198,8 +210,23 @@ elsewhere after launch).
   `launch_request_test.cpp:164-185`.
 
 **T-N6. The file changes between validation and read** (time-of-check to time-of-use).
-- Status: **Unmitigated.**
-- Detail: `loadMarkdownFile` validates through `resolveFile` (`main_window.cpp:1560`) and then
+- Status: **Mitigated for the final component (F-1 closed); the directory-swap race remains
+  under T-S4 / F-2.**
+- Mitigation (2026-09-11): `readNoteFile` opens with `O_NOFOLLOW` and checks the descriptor
+  is a regular file, so a note swapped for a symlink, directory, or pipe after validation is
+  refused rather than read. Both reload paths re-run `resolveFile` and require the canonical
+  path to still equal the tracked one (`MainWindow::revalidateTrackedPath`). Tests:
+  `refusesASymlinkEvenToAReadableFile`, `refusesADirectoryAndAPipeWithoutBlocking`
+  (`tests/unit/note_reader_test.cpp`), `keepsTheBufferWhenItsNoteIsSwappedForASymlink`
+  (`tests/unit/main_window_test.cpp`).
+- Correction found while fixing (2026-09-11): the watcher-driven variant described below was
+  already blocked, by accident rather than design. The registry's path lookup canonicalises,
+  so once the note was a symlink the handler could not find its own buffer and returned
+  silently, with no message and no conflict mark. The explicit reload (`:e!`) did follow
+  the link. The fix looks the buffer up by its exact tracked path
+  (`BufferRegistry::findByExactPath`), so the swap is now reported and marked as well as
+  refused.
+- Original detail: `loadMarkdownFile` validated through `resolveFile` (`main_window.cpp:1560`) and then
   reads by name with a plain `std::ifstream` (`:67`), which follows symlinks. The reload on
   external change (`:1409`) and the reload command (`:1361`) skip validation entirely and read
   the stored path. Swapping an open note for a symlink to any user-readable file makes the
@@ -418,8 +445,15 @@ elsewhere after launch).
   misattribution, not new access. Finding F-15b.
 
 **T-P6. Two instances on one root destroy each other's work.**
-- Status: **Partial, worse than documented.**
-- Detail: there is no lock of any kind. The snapshot is last-close-wins, documented
+- Status: **Mitigated (F-7 closed, ADR 0012).**
+- Mitigation (2026-09-11): a per-root `flock` on `sessions/<id>/instance.lock`
+  (`src/session/instance_lock.cpp`), taken at start by `ApplicationController`. Only the
+  holder restores, adopts, or checkpoints into existing records; any other instance restores
+  structure only, reopens dirty notes clean, reports them as held elsewhere, and writes only
+  its own new records. The kernel releases the lock on any exit. Tests:
+  `secondInstanceLeavesTheFirstsRecordsAlone`, `theLockFollowsTheLiveInstance`
+  (`tests/integration/session_restore_test.cpp`).
+- Original detail: there was no lock of any kind. The snapshot is last-close-wins, documented
   (`docs/session-format.md:39-43`) and tested for non-corruption
   (`session_store_test.cpp:353-416`; `session_restore_test.cpp`
   `concurrentLaunchesLastCloseWinsWithoutCorruption`). But a second instance treats the
@@ -442,7 +476,9 @@ elsewhere after launch).
   Finding F-23.
 
 **T-W2. An external change reloads content into the editor without asking.**
-- Status: **Accepted (ADR 0006), with the T-N4 and T-N6 caveats.**
+- Status: **Accepted (ADR 0006).** The T-N4 and T-N6 caveats are closed by F-1: the reload
+  re-validates the path and reads through the bounded reader, so it can no longer be made
+  to read the wrong file or too much of one.
 - Detail: a clean buffer is reloaded silently (`main_window.cpp:1409-1425`); a dirty one is
   flagged and plain `:w` refuses. The reload path is what makes T-N4 and T-N6 reachable with
   no user action; fixing those closes the sharp edge here.
@@ -599,13 +635,13 @@ unless Matt defers with a recorded reason; **Low** may be deferred to the limita
 
 | Id | Severity | Finding | Threats | Smallest decision |
 | --- | --- | --- | --- | --- |
-| F-1 | Blocking | Open and reload read by name after validation, follow symlinks, and have no size cap; the watcher makes this reachable with no user action. | T-N4, T-N6, T-W2 | Approve: one bounded reader (`O_NOFOLLOW`, `fstat` regular-file check, size cap) used by open, reload, external-change reload, and the conflict hash. Pick the cap (search uses 4 MiB; notes may want more). |
+| F-1 | ~~Blocking~~ **Closed 2026-09-11** | Open and reload read by name after validation, follow symlinks, and have no size cap; the watcher makes this reachable with no user action. | T-N4, T-N6, T-W2 | Done: `readNoteFile` (`src/persistence/note_reader.cpp`) with `O_NOFOLLOW`, regular-file check on the descriptor, 16 MiB cap matching the recovery ceiling; used by open, both reloads, and the conflict hash; reloads re-validate the path first. |
 | F-2 | Should-fix | Save-time and path-resolution races between check and rename; ADR 0006 overstates the guarantee. | T-S3, T-S4 | Approve either an inode/hash recheck immediately before rename, or correct ADR 0006 and record the window as accepted. |
 | F-3 | Should-fix | Status line, sidebar heading, search status, and buffer prompts render untrusted names as rich text. | T-U1 | Approve `Qt::PlainText` on each, with a test that a `<b>`-named file shows its angle brackets. |
 | F-4 | Should-fix | `RecoveryStore` does not refuse symlinked ancestor directories; `SessionStore` does. | T-P5 | Approve mirroring the session store's per-level check, with a test. |
 | F-5 | Decide | KTextEditor persists yanked text and macros to `~/.config/katevirc`. | T-E5 | Rule: accept and document beside the recovery-record statement, or task 8.1.3 to find a KTextEditor setting that disables it (may not exist). |
 | F-6 | Should-fix | Editor boundary properties are inert rather than mitigated: modelines, swap and backup files, JS engine, `:` pass-through with no deny-list. | T-E1–T-E4 | Approve regression tests pinning S1 (no URL, modelines inert, no swap file written), and rule on whether `set-*` and `reload` should be intercepted. |
-| F-7 | Decide | Two instances on one root adopt each other's live recovery records and overwrite them. | T-P6 | Rule: a per-root lock file that refuses or warns on a second launch, or record instance liveness in records so orphans are only ever dead ones. |
+| F-7 | ~~Decide~~ **Closed 2026-09-11** | Two instances on one root adopt each other's live recovery records and overwrite them. | T-P6 | Done, ADR 0012: per-root `flock`; the holder owns recovery, everyone else restores structure only and never touches existing records. |
 | F-8 | Should-fix | Hardening flags absent (`_FORTIFY_SOURCE`, `_GLIBCXX_ASSERTIONS`, stack-clash, CET) and unchecked; the check runs on the dev binary. | T-B1 | Approve adding the flags to the release preset, extending `security-check.sh` to test them, and pointing the docs at the release binary. |
 | F-9 | Decide | No CI; every gate is manual. | T-B2 | Rule whether Phase 8 adds a GitHub Actions workflow running the six gates on pull requests, or records manual gating as the accepted process. |
 | F-10 | Should-fix | Unchecked dereference of a failed root resolution in `application_controller.cpp:211`; uncaught throw from the tree model at startup. | T-R5 | Approve the check and a graceful exit message, with a test. |
