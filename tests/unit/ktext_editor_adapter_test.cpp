@@ -64,6 +64,9 @@ void KTextEditorAdapterTest::configuresMarkdownWritingView() {
         const auto theme = repository.theme(QString::fromLatin1(name));
         QVERIFY2(theme.isValid(), name);
         QCOMPARE(qAlpha(theme.editorColor(KSyntaxHighlighting::Theme::CurrentLine)), 0);
+        // Likewise the icon-border separator: a hairline the hidden border
+        // would otherwise leave down the text area's left edge.
+        QCOMPARE(qAlpha(theme.editorColor(KSyntaxHighlighting::Theme::Separator)), 0);
     }
     for (const bool dark : {true, false}) {
         omanotes::ThemePalette palette;

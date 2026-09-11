@@ -8,7 +8,7 @@
         "license": "SPDX-License-Identifier: MIT",
         "revision": 1,
         "name": "OmaNotes Light",
-        "omanotes-note": "Derived from KDE's Breeze Light theme. The only change: CurrentLine is fully transparent, because OmaNotes overlays its own Omarchy ground colour and wants no current-line bar. Loaded from :/org.kde.syntax-highlighting/themes-addons, the path KSyntaxHighlighting reserves for applications."
+        "omanotes-note": "Derived from KDE's Breeze Light theme. Two changes: CurrentLine is fully transparent (no current-line bar; OmaNotes overlays its own Omarchy ground colour) and Separator is fully transparent (no hairline at the text area's left edge; the icon border is hidden). Loaded from :/org.kde.syntax-highlighting/themes-addons, the path KSyntaxHighlighting reserves for applications."
     },
     "text-styles": {
         "Normal": {
@@ -466,7 +466,7 @@
         "SavedLines": "#2ecc71",
         "SearchHighlight": "#ffff00",
         "TextSelection": "#94caef",
-        "Separator": "#d5d5d5",
+        "Separator": "#00000000",
         "SpellChecking": "#bf0303",
         "TabMarker": "#d2d2d2",
         "TemplateBackground": "#d6d2d0",
