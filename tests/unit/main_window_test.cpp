@@ -1448,17 +1448,34 @@ void MainWindowTest::mouseTogglesTheSidebar() {
     QVERIFY(!sidebar->isVisible());
     QCOMPARE(toggle->focusPolicy(), Qt::NoFocus);
     QVERIFY(toggle->toolTip().contains(QStringLiteral("Space e")));
+    // The glyph points the way the tree will go: » while it is away.
+    QCOMPARE(toggle->text(), QStringLiteral("\u00bb"));
 
     // The glyph is the mouse route to pane.sidebar.toggle: one click shows the
-    // tree and moves focus into it, exactly as Space e does.
+    // tree and moves focus into it, exactly as Space e does; the glyph turns
+    // round to « and the tooltip says "Hide".
     QTest::mouseClick(toggle, Qt::LeftButton);
     QTRY_VERIFY(sidebar->isVisible());
     QTRY_VERIFY(tree->hasFocus());
+    QCOMPARE(toggle->text(), QStringLiteral("\u00ab"));
+    QVERIFY(toggle->toolTip().startsWith(QStringLiteral("Hide")));
 
     // A second click hides it and hands focus back to the text.
     QTest::mouseClick(toggle, Qt::LeftButton);
     QTRY_VERIFY(!sidebar->isVisible());
     QTRY_VERIFY(editor->hasFocus());
+    QCOMPARE(toggle->text(), QStringLiteral("\u00bb"));
+    QVERIFY(toggle->toolTip().startsWith(QStringLiteral("Show")));
+
+    // The keyboard routes flip it too: Ctrl+H focuses the sidebar, showing it.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_H, Qt::ControlModifier);
+    QTRY_VERIFY(tree->hasFocus());
+    QCOMPARE(toggle->text(), QStringLiteral("\u00ab"));
+    QTest::keyClick(tree, Qt::Key_Space);
+    QTest::keyClick(tree, Qt::Key_E);
+    QTRY_VERIFY(!sidebar->isVisible());
+    QTRY_VERIFY(editor->hasFocus());
+    QCOMPARE(toggle->text(), QStringLiteral("\u00bb"));
 
     // With the tree already open and focus in the editor, the click still
     // closes it and the editor keeps focus.

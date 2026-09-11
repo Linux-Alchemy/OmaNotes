@@ -107,7 +107,7 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
     sidebarToggle->setText(QStringLiteral("\u00bb"));
     sidebarToggle->setObjectName(QStringLiteral("sidebarToggleButton"));
     sidebarToggle->setAccessibleName(QStringLiteral("Show or hide sidebar"));
-    sidebarToggle->setToolTip(QStringLiteral("Show or hide sidebar (Space e)"));
+    sidebarToggle->setToolTip(QStringLiteral("Show sidebar (Space e)"));
     sidebarToggle->setAutoRaise(true);
     sidebarToggle->setFocusPolicy(Qt::NoFocus);
 
@@ -205,6 +205,7 @@ MainWindow::MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, Q
     QToolButton* newBufferButton = nullptr;
     writingArea_ = buildWritingArea(splitter, editorStack_, bufferStrip_, sidebarToggleButton,
                                     newBufferButton, statusArea_, namePrompt_);
+    sidebarToggle_ = sidebarToggleButton;
     splitter->addWidget(writingArea_);
     splitter->setStretchFactor(0, 0);
     splitter->setStretchFactor(1, 1);
@@ -489,9 +490,20 @@ void MainWindow::applyWindow(const WindowSnapshot& window) {
     }
 }
 
+void MainWindow::setSidebarShown(bool shown) {
+    shown ? sidebar_->show() : sidebar_->hide();
+    if (sidebarToggle_ == nullptr) {
+        return;
+    }
+    // The glyph points the way the tree will go: » pulls it out, « puts it away.
+    sidebarToggle_->setText(shown ? QStringLiteral("\u00ab") : QStringLiteral("\u00bb"));
+    sidebarToggle_->setToolTip(shown ? QStringLiteral("Hide sidebar (Space e)")
+                                     : QStringLiteral("Show sidebar (Space e)"));
+}
+
 void MainWindow::applySidebar(const SidebarSnapshot& sidebar,
                               const std::optional<std::filesystem::path>& selected) {
-    sidebar.visible ? sidebar_->show() : sidebar_->hide();
+    setSidebarShown(sidebar.visible);
     if (sidebar.width > 0 && splitter_ != nullptr) {
         const auto total = std::max(splitter_->width(), sidebar.width + 1);
         splitter_->setSizes({sidebar.width, total - sidebar.width});
@@ -895,7 +907,7 @@ void MainWindow::registerCommands() {
                 QStringLiteral("pane"), inNormalMode,
                 [this](AppContext&) {
                     prefixRouter_->cancelPending();
-                    sidebar_->show();
+                    setSidebarShown(true);
                     sidebar_->focusTree();
                     emit sessionStateChanged();
                 },
@@ -909,14 +921,14 @@ void MainWindow::registerCommands() {
                     // LazyVim's explorer toggle: opening also moves focus
                     // there; closing hands focus back to the text.
                     if (sidebar_->isVisible()) {
-                        sidebar_->hide();
+                        setSidebarShown(false);
                         if (context.focus == FocusContext::Sidebar) {
                             runCommand(QStringLiteral("pane.editor"));
                         }
                         emit sessionStateChanged();
                         return;
                     }
-                    sidebar_->show();
+                    setSidebarShown(true);
                     sidebar_->focusTree();
                     emit sessionStateChanged();
                 },
