@@ -1,4 +1,5 @@
 #include "app/launch_request.hpp"
+#include "persistence/note_reader.hpp"
 #include "ui/main_window.hpp"
 #include "workspace/file_tree_model.hpp"
 
@@ -158,6 +159,9 @@ class MainWindowTest final : public QObject {
     void refusesEditorWriteCommandsItDoesNotImplementYet();
     void doesNotLetNormalModeWriteShortcutsReachTheEditorsWriter();
     void reloadsACleanBufferWhenItsFileChangesOnDisk();
+    void refusesToOpenAnOversizedNote();
+    void keepsTheBufferWhenItsNoteIsSwappedForASymlink();
+    void keepsTheBufferWhenItsNoteGrowsPastTheLimit();
     void keepsEditsAndRefusesPlainWriteWhenFileChangedUnderneath();
     void refusesToOverwriteExternalChangesEvenBeforeTheWatcherNotices();
     void reloadsOverUnsavedEditsOnlyWithBang();
@@ -862,6 +866,88 @@ void MainWindowTest::reloadsACleanBufferWhenItsFileChangesOnDisk() {
     QVERIFY(!editor->document()->isModified());
     QVERIFY2(status->text().contains(QStringLiteral("Reloaded note.md")),
              qPrintable(status->text()));
+}
+
+void MainWindowTest::refusesToOpenAnOversizedNote() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto big = root / "big.md";
+    writeFile(big, QByteArray(static_cast<qsizetype>(omanotes::kNoteMaxBytes) + 1, 'x'));
+
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    QVERIFY(status != nullptr);
+    const auto before = window.buffers().buffers().size();
+
+    // Too big to read is refused before any buffer exists for it: no empty
+    // tab, no partial text, and the reason names the file and the limit.
+    window.focusRequestedFile(big);
+    QVERIFY2(status->text().contains(QStringLiteral("big.md is larger than 16 MiB")),
+             qPrintable(status->text()));
+    QCOMPARE(window.buffers().buffers().size(), before);
+}
+
+void MainWindowTest::keepsTheBufferWhenItsNoteIsSwappedForASymlink() {
+    QTemporaryDir temporary;
+    QTemporaryDir elsewhere;
+    QVERIFY(temporary.isValid() && elsewhere.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "# Original\n");
+    const auto secret = std::filesystem::canonical(pathFor(elsewhere.path())) / "secret.md";
+    writeFile(secret, "# SECRET\n");
+
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr && editor != nullptr);
+    QCOMPARE(editor->document()->text(), QStringLiteral("# Original\n"));
+
+    // A writer inside the root replaces the open note with a link to a file
+    // outside it. The watcher fires; the reload must not follow the link.
+    std::filesystem::remove(note);
+    std::filesystem::create_symlink(secret, note);
+
+    QTRY_VERIFY2(status->text().contains(QStringLiteral("could not be read safely")),
+                 qPrintable(status->text()));
+    QCOMPARE(editor->document()->text(), QStringLiteral("# Original\n"));
+    QVERIFY(!editor->document()->text().contains(QStringLiteral("SECRET")));
+
+    // An explicit reload refuses too: re-validation sees the path now resolve
+    // outside the root, and the buffer is left as it was.
+    typeViCommand(*editor, QStringLiteral("e!"));
+    QTRY_VERIFY2(status->text().contains(QStringLiteral("outside the workspace")) ||
+                     status->text().contains(QStringLiteral("symlink")) ||
+                     status->text().contains(QStringLiteral("resolves elsewhere")),
+                 qPrintable(status->text()));
+    QVERIFY(!status->text().contains(QStringLiteral("Reloaded")));
+    QCOMPARE(editor->document()->text(), QStringLiteral("# Original\n"));
+}
+
+void MainWindowTest::keepsTheBufferWhenItsNoteGrowsPastTheLimit() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "# Original\n");
+
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    auto* editor = activeEditor(window);
+    QVERIFY(status != nullptr && editor != nullptr);
+
+    // The note balloons past the limit on disk; the clean buffer is kept and
+    // nothing of that size is read into memory.
+    replaceFileByRename(note, QByteArray(static_cast<qsizetype>(omanotes::kNoteMaxBytes) + 1, 'x'));
+
+    QTRY_VERIFY2(status->text().contains(QStringLiteral("could not be read safely")),
+                 qPrintable(status->text()));
+    QCOMPARE(editor->document()->text(), QStringLiteral("# Original\n"));
+    QVERIFY(!editor->document()->isModified());
 }
 
 void MainWindowTest::keepsEditsAndRefusesPlainWriteWhenFileChangedUnderneath() {

@@ -93,6 +93,18 @@ std::optional<BufferId> BufferRegistry::findByPath(const std::filesystem::path& 
     return match->id;
 }
 
+std::optional<BufferId> BufferRegistry::findByExactPath(const std::filesystem::path& path) const {
+    if (path.empty()) {
+        return std::nullopt;
+    }
+    const auto match = std::ranges::find_if(
+        buffers_, [&path](const BufferState& buffer) { return buffer.path == path; });
+    if (match == buffers_.end()) {
+        return std::nullopt;
+    }
+    return match->id;
+}
+
 std::optional<std::size_t> BufferRegistry::indexOf(BufferId id) const noexcept {
     const auto match =
         std::ranges::find_if(buffers_, [id](const BufferState& buffer) { return buffer.id == id; });
