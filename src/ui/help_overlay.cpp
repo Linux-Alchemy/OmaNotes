@@ -53,6 +53,8 @@ void HelpOverlay::showCommands(const CommandRegistry& commands, const AppContext
         item->setData(0, Qt::UserRole, command->id);
     }
     list_->resizeColumnToContents(0);
+    // Room between the columns: the longest label must not touch its keys.
+    list_->setColumnWidth(0, list_->columnWidth(0) + 32);
     if (list_->topLevelItemCount() > 0) {
         list_->setCurrentItem(list_->topLevelItem(0));
     }
