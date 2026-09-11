@@ -185,6 +185,7 @@ class MainWindowTest final : public QObject {
     void remappedPaneKeyReplacesTheOldRoute();
     void leaderOverridesWinOverDirectShiftKeys();
     void closesCleanly();
+    void sidebarSelectionBarFollowsFocus();
     void colonQuitsWithPromptForUnsavedWork();
     void colonQuitVariantsSaveOrDiscard();
     void scrollbarsAreNeverShown();
@@ -1768,17 +1769,16 @@ void MainWindowTest::themeDressesEveryRegion() {
     omanotes::MainWindow window({root, note, false}, writeFixtureTheme(temporary));
     window.show();
 
-    // The sidebar's selected row is strong while its tree owns focus and
-    // dims when it does not (the 5.1 gate debt). Under an active stylesheet
-    // Qt ignores QPalette for item selection, so the rules must be in the
-    // stylesheet itself, dim included.
+    // The sidebar's selected row is painted only while the sidebar has
+    // focus, and vanishes otherwise; no accent line marks either pane (Matt's
+    // gate finding, 2026-09-10). Under an active stylesheet Qt ignores
+    // QPalette for item selection, so the rules must be in the stylesheet.
     const auto sheet = window.styleSheet();
+    QVERIFY(sheet.contains(QStringLiteral("QFrame#sidebar[paneActive=\"true\"] "
+                                          "QTreeView::item:selected { background-color: #303a60")));
     QVERIFY(sheet.contains(
-        QStringLiteral("QTreeView::item:selected:active { background-color: #303a60")));
-    const auto inactiveRule =
-        sheet.mid(sheet.indexOf(QStringLiteral("QTreeView::item:selected:!active")));
-    QVERIFY(!inactiveRule.isEmpty());
-    QVERIFY(!inactiveRule.first(inactiveRule.indexOf(u'}')).contains(QStringLiteral("#303a60")));
+        QStringLiteral("QFrame#sidebar QTreeView::item:selected { background-color: #181826")));
+    QVERIFY(!sheet.contains(QStringLiteral("border-top")));
 
     // The reading pane's ground is stylesheet-painted; its document colours
     // (text, links) still come from the palette it renders with.
@@ -2006,6 +2006,39 @@ void MainWindowTest::colonQuitVariantsSaveOrDiscard() {
         QTest::mouseClick(prompt->button(QMessageBox::Discard), Qt::LeftButton);
         QTRY_VERIFY(!window.isVisible());
     }
+}
+
+void MainWindowTest::sidebarSelectionBarFollowsFocus() {
+    QTemporaryDir temporary;
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    writeFile(root / "alpha.md", "# Alpha\n");
+    writeFile(root / "beta.md", "# Beta\n");
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* editor = activeEditor(window);
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    auto* sidebar = window.findChild<QWidget*>(QStringLiteral("sidebar"));
+    auto* tree = window.findChild<QTreeView*>(QStringLiteral("fileTree"));
+    QVERIFY(sidebar != nullptr && tree != nullptr);
+
+    // Entering the sidebar selects the row it lands on, not merely makes it
+    // current: a QTreeView given focus with no current row picks the first
+    // one itself without selecting it, and an unselected row paints no bar.
+    auto* target = editor->focusProxy() != nullptr ? editor->focusProxy() : editor;
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("e"));
+    QTRY_VERIFY(tree->hasFocus());
+    QTRY_VERIFY(sidebar->property("paneActive").toBool());
+    QCOMPARE(tree->currentIndex().data().toString(), QStringLiteral("alpha.md"));
+    QVERIFY(tree->selectionModel()->isSelected(tree->currentIndex()));
+
+    // Leaving the sidebar clears its focus flag; the stylesheet keys the
+    // bar's colour to that flag, so the bar goes with it.
+    QTest::keyClick(tree, Qt::Key_L, Qt::ControlModifier);
+    QTRY_VERIFY(activeEditor(window)->hasFocus());
+    QTRY_VERIFY(!sidebar->property("paneActive").toBool());
+    QVERIFY(tree->selectionModel()->isSelected(tree->currentIndex()));
 }
 
 void MainWindowTest::searchOpensMatchesAndHelpRunsCommands() {

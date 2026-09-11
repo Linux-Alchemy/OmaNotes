@@ -17,6 +17,7 @@
 #include <KTextEditor/View>
 #include <QAction>
 
+#include <QAbstractItemView>
 #include <QAbstractTextDocumentLayout>
 #include <QApplication>
 #include <QByteArray>
@@ -264,7 +265,12 @@ MainWindow::MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, Q
     connect(prefixRouter_.get(), &PrefixRouter::feedbackChanged, statusArea_,
             [this](const QString& message) { statusArea_->setText(message); });
     connect(prefixRouter_.get(), &PrefixRouter::sequenceAccepted, this,
-            [this](const QString& commandId, const QString&) { runCommand(commandId); });
+            [this](const QString& commandId, const QString&) {
+                // The "Space …" feedback has served its purpose; the mode
+                // comes back, and the command may then say its own piece.
+                refreshEditorStatus();
+                runCommand(commandId);
+            });
     connect(bufferStrip_, &BufferStrip::bufferSelected, this, [this](BufferId id) {
         auto context = currentContext();
         context.targetBuffer = id;
@@ -1806,26 +1812,27 @@ void MainWindow::refreshEditorStatus() {
 
 void MainWindow::applyTheme(const ThemePalette& palette) {
     const auto name = [](const QColor& colour) { return colour.name(QColor::HexRgb); };
-    // Every pane wears a permanent 2px top border so the accent mark on the
-    // focused one never shifts the layout, only the colour.
+    // Where you are is told by what is there, not by a mark on the frame
+    // (Matt's call, 2026-09-10): the sidebar's selected row is painted only
+    // while the sidebar has focus, and the editor has its cursor. The
+    // paneActive property is the window's own per-pane focus flag; Qt's
+    // :active pseudo-state follows the whole window, not the pane.
     setStyleSheet(QStringLiteral(R"(
-* { font-family: monospace; font-size: %11pt; }
+* { font-family: monospace; font-size: %9pt; }
 QScrollBar:vertical { width: 0px; }
 QScrollBar:horizontal { height: 0px; }
 QMainWindow#mainWindow { background-color: %1; }
 QSplitter#workspaceSplitter::handle { background-color: %2; }
-QFrame#sidebar { background-color: %3; border: none; border-top: 2px solid %3; }
-QFrame#sidebar[paneActive="true"] { border-top: 2px solid %4; }
-QFrame#sidebar QTreeView { background-color: %3; color: %5; border: none; }
-QFrame#sidebar QTreeView::item:selected:active { background-color: %6; color: %9; }
-QFrame#sidebar QTreeView::item:selected:!active { background-color: %8; color: %10; }
+QFrame#sidebar { background-color: %3; border: none; }
+QFrame#sidebar QTreeView { background-color: %3; color: %5; border: none; outline: none; }
+QFrame#sidebar QTreeView::item:selected { background-color: %3; color: %5; }
+QFrame#sidebar[paneActive="true"] QTreeView::item:selected { background-color: %6; color: %8; }
 QLabel#sidebarHeading { color: %7; }
-QTextBrowser#readingView { background-color: %1; border: none; font-size: %12pt; }
-QWidget#writingArea { background-color: %1; border-top: 2px solid %1; }
-QWidget#writingArea[paneActive="true"] { border-top: 2px solid %4; }
+QTextBrowser#readingView { background-color: %1; border: none; font-size: %10pt; }
+QWidget#writingArea { background-color: %1; }
 QWidget#statusRow { background-color: %1; }
 QLabel#statusArea { background-color: %1; color: %5; }
-QLineEdit#namePrompt { background-color: %3; color: %5; selection-background-color: %6; selection-color: %9; }
+QLineEdit#namePrompt { background-color: %3; color: %5; selection-background-color: %6; selection-color: %8; }
 QWidget#bufferRow { background-color: %1; }
 QTabBar#bufferStrip { background-color: %1; }
 QTabBar#bufferStrip::tab { background-color: %1; color: %7; padding: 5px 12px; border: none; }
@@ -1838,18 +1845,17 @@ QToolButton#helpButton:hover { color: %4; }
 QDialog#helpOverlay, QDialog#searchPalette, QMessageBox { background-color: %1; color: %5; }
 QDialog#helpOverlay QLabel, QDialog#searchPalette QLabel, QMessageBox QLabel { color: %5; }
 QTreeWidget#helpCommands, QListWidget#searchResults, QPlainTextEdit#searchPreview { background-color: %3; color: %5; border: none; }
-QTreeWidget#helpCommands::item:selected, QListWidget#searchResults::item:selected { background-color: %6; color: %9; }
-QLineEdit#searchQuery { background-color: %3; color: %5; border: 1px solid %2; padding: 4px 6px; selection-background-color: %6; selection-color: %9; }
+QTreeWidget#helpCommands::item:selected, QListWidget#searchResults::item:selected { background-color: %6; color: %8; }
+QLineEdit#searchQuery { background-color: %3; color: %5; border: 1px solid %2; padding: 4px 6px; selection-background-color: %6; selection-color: %8; }
 QDialog QPushButton { background-color: %3; color: %5; border: 1px solid %2; padding: 4px 14px; }
 QDialog QPushButton:default { border: 1px solid %4; }
 QDialog QPushButton:hover { background-color: %2; }
-QLineEdit#commandtext { background-color: %1; color: %5; border: none; selection-background-color: %6; selection-color: %9; }
+QLineEdit#commandtext { background-color: %1; color: %5; border: none; selection-background-color: %6; selection-color: %8; }
 QLabel#bartypeindicator, QLabel#commandresponsemessage, QLabel#waitingforregisterindicator { background-color: %1; color: %7; }
 )")
                       .arg(name(palette.background), name(palette.border), name(palette.surface),
                            name(palette.accent), name(palette.text), name(palette.selection),
-                           name(palette.mutedText), name(palette.inactiveSelection),
-                           name(palette.selectedText), name(palette.inactiveSelectedText),
+                           name(palette.mutedText), name(palette.selectedText),
                            QString::number(palette.baseFontPointSize),
                            QString::number(palette.baseFontPointSize + 1.0)));
     writingArea_->setAttribute(Qt::WA_StyledBackground, true);
@@ -1921,6 +1927,13 @@ void MainWindow::markActivePane() {
         pane->setProperty("paneActive", active);
         pane->style()->unpolish(pane);
         pane->style()->polish(pane);
+        // Rules on descendants keyed to the pane's property are re-evaluated
+        // only when those descendants are polished too.
+        for (auto* view : pane->findChildren<QAbstractItemView*>()) {
+            view->style()->unpolish(view);
+            view->style()->polish(view);
+            view->viewport()->update();
+        }
     };
     mark(sidebar_);
     mark(writingArea_);

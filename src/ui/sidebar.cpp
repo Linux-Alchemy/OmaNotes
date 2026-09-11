@@ -6,6 +6,7 @@
 #include <QByteArray>
 #include <QFile>
 #include <QHeaderView>
+#include <QItemSelectionModel>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QTreeView>
@@ -48,13 +49,20 @@ Sidebar::Sidebar(const std::filesystem::path& root, QWidget* parent)
 }
 
 void Sidebar::focusTree() {
-    tree_->setFocus(Qt::ShortcutFocusReason);
+    // Choose the row before taking focus: a QTreeView that gains focus with
+    // no current row makes the first row current itself, without selecting
+    // it, and an unselected current row paints no selection bar.
     if (!tree_->currentIndex().isValid()) {
         if (model_->canFetchMore({})) {
             model_->fetchMore({});
         }
         tree_->setCurrentIndex(model_->index(0, 0));
     }
+    if (const auto current = tree_->currentIndex(); current.isValid()) {
+        tree_->selectionModel()->select(current, QItemSelectionModel::ClearAndSelect |
+                                                     QItemSelectionModel::Rows);
+    }
+    tree_->setFocus(Qt::ShortcutFocusReason);
 }
 
 void Sidebar::noteFileCreated(const std::filesystem::path& path) { model_->noteFileCreated(path); }
