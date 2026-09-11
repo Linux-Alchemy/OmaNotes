@@ -1797,6 +1797,9 @@ void MainWindowTest::themeDressesEveryRegion() {
     QVERIFY(window.styleSheet().contains(QStringLiteral("#d08050")));
     QVERIFY(window.styleSheet().contains(QStringLiteral("#181826")));
     QVERIFY(window.styleSheet().contains(QStringLiteral("QFrame#sidebar QTreeView")));
+    // The help glyph sits flat in the status row, not in a stock button box.
+    QVERIFY(window.styleSheet().contains(
+        QStringLiteral("QToolButton#helpButton { background: transparent")));
 
     // The dialogs are separate windows the scoped rules used to miss: the
     // help overlay, the search palette, and the close prompt all theme.

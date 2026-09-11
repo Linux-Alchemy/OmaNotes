@@ -1692,6 +1692,8 @@ QTabBar#bufferStrip::tab:selected { background-color: %1; color: %5; }
 QToolButton#newBufferButton { background-color: %3; color: %7; border: none; padding: 2px 8px; }
 QToolButton#tabCloseButton { background: transparent; color: %7; border: none; padding: 0px 2px; }
 QToolButton#tabCloseButton:hover { color: %4; }
+QToolButton#helpButton { background: transparent; color: %7; border: none; padding: 0px 6px; }
+QToolButton#helpButton:hover { color: %4; }
 QDialog#helpOverlay, QDialog#searchPalette, QMessageBox { background-color: %1; color: %5; }
 QDialog#helpOverlay QLabel, QDialog#searchPalette QLabel, QMessageBox QLabel { color: %5; }
 QTreeWidget#helpCommands, QListWidget#searchResults, QPlainTextEdit#searchPreview { background-color: %3; color: %5; border: none; }
