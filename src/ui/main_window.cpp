@@ -104,7 +104,7 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
     // The mouse route to the sidebar: a flat glyph at the seam where the tree
     // meets the tabs, running the same toggle command as Space e.
     sidebarToggle = new QToolButton(writingArea);
-    sidebarToggle->setText(QStringLiteral("\u2261"));
+    sidebarToggle->setText(QStringLiteral("\u00bb"));
     sidebarToggle->setObjectName(QStringLiteral("sidebarToggleButton"));
     sidebarToggle->setAccessibleName(QStringLiteral("Show or hide sidebar"));
     sidebarToggle->setToolTip(QStringLiteral("Show or hide sidebar (Space e)"));
