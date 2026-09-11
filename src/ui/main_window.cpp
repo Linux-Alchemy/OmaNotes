@@ -833,7 +833,7 @@ void MainWindow::registerCommands() {
                {QStringLiteral("b d")});
     routedOutsideLeader_.push_back(QStringLiteral("buffer.close"));
     addCommand({QStringLiteral("buffer.close.discard"),
-                QStringLiteral("Close buffer, discarding changes"),
+                QStringLiteral("Close buffer, discard"),
                 QStringLiteral("buffer"),
                 always,
                 [this](AppContext& context) {
