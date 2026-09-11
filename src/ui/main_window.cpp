@@ -127,8 +127,9 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
     namePrompt->setContentsMargins(10, 6, 10, 6);
     namePrompt->hide();
 
-    // The strip is one band: the tabs, the +, and the empty run after them
-    // share a ground, so nothing in the row sits on a different colour.
+    // The strip is one band in the pane's own colour (Matt's call,
+    // 2026-09-10): tabs, the +, and the empty run after them all sit on the
+    // ground the editor sits on; the active tab is told by its text alone.
     auto* bufferRow = new QWidget(writingArea);
     bufferRow->setObjectName(QStringLiteral("bufferRow"));
     bufferRow->setAttribute(Qt::WA_StyledBackground, true);
@@ -241,7 +242,7 @@ MainWindow::MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, Q
     helpButton->setAccessibleName(QStringLiteral("Show commands"));
     helpButton->setToolTip(QStringLiteral("Show commands (Space ?)"));
     // Same for the status row: the mode, the ?, and the space between are
-    // one band, and the ? sits flat on it.
+    // one band in the pane's colour, and the ? sits flat on it.
     auto* pane = statusArea_->parentWidget();
     auto* paneLayout = qobject_cast<QVBoxLayout*>(pane->layout());
     auto* statusRow = new QWidget(pane);
@@ -1698,14 +1699,14 @@ QLabel#sidebarHeading { color: %7; }
 QTextBrowser#readingView { background-color: %1; border: none; font-size: %12pt; }
 QWidget#writingArea { background-color: %1; border-top: 2px solid %1; }
 QWidget#writingArea[paneActive="true"] { border-top: 2px solid %4; }
-QWidget#statusRow { background-color: %3; }
-QLabel#statusArea { background-color: %3; color: %5; }
+QWidget#statusRow { background-color: %1; }
+QLabel#statusArea { background-color: %1; color: %5; }
 QLineEdit#namePrompt { background-color: %3; color: %5; selection-background-color: %6; selection-color: %9; }
-QWidget#bufferRow { background-color: %3; }
-QTabBar#bufferStrip { background-color: %3; }
-QTabBar#bufferStrip::tab { background-color: %3; color: %7; padding: 5px 12px; border: none; }
+QWidget#bufferRow { background-color: %1; }
+QTabBar#bufferStrip { background-color: %1; }
+QTabBar#bufferStrip::tab { background-color: %1; color: %7; padding: 5px 12px; border: none; }
 QTabBar#bufferStrip::tab:selected { background-color: %1; color: %5; }
-QToolButton#newBufferButton { background-color: %3; color: %7; border: none; padding: 2px 8px; }
+QToolButton#newBufferButton { background-color: %1; color: %7; border: none; padding: 2px 8px; }
 QToolButton#tabCloseButton { background: transparent; color: %7; border: none; padding: 0px 2px; }
 QToolButton#tabCloseButton:hover { color: %4; }
 QToolButton#helpButton { background: transparent; color: %7; border: none; padding: 0px 6px; }
