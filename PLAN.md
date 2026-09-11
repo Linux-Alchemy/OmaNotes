@@ -35,7 +35,11 @@ ctest --preset dev --output-on-failure
 cmake --build --preset dev --target format-check
 cmake --build --preset dev --target clang-tidy
 cmake --build --preset dev --target security-check
+cmake --build --preset release --target security-check
 ```
+
+The dev invocation of the security check reports what a sanitizer build can and cannot show;
+the release invocation is the evidence (`docs/development-baseline.md`, F-8).
 
 Development builds enable AddressSanitizer and UndefinedBehaviorSanitizer where compatible with the target Omarchy toolchain. Release builds must not weaken path, state-file, or Markdown safety checks.
 
@@ -1193,3 +1197,29 @@ Decision required: approve / request changes / stop and redesign
   window suite gains oversized open refused, symlink swap kept and reported, growth past the
   limit kept; `session-restore` gains the second-instance scenario and the lock following
   clean close and kill. Awaiting Matt's gate.
+
+- **2026-09-11:** 8.1.3 second pass, four code PRs and this docs PR, per Matt's rulings after
+  the High findings landed (#35). Rulings: F-2 do both (recheck and ADR wording); F-5 document;
+  F-9 no CI, manual gating is the process; F-13 fold the wide-root notice in.
+  `fix/8.1.3-second-pass` (#36): F-3 every label that shows a file, directory, or link name is
+  plain text (status line, sidebar heading, search status, both close prompts); F-4 the recovery
+  store refuses a symlink at any of the three directory levels above it, on write and on list;
+  F-10 the parked-work notice no longer dereferences a failed root resolution and an exception
+  while the window is built exits with a message; F-13 a workspace that is `/` or the home
+  directory gets one status-line notice; F-6 regression tests pin that the editor's document
+  never gets a URL and that `kate:` modelines in note text move nothing.
+  `build/8.1.3-hardening` (#37): F-8 `-fstack-clash-protection`, `-fcf-protection=full`,
+  `_GLIBCXX_ASSERTIONS`, and `_FORTIFY_SOURCE=3` outside Debug on every target; the security
+  script verifies stack protector, full RELRO, CET marks and fortified calls, says what a
+  sanitizer build cannot show, and fails a plain binary; the baseline docs run it on the release
+  preset. The quality contract below keeps the dev invocation, which now reports what it can and
+  cannot evaluate; the release invocation is the evidence.
+  `polish/tab-scroll-buttons` (#38): the buffer strip's scroll buttons, seen at Matt's gate in a
+  tiled window, wear the pane colour with the muted ink.
+  `fix/8.1.3-save-recheck` (#39): F-2 the atomic writer takes a precondition (absent, or a
+  content hash) and re-checks it after the new bytes are durable and immediately before the
+  rename; a change in between is refused with nothing replaced; `:w!` asks for none of it. ADR
+  0006 now says what the code guarantees and names the instant that remains open.
+  Accepted without code, recorded in the threat model: F-5 KTextEditor persists Vi registers and
+  macros to `~/.config/katevirc`, documented beside the recovery-record statement; F-9 no CI,
+  every gate runs by hand and the PR template says so. Awaiting Matt's gate on the five.
