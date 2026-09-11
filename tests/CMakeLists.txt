@@ -93,6 +93,7 @@ add_executable(
     omanotes_persistence_tests
     integration/atomic_save_test.cpp
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/note_reader.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.hpp"
     "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.cpp"
     "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.hpp"
@@ -111,6 +112,7 @@ add_executable(
     omanotes_save_tests
     unit/document_store_test.cpp
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/note_reader.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.hpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/document_store.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/document_store.hpp"
@@ -378,6 +380,7 @@ add_executable(omanotes_session_store_tests
     "${CMAKE_SOURCE_DIR}/src/session/session_snapshot.cpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_snapshot.hpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
+    "${CMAKE_SOURCE_DIR}/src/persistence/note_reader.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.hpp"
     "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.cpp"
     "${CMAKE_SOURCE_DIR}/src/workspace/workspace_root.hpp"

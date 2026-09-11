@@ -2,6 +2,7 @@
 #include "workspace/workspace_root.hpp"
 
 #include <QByteArrayView>
+#include <QCryptographicHash>
 #include <QFile>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -53,6 +54,7 @@ class AtomicSaveTest final : public QObject {
     void refusesTargetsOutsideTheRoot();
     void refusesADirectoryTarget();
     void leavesTheOriginalIntactWhenTheWriteCannotStart();
+    void refusesToReplaceAFileThatChangedSinceItWasChecked();
 };
 
 void AtomicSaveTest::writesANewFileAndLeavesNoTemporary() {
@@ -226,6 +228,62 @@ void AtomicSaveTest::leavesTheOriginalIntactWhenTheWriteCannotStart() {
     QCOMPARE(restored, 0);
     QCOMPARE(readFile(target), QByteArray("# Original\n"));
     QCOMPARE(strayTemporaries(directory), 0);
+}
+
+void AtomicSaveTest::refusesToReplaceAFileThatChangedSinceItWasChecked() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "# Checked\n");
+    const auto workspace = omanotes::WorkspaceRoot::resolve(root);
+    QVERIFY(workspace.has_value());
+    const omanotes::AtomicFileWriter writer;
+    const auto hashOf = [](const QByteArray& bytes) {
+        return QCryptographicHash::hash(bytes, QCryptographicHash::Sha256);
+    };
+
+    // The caller compared against "# Checked" and decided to save. Someone
+    // else wrote in between. The precondition is re-checked after the new
+    // bytes are durable and before the rename, and the replace is refused.
+    writeFile(note, "# Someone else\n");
+    const auto stale = writer.write(note, QByteArrayView("# Mine\n"), *workspace,
+                                    omanotes::WritePrecondition::matches(hashOf("# Checked\n")));
+    QVERIFY(!stale.has_value());
+    QCOMPARE(stale.error().code, omanotes::SaveErrorCode::ChangedSinceRead);
+    QVERIFY(QString::fromStdString(stale.error().message).contains(QStringLiteral("changed")));
+    QCOMPARE(readFile(note), QByteArray("# Someone else\n"));
+    QCOMPARE(strayTemporaries(root), 0);
+
+    // With the hash the disk actually holds, the same write goes through.
+    const auto fresh =
+        writer.write(note, QByteArrayView("# Mine\n"), *workspace,
+                     omanotes::WritePrecondition::matches(hashOf("# Someone else\n")));
+    QVERIFY(fresh.has_value());
+    QCOMPARE(readFile(note), QByteArray("# Mine\n"));
+
+    // A save that expected no file finds one: refused, the file kept.
+    const auto appeared = writer.write(note, QByteArrayView("# New\n"), *workspace,
+                                       omanotes::WritePrecondition::absent());
+    QVERIFY(!appeared.has_value());
+    QCOMPARE(appeared.error().code, omanotes::SaveErrorCode::ChangedSinceRead);
+    QCOMPARE(readFile(note), QByteArray("# Mine\n"));
+
+    // A save that expected the file finds it gone: refused, not recreated.
+    std::filesystem::remove(note);
+    const auto vanished = writer.write(note, QByteArrayView("# Mine\n"), *workspace,
+                                       omanotes::WritePrecondition::matches(hashOf("# Mine\n")));
+    QVERIFY(!vanished.has_value());
+    QCOMPARE(vanished.error().code, omanotes::SaveErrorCode::ChangedSinceRead);
+    QVERIFY(!std::filesystem::exists(note));
+
+    // `:w!` asks for none of this and always replaces.
+    writeFile(note, "# Whatever\n");
+    const auto forced = writer.write(note, QByteArrayView("# Forced\n"), *workspace,
+                                     omanotes::WritePrecondition::any());
+    QVERIFY(forced.has_value());
+    QCOMPARE(readFile(note), QByteArray("# Forced\n"));
+    QCOMPARE(strayTemporaries(root), 0);
 }
 
 QTEST_MAIN(AtomicSaveTest)

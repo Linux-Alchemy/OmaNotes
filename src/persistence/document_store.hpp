@@ -25,7 +25,8 @@ class DocumentStore final {
 
     /// Resolve `requested` and write `text` to it as UTF-8.
     [[nodiscard]] std::expected<std::filesystem::path, SaveError>
-    save(const std::filesystem::path& requested, const QString& text) const;
+    save(const std::filesystem::path& requested, const QString& text,
+         const WritePrecondition& precondition = {}) const;
 
   private:
     WorkspaceRoot root_;

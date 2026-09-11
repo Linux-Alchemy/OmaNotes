@@ -1812,9 +1812,14 @@ QString MainWindow::saveTo(const std::filesystem::path& requested, bool force) {
 
     // The guarantee of this whole task lives here, not in the watcher: the
     // watcher is a courtesy that may lag, but a write compares against the
-    // disk at the moment it happens.
+    // disk when it decides, and the writer compares again just before the
+    // rename (ADR 0006). `:w!` skips both.
+    WritePrecondition precondition = WritePrecondition::any();
     if (!force) {
         const auto current = DiskRevision::read(*destination);
+        precondition = current.state == DiskRevision::State::Present
+                           ? WritePrecondition::matches(current.contentHash)
+                           : WritePrecondition::absent();
         const auto name = displayName(*destination);
         const auto tracked = tracked_.find(activeId);
         // Buffers remember canonical paths, so a target typed through a
@@ -1848,7 +1853,7 @@ QString MainWindow::saveTo(const std::filesystem::path& requested, bool force) {
     }
 
     const auto text = editor->text();
-    const auto written = store.save(target, text);
+    const auto written = store.save(target, text, precondition);
     if (!written) {
         return QString::fromStdString(written.error().message);
     }
