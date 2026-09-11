@@ -1,6 +1,10 @@
 #include "editor/ktext_editor_adapter.hpp"
+#include "ui/theme_adapter.hpp"
 
+#include <KSyntaxHighlighting/Repository>
+#include <KSyntaxHighlighting/Theme>
 #include <KTextEditor/Document>
+#include <KTextEditor/Editor>
 #include <KTextEditor/View>
 
 #include <KActionCollection>
@@ -52,9 +56,33 @@ void KTextEditorAdapterTest::configuresMarkdownWritingView() {
     QCOMPARE(view->configValue(QStringLiteral("scrollbar-minimap")).toBool(), false);
     QVERIFY(!view->isStatusBarEnabled());
 
+    // The bundled themes are found through KSyntaxHighlighting's addons
+    // resource path, and their current-line colour is fully transparent:
+    // no bar under the cursor line (Matt's call, 2026-09-10).
+    const auto& repository = KTextEditor::Editor::instance()->repository();
+    for (const auto* name : {"OmaNotes Dark", "OmaNotes Light"}) {
+        const auto theme = repository.theme(QString::fromLatin1(name));
+        QVERIFY2(theme.isValid(), name);
+        QCOMPARE(qAlpha(theme.editorColor(KSyntaxHighlighting::Theme::CurrentLine)), 0);
+        // Likewise the icon-border separator: a hairline the hidden border
+        // would otherwise leave down the text area's left edge.
+        QCOMPARE(qAlpha(theme.editorColor(KSyntaxHighlighting::Theme::Separator)), 0);
+    }
+    for (const bool dark : {true, false}) {
+        omanotes::ThemePalette palette;
+        palette.dark = dark;
+        palette.background = QColor(dark ? QStringLiteral("#101018") : QStringLiteral("#fafafa"));
+        palette.selection = QColor(QStringLiteral("#2d5c76"));
+        adapter.applyTheme(palette);
+        QCOMPARE(view->configValue(QStringLiteral("theme")).toString(),
+                 dark ? QStringLiteral("OmaNotes Dark") : QStringLiteral("OmaNotes Light"));
+        QCOMPARE(qAlpha(view->theme().editorColor(KSyntaxHighlighting::Theme::CurrentLine)), 0);
+    }
+
     const auto releasedSequences = {
         QKeySequence(QStringLiteral("Ctrl+H")),      QKeySequence(QStringLiteral("Ctrl+B")),
         QKeySequence(QStringLiteral("Ctrl+F")),      QKeySequence(QStringLiteral("Ctrl+R")),
+        QKeySequence(QStringLiteral("Ctrl+D")),      QKeySequence(QStringLiteral("Ctrl+U")),
         QKeySequence(QStringLiteral("Ctrl+V")),      QKeySequence(QStringLiteral("Ctrl+S")),
         QKeySequence(QStringLiteral("Ctrl+Shift+S"))};
     for (const auto& sequence : releasedSequences) {

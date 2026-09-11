@@ -33,7 +33,7 @@ because such a sequence could never be typed. The vocabulary:
 | `Space e` | Show or hide the sidebar; showing it moves focus there | |
 | | Focus sidebar, showing it first if hidden | `Ctrl+H` in Normal mode |
 | `Space b d` | Close buffer, refusing unsaved work | |
-| `Space b D` | Close buffer, discarding changes | |
+| `Space b D` | Close buffer, discard | |
 | `Space b n` / `Space b p` | Next / previous buffer | `Shift+L` / `Shift+H` |
 | `Space f n` | New buffer | |
 | `Space f f`, `Space Space` | Find files | not available until Task 5.2 |

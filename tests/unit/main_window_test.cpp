@@ -16,6 +16,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QScrollBar>
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QTabBar>
@@ -24,9 +25,11 @@
 #include <QToolButton>
 #include <QTreeView>
 #include <QTreeWidget>
+#include <QWheelEvent>
 #include <QtTest>
 
 #include <filesystem>
+#include <map>
 #include <utility>
 
 namespace {
@@ -100,13 +103,18 @@ void replaceFileByRename(const std::filesystem::path& path, const QByteArray& co
 
 /// Type `:command<Return>` on the editor's own Vi command line.
 void typeViCommand(KTextEditor::View& editor, const QString& command) {
+    editor.window()->activateWindow();
     editor.setFocus();
     QTRY_VERIFY(editor.hasFocus());
-    auto* editorTarget = QApplication::focusWidget();
-    QVERIFY(editorTarget != nullptr);
+    // Type at the view's own input widget (its focus proxy), not at whatever
+    // QApplication::focusWidget() says: after a modal dialog the offscreen
+    // platform can leave that pointing at the dialog's button.
+    auto* editorTarget = editor.focusProxy() != nullptr ? editor.focusProxy() : &editor;
     QTest::keyClick(editorTarget, Qt::Key_Colon);
-    QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
-                QApplication::focusWidget() != editorTarget);
+    // The command line is a line edit inside the editor; insist on it, so a
+    // stale focus widget (a dismissed dialog's button, say) is never typed at.
+    QTRY_VERIFY(qobject_cast<QLineEdit*>(QApplication::focusWidget()) != nullptr &&
+                editor.isAncestorOf(QApplication::focusWidget()));
     auto* commandLine = QApplication::focusWidget();
     QTest::keyClicks(commandLine, command);
     QTest::keyClick(commandLine, Qt::Key_Return);
@@ -177,6 +185,11 @@ class MainWindowTest final : public QObject {
     void remappedPaneKeyReplacesTheOldRoute();
     void leaderOverridesWinOverDirectShiftKeys();
     void closesCleanly();
+    void sidebarSelectionBarFollowsFocus();
+    void colonQuitsWithPromptForUnsavedWork();
+    void colonQuitVariantsSaveOrDiscard();
+    void scrollbarsAreNeverShown();
+    void halfPageKeysScrollWritingAndReading();
 };
 
 void MainWindowTest::hasRequiredRegions() {
@@ -198,17 +211,21 @@ void MainWindowTest::statusTracksEditorState() {
 
     QVERIFY(editor != nullptr);
     QVERIFY(status != nullptr);
-    QVERIFY(status->text().contains(QStringLiteral("NORMAL"), Qt::CaseInsensitive));
+    // Mode only, sentence case, no editor prefix: "Normal", not "VI: NORMAL".
+    QCOMPARE(status->text(), QStringLiteral("Normal"));
 
     editor->document()->setText(QStringLiteral("scratch"));
-    QTRY_VERIFY(status->text().contains(QStringLiteral("[+]")));
+    QTRY_VERIFY(editor->document()->isModified());
+    // The status line names neither the buffer nor its unsaved state.
+    QVERIFY(!status->text().contains(QStringLiteral("[+]")));
+    QVERIFY(!status->text().contains(QStringLiteral("Untitled")));
 
     editor->setFocus();
     QTRY_VERIFY(editor->hasFocus());
     auto* eventTarget = QApplication::focusWidget();
     QVERIFY(eventTarget != nullptr);
     QTest::keyClicks(eventTarget, QStringLiteral("i"));
-    QTRY_VERIFY(status->text().contains(QStringLiteral("INSERT"), Qt::CaseInsensitive));
+    QTRY_COMPARE(status->text(), QStringLiteral("Insert"));
 }
 
 void MainWindowTest::spacePrefixDoesNotSwallowInsertTextOrControlB() {
@@ -287,13 +304,14 @@ void MainWindowTest::markdownSidebarFiltersAndLoadsWithoutWriting() {
     editor = activeEditor(window);
     QVERIFY(editor != nullptr);
     QCOMPARE(editor->document()->text(), QStringLiteral("# Original\n"));
-    QCOMPARE(buffers->tabText(0), QStringLiteral("[No Name]"));
+    QCOMPARE(buffers->tabText(0), QStringLiteral("Untitled"));
     QCOMPARE(buffers->tabText(1), QStringLiteral("note.md"));
     QCOMPARE(buffers->currentIndex(), 1);
     QVERIFY(!editor->document()->isModified());
 
     editor->document()->setText(QStringLiteral("changed in memory"));
-    QTRY_COMPARE(buffers->tabText(1), QStringLiteral("note.md [+]"));
+    QTRY_VERIFY(editor->document()->isModified());
+    QCOMPARE(buffers->tabText(1), QStringLiteral("note.md"));
     QFile diskFile(QString::fromStdString((root / "note.md").string()));
     QVERIFY(diskFile.open(QIODevice::ReadOnly));
     QCOMPARE(diskFile.readAll(), QByteArray("# Original\n"));
@@ -440,7 +458,8 @@ void MainWindowTest::reopeningAnOpenFileKeepsUnsavedEditsAndDoesNotDuplicate() {
     auto* editor = activeEditor(window);
     QVERIFY(editor != nullptr);
     editor->document()->setText(QStringLiteral("unsaved work"));
-    QTRY_COMPARE(buffers->tabText(0), QStringLiteral("note.md [+]"));
+    QTRY_VERIFY(editor->document()->isModified());
+    QCOMPARE(buffers->tabText(0), QStringLiteral("note.md"));
 
     auto* model = static_cast<omanotes::FileTreeModel*>(tree->model());
     if (model->canFetchMore({})) {
@@ -527,7 +546,8 @@ void MainWindowTest::savesAnOpenFileWithControlS() {
     QVERIFY(editor != nullptr);
 
     editor->document()->setText(QStringLiteral("# Edited\n"));
-    QTRY_COMPARE(buffers->tabText(0), QStringLiteral("note.md [+]"));
+    QTRY_VERIFY(editor->document()->isModified());
+    QCOMPARE(buffers->tabText(0), QStringLiteral("note.md"));
 
     editor->setFocus();
     QTRY_VERIFY(editor->hasFocus());
@@ -556,7 +576,7 @@ void MainWindowTest::namesAScratchBufferBeforeWritingIt() {
     QVERIFY(prompt != nullptr);
     QVERIFY(editor != nullptr);
     QVERIFY(!prompt->isVisible());
-    QCOMPARE(buffers->tabText(0), QStringLiteral("[No Name]"));
+    QCOMPARE(buffers->tabText(0), QStringLiteral("Untitled"));
 
     editor->document()->setText(QStringLiteral("# Fresh\n"));
     editor->setFocus();
@@ -692,14 +712,15 @@ void MainWindowTest::refusesEditorWriteCommandsItDoesNotImplementYet() {
     editor->setFocus();
     QTRY_VERIFY(editor->hasFocus());
 
-    // :wq must never reach KTextEditor's own save, which would open a modal
-    // dialog and write outside the workspace.
+    // :saveas must never reach KTextEditor's own save, which would open a
+    // modal dialog and write outside the workspace. (:wq is ours now: it
+    // writes through the atomic saver and quits.)
     auto* editorTarget = QApplication::focusWidget();
     QTest::keyClick(editorTarget, Qt::Key_Colon);
     QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
                 QApplication::focusWidget() != editorTarget);
     auto* commandLine = QApplication::focusWidget();
-    QTest::keyClicks(commandLine, QStringLiteral("wq"));
+    QTest::keyClicks(commandLine, QStringLiteral("saveas"));
     QTest::keyClick(commandLine, Qt::Key_Return);
 
     QTRY_VERIFY(status->text().contains(QStringLiteral("not available yet")));
@@ -1077,14 +1098,29 @@ void MainWindowTest::everyCommandHasOneImplementationAndARoute() {
     QVERIFY2(findings.empty(), qPrintable(report));
 
     const auto& commands = window.commands();
-    for (const auto* id :
-         {"file.save", "file.open", "buffer.new", "buffer.close", "buffer.close.discard",
-          "buffer.next", "buffer.previous", "buffer.show", "pane.sidebar", "pane.editor",
-          "search.files", "search.text", "help.show", "view.reading", "edit.paste", "edit.copy",
-          "editor.visual-block"}) {
+    for (const auto* id : {"file.save",
+                           "file.open",
+                           "buffer.new",
+                           "buffer.close",
+                           "buffer.close.discard",
+                           "buffer.next",
+                           "buffer.previous",
+                           "buffer.show",
+                           "pane.sidebar",
+                           "pane.editor",
+                           "search.files",
+                           "search.text",
+                           "help.show",
+                           "view.reading",
+                           "edit.paste",
+                           "edit.copy",
+                           "editor.visual-block",
+                           "view.half-page-down",
+                           "view.half-page-up",
+                           "app.quit"}) {
         QVERIFY2(commands.find(QString::fromLatin1(id)) != nullptr, id);
     }
-    QCOMPARE(commands.commands().size(), std::size_t{18});
+    QCOMPARE(commands.commands().size(), std::size_t{21});
 }
 
 void MainWindowTest::leaderSequencesRunRegisteredCommands() {
@@ -1196,7 +1232,7 @@ void MainWindowTest::closesBuffersFromTheLeaderAndGuardsUnsavedWork() {
         qPrintable(status->text()));
     QVERIFY(status->text().contains(QStringLiteral("Space+b+D")));
     QCOMPARE(strip->count(), 1);
-    QCOMPARE(strip->tabText(0), QStringLiteral("closing.md [+]"));
+    QCOMPARE(strip->tabText(0), QStringLiteral("closing.md"));
 
     // Space b D discards. The last buffer closing leaves a scratch buffer to
     // type in, with its own editor, and nothing reaches the disk.
@@ -1204,7 +1240,7 @@ void MainWindowTest::closesBuffersFromTheLeaderAndGuardsUnsavedWork() {
     QTest::keyClicks(target, QStringLiteral("bD"));
     QTRY_COMPARE(status->text(), QStringLiteral("Closed closing.md, discarding changes"));
     QCOMPARE(strip->count(), 1);
-    QCOMPARE(strip->tabText(0), QStringLiteral("[No Name]"));
+    QCOMPARE(strip->tabText(0), QStringLiteral("Untitled"));
     // One editor per open buffer plus the permanent reading view.
     QCOMPARE(stack->count(), 2);
     QCOMPARE(readFile(note), QByteArray("keep me\n"));
@@ -1227,7 +1263,7 @@ void MainWindowTest::closesBuffersFromTheLeaderAndGuardsUnsavedWork() {
     target = QApplication::focusWidget();
     QTest::keyClick(target, Qt::Key_Space);
     QTest::keyClicks(target, QStringLiteral("bd"));
-    QTRY_COMPARE(status->text(), QStringLiteral("Closed [No Name]"));
+    QTRY_COMPARE(status->text(), QStringLiteral("Closed Untitled"));
     QCOMPARE(strip->count(), 1);
     // One editor per open buffer plus the permanent reading view.
     QCOMPARE(stack->count(), 2);
@@ -1336,19 +1372,20 @@ void MainWindowTest::mouseCreatesAndClosesBuffers() {
     QTest::mouseClick(newBuffer, Qt::LeftButton);
     QTRY_COMPARE(strip->count(), 2);
     QCOMPARE(strip->currentIndex(), 1);
-    QCOMPARE(strip->tabText(1), QStringLiteral("[No Name]"));
+    QCOMPARE(strip->tabText(1), QStringLiteral("Untitled"));
     QVERIFY(activeEditor(window)->document()->text().isEmpty());
 
     // A dirty buffer's close button asks first; Cancel keeps everything.
     activeEditor(window)->document()->setText(QStringLiteral("draft"));
-    QTRY_COMPARE(strip->tabText(1), QStringLiteral("[No Name] [+]"));
+    QTRY_VERIFY(activeEditor(window)->document()->isModified());
+    QCOMPARE(strip->tabText(1), QStringLiteral("Untitled"));
     auto* scratchClose = closeButtonFor(*strip, 1);
     QVERIFY(scratchClose != nullptr);
     QTest::mouseClick(scratchClose, Qt::LeftButton);
     auto* prompt = window.findChild<QMessageBox*>(QStringLiteral("closeBufferPrompt"));
     QVERIFY(prompt != nullptr);
     QTRY_VERIFY(prompt->isVisible());
-    QVERIFY(prompt->text().contains(QStringLiteral("[No Name]")));
+    QVERIFY(prompt->text().contains(QStringLiteral("Untitled")));
     QTest::mouseClick(prompt->button(QMessageBox::Cancel), Qt::LeftButton);
     QTRY_VERIFY(!prompt->isVisible());
     QCOMPARE(strip->count(), 2);
@@ -1369,7 +1406,8 @@ void MainWindowTest::mouseCreatesAndClosesBuffers() {
 
     // Discard closes without touching the disk; the last buffer leaves a scratch.
     activeEditor(window)->document()->setText(QStringLiteral("note\nedited\n"));
-    QTRY_COMPARE(strip->tabText(0), QStringLiteral("note.md [+]"));
+    QTRY_VERIFY(activeEditor(window)->document()->isModified());
+    QCOMPARE(strip->tabText(0), QStringLiteral("note.md"));
     auto* noteClose = closeButtonFor(*strip, 0);
     QVERIFY(noteClose != nullptr);
     QTest::mouseClick(noteClose, Qt::LeftButton);
@@ -1378,7 +1416,7 @@ void MainWindowTest::mouseCreatesAndClosesBuffers() {
     QTRY_COMPARE(status->text(), QStringLiteral("Closed note.md, discarding changes"));
     QCOMPARE(readFile(note), QByteArray("note\n"));
     QCOMPARE(strip->count(), 1);
-    QCOMPARE(strip->tabText(0), QStringLiteral("[No Name]"));
+    QCOMPARE(strip->tabText(0), QStringLiteral("Untitled"));
 
     // A clean close needs no prompt and acts on the clicked tab, not the
     // active buffer.
@@ -1471,6 +1509,144 @@ void MainWindowTest::superChordsRouteUniversalCopyAndPaste() {
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
 }
 
+void MainWindowTest::scrollbarsAreNeverShown() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "long.md";
+    QByteArray body("# Long\n\n");
+    for (int line = 0; line < 400; ++line) {
+        body += "a line of body text that goes on for a while\n";
+    }
+    writeFile(note, body);
+    omanotes::MainWindow window({root, note, false});
+    window.resize(600, 300);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    auto* editor = activeEditor(window);
+    QVERIFY(editor != nullptr);
+    auto* reading = window.findChild<QTextBrowser*>(QStringLiteral("readingView"));
+    QVERIFY(reading != nullptr);
+    auto* tree = window.findChild<QTreeView*>();
+    QVERIFY(tree != nullptr);
+
+    // A note far taller than the window would earn a scrollbar anywhere
+    // else. Here the bars have no size, so nothing to grab, nothing to see.
+    QTRY_VERIFY(editor->document()->lines() > 300);
+    QVERIFY(editor->verticalScrollBar()->maximum() > 0);
+    // Layout runs on a posted event, and a bar Qt never shows keeps a stale
+    // default geometry, so "hidden or zero width" is the honest check.
+    const auto unseen = [](const QScrollBar* bar) {
+        return !bar->isVisible() || bar->width() == 0;
+    };
+    QTRY_VERIFY(unseen(editor->verticalScrollBar()));
+    QTRY_VERIFY(unseen(editor->horizontalScrollBar()));
+
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("m"));
+    QTRY_VERIFY(reading->isVisible());
+    QTRY_VERIFY(reading->verticalScrollBar()->maximum() > 0);
+    QTRY_VERIFY(unseen(reading->verticalScrollBar()));
+    QTRY_VERIFY(unseen(tree->verticalScrollBar()));
+
+    // Scrolling itself still works: the wheel moves the view without a bar.
+    const auto before = reading->verticalScrollBar()->value();
+    QWheelEvent wheel(QPointF(10, 10), reading->viewport()->mapToGlobal(QPoint(10, 10)),
+                      QPoint(0, -120), QPoint(0, -120), Qt::NoButton, Qt::NoModifier,
+                      Qt::NoScrollPhase, false);
+    QApplication::sendEvent(reading->viewport(), &wheel);
+    QTRY_VERIFY(reading->verticalScrollBar()->value() > before);
+}
+
+void MainWindowTest::halfPageKeysScrollWritingAndReading() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "long.md";
+    QByteArray body("# Long\n\n");
+    for (int line = 0; line < 400; ++line) {
+        body += "a line of body text\n";
+    }
+    writeFile(note, body);
+    omanotes::MainWindow window({root, note, false});
+    window.resize(600, 300);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    auto* editor = activeEditor(window);
+    QVERIFY(editor != nullptr);
+    QTRY_VERIFY(editor->document()->lines() > 300);
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QCOMPARE(editor->cursorPosition(), KTextEditor::Cursor(0, 0));
+
+    // Normal mode: Ctrl+D and Ctrl+U are Vi's half page, not Kate's Comment
+    // and Uppercase, so the cursor moves and the text does not.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_D, Qt::ControlModifier);
+    QTRY_VERIFY(editor->cursorPosition().line() > 0);
+    const auto afterDown = editor->cursorPosition().line();
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_D, Qt::ControlModifier);
+    QTRY_VERIFY(editor->cursorPosition().line() > afterDown);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_U, Qt::ControlModifier);
+    QTRY_COMPARE(editor->cursorPosition().line(), afterDown);
+    QCOMPARE(editor->document()->text(), QString::fromUtf8(body));
+    QVERIFY(!editor->document()->isModified());
+
+    // Insert mode keeps Vi's own meaning (dedent; nothing to dedent here)
+    // rather than commenting the line.
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("i"));
+    QTRY_COMPARE(editor->viewMode(), KTextEditor::View::ViModeInsert);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_D, Qt::ControlModifier);
+    QTest::qWait(50);
+    QCOMPARE(editor->document()->text(), QString::fromUtf8(body));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QTRY_COMPARE(editor->viewMode(), KTextEditor::View::ViModeNormal);
+
+    // The reading view has no Vi; the same keys scroll it half a screen.
+    auto* reading = window.findChild<QTextBrowser*>(QStringLiteral("readingView"));
+    QVERIFY(reading != nullptr);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("m"));
+    QTRY_VERIFY(reading->isVisible());
+    QTRY_VERIFY(reading->verticalScrollBar()->maximum() > 0);
+    const auto top = reading->verticalScrollBar()->value();
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_D, Qt::ControlModifier);
+    QTRY_VERIFY(reading->verticalScrollBar()->value() > top);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_U, Qt::ControlModifier);
+    QTRY_COMPARE(reading->verticalScrollBar()->value(), top);
+
+    // Both are in the help with their keys.
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
+    QTest::keyClicks(QApplication::focusWidget(), QStringLiteral("?"));
+    auto* help = window.findChild<QDialog*>(QStringLiteral("helpOverlay"));
+    QTRY_VERIFY(help->isVisible());
+    auto* commands = help->findChild<QTreeWidget*>(QStringLiteral("helpCommands"));
+    std::map<QString, QString> keysById;
+    for (int row = 0; row < commands->topLevelItemCount(); ++row) {
+        auto* item = commands->topLevelItem(row);
+        keysById[item->data(0, Qt::UserRole).toString()] = item->text(1);
+    }
+    // Lower case: Ctrl+d is not Ctrl+Shift+D, and the help must not imply it.
+    QCOMPARE(keysById[QStringLiteral("view.half-page-down")], QStringLiteral("Ctrl+d"));
+    QCOMPARE(keysById[QStringLiteral("view.half-page-up")], QStringLiteral("Ctrl+u"));
+    QCOMPARE(keysById[QStringLiteral("file.save")], QStringLiteral("Ctrl+s"));
+    QCOMPARE(keysById[QStringLiteral("pane.editor")], QStringLiteral("Ctrl+l (sidebar)"));
+    // The way out is listed, labelled as Matt asked, with its Vi route.
+    QCOMPARE(keysById[QStringLiteral("app.quit")], QStringLiteral(":q"));
+    QTreeWidgetItem* quit = nullptr;
+    for (int row = 0; row < commands->topLevelItemCount(); ++row) {
+        if (commands->topLevelItem(row)->data(0, Qt::UserRole).toString() ==
+            QStringLiteral("app.quit")) {
+            quit = commands->topLevelItem(row);
+        }
+    }
+    QVERIFY(quit != nullptr);
+    QCOMPARE(quit->text(0), QStringLiteral("IYKYK"));
+    QTest::keyClick(commands, Qt::Key_Escape);
+    QTRY_VERIFY(!help->isVisible());
+}
+
 void MainWindowTest::readingViewTogglesAndPreservesState() {
     QTemporaryDir temporary;
     QVERIFY(temporary.isValid());
@@ -1497,7 +1673,7 @@ void MainWindowTest::readingViewTogglesAndPreservesState() {
     QTRY_COMPARE(stack->currentWidget(), reading);
     QVERIFY(reading->toPlainText().contains(QStringLiteral("body text")));
     QVERIFY(!editor->document()->isModified());
-    QTRY_VERIFY2(status->text().contains(QStringLiteral("READING")), qPrintable(status->text()));
+    QTRY_COMPARE(status->text(), QStringLiteral("Reading"));
 
     // Space m from the reading view returns to writing, cursor intact.
     QTest::keyClick(QApplication::focusWidget(), Qt::Key_Space);
@@ -1530,7 +1706,7 @@ void MainWindowTest::readingViewTogglesAndPreservesState() {
     QTRY_COMPARE(stack->currentWidget(), reading);
     QVERIFY(reading->toPlainText().contains(QStringLiteral("edited body")));
     QVERIFY(backToWriting->document()->isModified());
-    QVERIFY2(status->text().contains(QStringLiteral("[+]")), qPrintable(status->text()));
+    QVERIFY2(!status->text().contains(QStringLiteral("[+]")), qPrintable(status->text()));
 }
 
 void MainWindowTest::readingViewRoutesCopyAndRefusesPaste() {
@@ -1619,17 +1795,16 @@ void MainWindowTest::themeDressesEveryRegion() {
     omanotes::MainWindow window({root, note, false}, writeFixtureTheme(temporary));
     window.show();
 
-    // The sidebar's selected row is strong while its tree owns focus and
-    // dims when it does not (the 5.1 gate debt). Under an active stylesheet
-    // Qt ignores QPalette for item selection, so the rules must be in the
-    // stylesheet itself, dim included.
+    // The sidebar's selected row is painted only while the sidebar has
+    // focus, and vanishes otherwise; no accent line marks either pane (Matt's
+    // gate finding, 2026-09-10). Under an active stylesheet Qt ignores
+    // QPalette for item selection, so the rules must be in the stylesheet.
     const auto sheet = window.styleSheet();
+    QVERIFY(sheet.contains(QStringLiteral("QFrame#sidebar[paneActive=\"true\"] "
+                                          "QTreeView::item:selected { background-color: #303a60")));
     QVERIFY(sheet.contains(
-        QStringLiteral("QTreeView::item:selected:active { background-color: #303a60")));
-    const auto inactiveRule =
-        sheet.mid(sheet.indexOf(QStringLiteral("QTreeView::item:selected:!active")));
-    QVERIFY(!inactiveRule.isEmpty());
-    QVERIFY(!inactiveRule.first(inactiveRule.indexOf(u'}')).contains(QStringLiteral("#303a60")));
+        QStringLiteral("QFrame#sidebar QTreeView::item:selected { background-color: #181826")));
+    QVERIFY(!sheet.contains(QStringLiteral("border-top")));
 
     // The reading pane's ground is stylesheet-painted; its document colours
     // (text, links) still come from the palette it renders with.
@@ -1656,10 +1831,34 @@ void MainWindowTest::themeDressesEveryRegion() {
     QVERIFY(window.styleSheet().contains(QStringLiteral("#d08050")));
     QVERIFY(window.styleSheet().contains(QStringLiteral("#181826")));
     QVERIFY(window.styleSheet().contains(QStringLiteral("QFrame#sidebar QTreeView")));
+    // The help glyph sits flat in the status row, not in a stock button box.
+    QVERIFY(window.styleSheet().contains(
+        QStringLiteral("QToolButton#helpButton { background: transparent")));
+    // Each bar is one band in the pane's own colour: tabs, +, the run after
+    // them, the mode and the ? all share the editor's ground (Matt's gate
+    // finding, 2026-09-10).
+    QVERIFY(window.findChild<QWidget*>(QStringLiteral("bufferRow")) != nullptr);
+    QVERIFY(window.findChild<QWidget*>(QStringLiteral("statusRow")) != nullptr);
+    QVERIFY(window.styleSheet().contains(
+        QStringLiteral("QWidget#bufferRow { background-color: #101018")));
+    QVERIFY(window.styleSheet().contains(
+        QStringLiteral("QWidget#statusRow { background-color: #101018")));
+    QVERIFY(window.styleSheet().contains(
+        QStringLiteral("QLabel#statusArea { background-color: #101018")));
+    QVERIFY(window.styleSheet().contains(
+        QStringLiteral("QTabBar#bufferStrip::tab { background-color: #101018")));
+    // Vi's `:` line is a child of the editor and wears the pane colour with
+    // no frame; its completion drop-down has no parent, so its rule lives on
+    // the application (Matt's gate finding, 2026-09-10).
+    QVERIFY(window.styleSheet().contains(
+        QStringLiteral("QLineEdit#commandtext { background-color: #101018")));
+    QVERIFY(qApp->styleSheet().contains(QStringLiteral("QListView { background-color: #181826")));
 
     // The dialogs are separate windows the scoped rules used to miss: the
     // help overlay, the search palette, and the close prompt all theme.
     QVERIFY(sheet.contains(QStringLiteral("QTreeWidget#helpCommands")));
+    QVERIFY(sheet.contains(QStringLiteral(
+        "QTreeWidget#helpCommands QHeaderView::section { background-color: #181826")));
     QVERIFY(sheet.contains(QStringLiteral("QListWidget#searchResults")));
     QVERIFY(sheet.contains(QStringLiteral("QMessageBox")));
 }
@@ -1733,6 +1932,141 @@ void MainWindowTest::closesCleanly() {
     window.show();
     QVERIFY(window.close());
     QVERIFY(!window.isVisible());
+}
+
+void MainWindowTest::colonQuitsWithPromptForUnsavedWork() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "clean\n");
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* editor = activeEditor(window);
+    QVERIFY(editor != nullptr);
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+
+    // Unsaved work: :q asks rather than leaving or refusing silently.
+    editor->document()->setText(QStringLiteral("clean\nedited\n"));
+    QTRY_VERIFY(editor->document()->isModified());
+    typeViCommand(*editor, QStringLiteral("q"));
+    auto* prompt = window.findChild<QMessageBox*>(QStringLiteral("quitPrompt"));
+    QTRY_VERIFY(prompt != nullptr && prompt->isVisible());
+    QVERIFY2(prompt->text().contains(QStringLiteral("note.md")), qPrintable(prompt->text()));
+
+    // Cancel stays, with everything as it was.
+    QTest::mouseClick(prompt->button(QMessageBox::Cancel), Qt::LeftButton);
+    QTRY_VERIFY(!prompt->isVisible());
+    QVERIFY(window.isVisible());
+    QVERIFY(activeEditor(window)->document()->isModified());
+    QCOMPARE(readFile(note), QByteArray("clean\n"));
+
+    // Save writes inside the workspace and then quits.
+    typeViCommand(*activeEditor(window), QStringLiteral("q"));
+    QTRY_VERIFY(prompt->isVisible());
+    QTest::mouseClick(prompt->button(QMessageBox::Save), Qt::LeftButton);
+    QTRY_VERIFY(!window.isVisible());
+    QCOMPARE(readFile(note), QByteArray("clean\nedited\n"));
+    Q_UNUSED(status);
+}
+
+void MainWindowTest::colonQuitVariantsSaveOrDiscard() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "clean\n");
+
+    // A clean desk: :q simply closes.
+    {
+        omanotes::MainWindow window({root, note, false});
+        window.show();
+        typeViCommand(*activeEditor(window), QStringLiteral("q"));
+        QTRY_VERIFY(!window.isVisible());
+    }
+
+    // :q! discards: the window closes and the disk is untouched.
+    {
+        omanotes::MainWindow window({root, note, false});
+        window.show();
+        auto* editor = activeEditor(window);
+        editor->document()->setText(QStringLiteral("clean\nlost\n"));
+        QTRY_VERIFY(editor->document()->isModified());
+        typeViCommand(*editor, QStringLiteral("q!"));
+        QTRY_VERIFY(!window.isVisible());
+        QCOMPARE(readFile(note), QByteArray("clean\n"));
+    }
+
+    // :wq writes the active buffer and quits, no prompt.
+    {
+        omanotes::MainWindow window({root, note, false});
+        window.show();
+        auto* editor = activeEditor(window);
+        editor->document()->setText(QStringLiteral("clean\nkept\n"));
+        QTRY_VERIFY(editor->document()->isModified());
+        typeViCommand(*editor, QStringLiteral("wq"));
+        QTRY_VERIFY(!window.isVisible());
+        QCOMPARE(readFile(note), QByteArray("clean\nkept\n"));
+        QVERIFY(window.findChild<QMessageBox*>(QStringLiteral("quitPrompt")) == nullptr);
+    }
+
+    // Save on the prompt cannot name an Untitled buffer: it refuses with a
+    // message and stays, rather than quitting past the unsaved work.
+    {
+        omanotes::MainWindow window({root, std::nullopt, false});
+        window.show();
+        auto* editor = activeEditor(window);
+        editor->document()->setText(QStringLiteral("draft"));
+        QTRY_VERIFY(editor->document()->isModified());
+        typeViCommand(*editor, QStringLiteral("q"));
+        auto* prompt = window.findChild<QMessageBox*>(QStringLiteral("quitPrompt"));
+        QTRY_VERIFY(prompt != nullptr && prompt->isVisible());
+        QTest::mouseClick(prompt->button(QMessageBox::Save), Qt::LeftButton);
+        QTRY_VERIFY(!prompt->isVisible());
+        auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+        QTRY_VERIFY2(status->text().contains(QStringLiteral("no file name")),
+                     qPrintable(status->text()));
+        QVERIFY(window.isVisible());
+
+        // Discard on the prompt closes it and quits.
+        typeViCommand(*activeEditor(window), QStringLiteral("q"));
+        QTRY_VERIFY(prompt->isVisible());
+        QTest::mouseClick(prompt->button(QMessageBox::Discard), Qt::LeftButton);
+        QTRY_VERIFY(!window.isVisible());
+    }
+}
+
+void MainWindowTest::sidebarSelectionBarFollowsFocus() {
+    QTemporaryDir temporary;
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    writeFile(root / "alpha.md", "# Alpha\n");
+    writeFile(root / "beta.md", "# Beta\n");
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* editor = activeEditor(window);
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    auto* sidebar = window.findChild<QWidget*>(QStringLiteral("sidebar"));
+    auto* tree = window.findChild<QTreeView*>(QStringLiteral("fileTree"));
+    QVERIFY(sidebar != nullptr && tree != nullptr);
+
+    // Entering the sidebar selects the row it lands on, not merely makes it
+    // current: a QTreeView given focus with no current row picks the first
+    // one itself without selecting it, and an unselected row paints no bar.
+    auto* target = editor->focusProxy() != nullptr ? editor->focusProxy() : editor;
+    QTest::keyClick(target, Qt::Key_Space);
+    QTest::keyClicks(target, QStringLiteral("e"));
+    QTRY_VERIFY(tree->hasFocus());
+    QTRY_VERIFY(sidebar->property("paneActive").toBool());
+    QCOMPARE(tree->currentIndex().data().toString(), QStringLiteral("alpha.md"));
+    QVERIFY(tree->selectionModel()->isSelected(tree->currentIndex()));
+
+    // Leaving the sidebar clears its focus flag; the stylesheet keys the
+    // bar's colour to that flag, so the bar goes with it.
+    QTest::keyClick(tree, Qt::Key_L, Qt::ControlModifier);
+    QTRY_VERIFY(activeEditor(window)->hasFocus());
+    QTRY_VERIFY(!sidebar->property("paneActive").toBool());
+    QVERIFY(tree->selectionModel()->isSelected(tree->currentIndex()));
 }
 
 void MainWindowTest::searchOpensMatchesAndHelpRunsCommands() {
@@ -1829,12 +2163,12 @@ void MainWindowTest::configuredKeysRouteAndAppearInHelp() {
         const auto id = item->data(0, Qt::UserRole).toString();
         if (id == QStringLiteral("file.save")) {
             sawSave = true;
-            QCOMPARE(item->text(2), QKeySequence(QStringLiteral("Ctrl+Alt+Shift+S"))
+            QCOMPARE(item->text(1), QKeySequence(QStringLiteral("Ctrl+Alt+Shift+S"))
                                         .toString(QKeySequence::NativeText));
         }
         if (id == QStringLiteral("buffer.new")) {
             sawNew = true;
-            QCOMPARE(item->text(2), QStringLiteral("Space n"));
+            QCOMPARE(item->text(1), QStringLiteral("Space n"));
         }
     }
     QVERIFY(sawSave && sawNew);

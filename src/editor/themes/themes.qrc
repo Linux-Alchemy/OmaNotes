@@ -1,0 +1,9 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <!-- KSyntaxHighlighting loads application-bundled themes from this
+         resource prefix (see its Repository documentation). -->
+    <qresource prefix="/org.kde.syntax-highlighting/themes-addons">
+        <file>omanotes-dark.theme</file>
+        <file>omanotes-light.theme</file>
+    </qresource>
+</RCC>
