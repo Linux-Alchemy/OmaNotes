@@ -171,6 +171,7 @@ class MainWindowTest final : public QObject {
     void refusesDisabledCommandsWithAReason();
     void clicksAndShortcutsRunTheSameCommands();
     void mouseCreatesAndClosesBuffers();
+    void mouseTogglesTheSidebar();
     void insertModePasteRoutesTheClipboard();
     void superChordsRouteUniversalCopyAndPaste();
     void readingViewTogglesAndPreservesState();
@@ -1431,6 +1432,45 @@ void MainWindowTest::mouseCreatesAndClosesBuffers() {
     QCOMPARE(activeEditor(window)->document()->text(), QStringLiteral("second"));
 }
 
+void MainWindowTest::mouseTogglesTheSidebar() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    writeFile(root / "note.md", "# Note\n");
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* sidebar = window.findChild<QWidget*>(QStringLiteral("sidebar"));
+    auto* tree = window.findChild<QTreeView*>(QStringLiteral("fileTree"));
+    auto* toggle = window.findChild<QToolButton*>(QStringLiteral("sidebarToggleButton"));
+    auto* editor = activeEditor(window);
+    QVERIFY(sidebar != nullptr && tree != nullptr && toggle != nullptr && editor != nullptr);
+    QTRY_VERIFY(editor->hasFocus());
+    QVERIFY(!sidebar->isVisible());
+    QCOMPARE(toggle->focusPolicy(), Qt::NoFocus);
+    QVERIFY(toggle->toolTip().contains(QStringLiteral("Space e")));
+
+    // The glyph is the mouse route to pane.sidebar.toggle: one click shows the
+    // tree and moves focus into it, exactly as Space e does.
+    QTest::mouseClick(toggle, Qt::LeftButton);
+    QTRY_VERIFY(sidebar->isVisible());
+    QTRY_VERIFY(tree->hasFocus());
+
+    // A second click hides it and hands focus back to the text.
+    QTest::mouseClick(toggle, Qt::LeftButton);
+    QTRY_VERIFY(!sidebar->isVisible());
+    QTRY_VERIFY(editor->hasFocus());
+
+    // With the tree already open and focus in the editor, the click still
+    // closes it and the editor keeps focus.
+    QTest::mouseClick(toggle, Qt::LeftButton);
+    QTRY_VERIFY(tree->hasFocus());
+    editor->setFocus();
+    QTRY_VERIFY(editor->hasFocus());
+    QTest::mouseClick(toggle, Qt::LeftButton);
+    QTRY_VERIFY(!sidebar->isVisible());
+    QVERIFY(editor->hasFocus());
+}
+
 void MainWindowTest::insertModePasteRoutesTheClipboard() {
     QTemporaryDir temporary;
     QVERIFY(temporary.isValid());
@@ -1847,6 +1887,8 @@ void MainWindowTest::themeDressesEveryRegion() {
         QStringLiteral("QLabel#statusArea { background-color: #101018")));
     QVERIFY(window.styleSheet().contains(
         QStringLiteral("QTabBar#bufferStrip::tab { background-color: #101018")));
+    QVERIFY(window.styleSheet().contains(
+        QStringLiteral("QToolButton#sidebarToggleButton { background-color: #101018")));
     // Vi's `:` line is a child of the editor and wears the pane colour with
     // no frame; its completion drop-down has no parent, so its rule lives on
     // the application (Matt's gate finding, 2026-09-10).

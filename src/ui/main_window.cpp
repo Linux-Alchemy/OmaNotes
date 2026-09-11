@@ -90,7 +90,8 @@ std::expected<QString, QString> decodeNote(const QByteArray& bytes,
 constexpr auto kAddBangToOverride = " (add ! to override)";
 
 QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip*& buffers,
-                          QToolButton*& newBuffer, QLabel*& status, QLineEdit*& namePrompt) {
+                          QToolButton*& sidebarToggle, QToolButton*& newBuffer, QLabel*& status,
+                          QLineEdit*& namePrompt) {
     auto* writingArea = new QWidget(parent);
     writingArea->setObjectName(QStringLiteral("writingArea"));
 
@@ -99,6 +100,16 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
     layout->setSpacing(0);
 
     buffers = new BufferStrip(writingArea);
+
+    // The mouse route to the sidebar: a flat glyph at the seam where the tree
+    // meets the tabs, running the same toggle command as Space e.
+    sidebarToggle = new QToolButton(writingArea);
+    sidebarToggle->setText(QStringLiteral("\u2261"));
+    sidebarToggle->setObjectName(QStringLiteral("sidebarToggleButton"));
+    sidebarToggle->setAccessibleName(QStringLiteral("Show or hide sidebar"));
+    sidebarToggle->setToolTip(QStringLiteral("Show or hide sidebar (Space e)"));
+    sidebarToggle->setAutoRaise(true);
+    sidebarToggle->setFocusPolicy(Qt::NoFocus);
 
     newBuffer = new QToolButton(writingArea);
     newBuffer->setText(QStringLiteral("+"));
@@ -137,6 +148,7 @@ QWidget* buildWritingArea(QWidget* parent, QStackedWidget*& editors, BufferStrip
     auto* stripRow = new QHBoxLayout(bufferRow);
     stripRow->setContentsMargins(0, 0, 0, 0);
     stripRow->setSpacing(0);
+    stripRow->addWidget(sidebarToggle);
     stripRow->addWidget(buffers);
     stripRow->addWidget(newBuffer);
     stripRow->addStretch(1);
@@ -189,9 +201,10 @@ MainWindow::MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, Q
     watcher_ = std::make_unique<FileWatcher>();
     connect(watcher_.get(), &FileWatcher::fileChanged, this,
             [this](const std::filesystem::path& path) { handleExternalChange(path); });
+    QToolButton* sidebarToggleButton = nullptr;
     QToolButton* newBufferButton = nullptr;
-    writingArea_ = buildWritingArea(splitter, editorStack_, bufferStrip_, newBufferButton,
-                                    statusArea_, namePrompt_);
+    writingArea_ = buildWritingArea(splitter, editorStack_, bufferStrip_, sidebarToggleButton,
+                                    newBufferButton, statusArea_, namePrompt_);
     splitter->addWidget(writingArea_);
     splitter->setStretchFactor(0, 0);
     splitter->setStretchFactor(1, 1);
@@ -280,6 +293,8 @@ MainWindow::MainWindow(LaunchRequest launchRequest, ThemeSources themeSources, Q
             [this](BufferId id) { confirmCloseBuffer(id); });
     connect(newBufferButton, &QToolButton::clicked, this,
             [this] { runCommand(QStringLiteral("buffer.new")); });
+    connect(sidebarToggleButton, &QToolButton::clicked, this,
+            [this] { runCommand(QStringLiteral("pane.sidebar.toggle")); });
     connect(sidebar_, &Sidebar::fileActivated, this, [this](const std::filesystem::path& path) {
         auto context = currentContext();
         context.targetPath = path;
@@ -1851,6 +1866,8 @@ QWidget#bufferRow { background-color: %1; }
 QTabBar#bufferStrip { background-color: %1; }
 QTabBar#bufferStrip::tab { background-color: %1; color: %7; padding: 5px 12px; border: none; }
 QTabBar#bufferStrip::tab:selected { background-color: %1; color: %5; }
+QToolButton#sidebarToggleButton { background-color: %1; color: %7; border: none; padding: 2px 8px; }
+QToolButton#sidebarToggleButton:hover { color: %4; }
 QToolButton#newBufferButton { background-color: %1; color: %7; border: none; padding: 2px 8px; }
 QToolButton#tabCloseButton { background: transparent; color: %7; border: none; padding: 0px 2px; }
 QToolButton#tabCloseButton:hover { color: %4; }
