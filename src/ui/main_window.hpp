@@ -171,6 +171,17 @@ class MainWindow final : public QMainWindow, public SessionHost {
     /// through the atomic writer and nothing replaces a buffer unchecked.
     [[nodiscard]] bool interceptEditorFileCommand(QObject* watched, const QKeyEvent& event);
     QString saveActiveBufferOrReport(bool force = false);
+    /// Save every modified buffer that has a path, activating each in turn.
+    /// Returns the first failure's message, or empty. An unnamed modified
+    /// buffer fails: it needs `:w path.md` first.
+    QString saveAllModified(bool force);
+    /// `:q` and friends. With `discardChanges`, modified buffers are closed
+    /// without saving and the window closes; otherwise unsaved work brings
+    /// the quit prompt (Save / Discard / Cancel). SUPER+w never comes here:
+    /// the compositor's kill is handled by checkpoint and restore instead.
+    void quitApplication(bool discardChanges);
+    /// Close every modified buffer without saving, then the window.
+    void discardAllAndClose();
     /// Paint every region with the semantic palette: window chrome via one
     /// stylesheet, tree selection via palette groups (so the inactive
     /// selection dims), the reading view's colours, and each editor.
@@ -221,6 +232,7 @@ class MainWindow final : public QMainWindow, public SessionHost {
     /// destroyed, or a focus change during teardown reaches dead panes.
     QMetaObject::Connection focusConnection_;
     std::optional<BufferId> closePromptTarget_;
+    QMessageBox* quitPrompt_ = nullptr;
     std::optional<BufferId> closeAfterNaming_;
 };
 

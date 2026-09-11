@@ -1123,13 +1123,23 @@ bool MainWindow::interceptEditorFileCommand(QObject* watched, const QKeyEvent& e
         QStringLiteral("xa"),     QStringLiteral("xall"), QStringLiteral("exit"),
         QStringLiteral("saveas"), QStringLiteral("sav"),  QStringLiteral("update"),
         QStringLiteral("up")};
+    // Quitting too: Vi mode's own `:q` asks a host application this app never
+    // registers, so it would do nothing at all. `:q` is the way out of
+    // OmaNotes (Matt's call, 2026-09-10), with the save prompt when work is
+    // unsaved; `:q!` discards. Buffers here are Vim buffers, not windows, so
+    // `:q` and `:qa` mean the same thing.
+    static const QStringList kQuitVerbs = {QStringLiteral("q"),    QStringLiteral("q!"),
+                                           QStringLiteral("quit"), QStringLiteral("quit!"),
+                                           QStringLiteral("qa"),   QStringLiteral("qa!"),
+                                           QStringLiteral("qall"), QStringLiteral("qall!")};
     // Reloading goes the same way: the editor's own `:e` would replace the
     // buffer without consulting the revision the application is tracking.
     static const QStringList kEditVerbs = {QStringLiteral("e"), QStringLiteral("e!"),
                                            QStringLiteral("edit"), QStringLiteral("edit!")};
     const auto isWrite = kWriteVerbs.contains(verb);
     const auto isEdit = kEditVerbs.contains(verb);
-    if (!isWrite && !isEdit) {
+    const auto isQuit = kQuitVerbs.contains(verb);
+    if (!isWrite && !isEdit && !isQuit) {
         return false;
     }
 
@@ -1153,6 +1163,25 @@ bool MainWindow::interceptEditorFileCommand(QObject* watched, const QKeyEvent& e
     } else if (bare == QStringLiteral("w") || bare == QStringLiteral("write")) {
         failure = argument.isEmpty() ? saveActiveBufferOrReport(force)
                                      : saveTo(std::filesystem::path(argument.toStdString()), force);
+    } else if (isQuit) {
+        quitApplication(force);
+    } else if (bare == QStringLiteral("wq") || bare == QStringLiteral("x") ||
+               bare == QStringLiteral("exit")) {
+        // Vim's :wq writes this buffer and quits; other unsaved buffers still
+        // get their say through the prompt. :x is the same here: the only
+        // difference in Vim is skipping an unneeded write, which the saver
+        // already does.
+        failure = argument.isEmpty() ? saveActiveBufferOrReport(force)
+                                     : saveTo(std::filesystem::path(argument.toStdString()), force);
+        if (failure.isEmpty()) {
+            quitApplication(false);
+        }
+    } else if (bare == QStringLiteral("wqa") || bare == QStringLiteral("xa") ||
+               bare == QStringLiteral("xall")) {
+        failure = saveAllModified(force);
+        if (failure.isEmpty()) {
+            quitApplication(false);
+        }
     } else {
         failure = QStringLiteral("%1 is not available yet; use :w [path]").arg(verb);
     }
@@ -1160,6 +1189,101 @@ bool MainWindow::interceptEditorFileCommand(QObject* watched, const QKeyEvent& e
         statusArea_->setText(failure);
     }
     return true;
+}
+
+QString MainWindow::saveAllModified(bool force) {
+    for (const auto& buffer : buffers_.buffers()) {
+        if (!buffer.modified) {
+            continue;
+        }
+        if (buffers_.activate(buffer.id)) {
+            showBuffer(buffer.id);
+        }
+        if (!buffer.path.has_value()) {
+            return QStringLiteral("%1 has no file name; :w path.md names it")
+                .arg(buffer.displayName);
+        }
+        if (const auto failure = saveTo({}, force); !failure.isEmpty()) {
+            return failure;
+        }
+    }
+    return {};
+}
+
+void MainWindow::discardAllAndClose() {
+    std::vector<BufferId> modified;
+    for (const auto& buffer : buffers_.buffers()) {
+        if (buffer.modified) {
+            modified.push_back(buffer.id);
+        }
+    }
+    // Closing with discard drops each buffer's recovery record, so the
+    // decision sticks (docs/session-format.md, "Buffer discarded").
+    for (const auto id : modified) {
+        closeBuffer(id, true);
+    }
+    close();
+}
+
+void MainWindow::quitApplication(bool discardChanges) {
+    if (discardChanges) {
+        discardAllAndClose();
+        return;
+    }
+    QStringList unsaved;
+    for (const auto& buffer : buffers_.buffers()) {
+        if (buffer.modified) {
+            unsaved.append(buffer.displayName);
+        }
+    }
+    if (unsaved.isEmpty()) {
+        close();
+        return;
+    }
+    if (quitPrompt_ == nullptr) {
+        quitPrompt_ =
+            new QMessageBox(QMessageBox::Question, QString{}, QString{},
+                            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
+        quitPrompt_->setObjectName(QStringLiteral("quitPrompt"));
+        quitPrompt_->setDefaultButton(QMessageBox::Save);
+        for (auto* button : quitPrompt_->buttons()) {
+            button->setIcon(QIcon());
+        }
+        connect(quitPrompt_, &QMessageBox::finished, this, [this](int result) {
+            if (result == QMessageBox::Discard) {
+                discardAllAndClose();
+                return;
+            }
+            // Staying means back to the note, not to a dismissed dialog.
+            const auto backToEditor = [this] {
+                activateWindow();
+                if (auto* editor = activeEditor();
+                    editor != nullptr && editor->widget() != nullptr) {
+                    editor->widget()->setFocus(Qt::OtherFocusReason);
+                }
+            };
+            if (result != QMessageBox::Save) {
+                backToEditor();
+                return;
+            }
+            if (const auto failure = saveAllModified(false); !failure.isEmpty()) {
+                statusArea_->setText(failure);
+                backToEditor();
+                return;
+            }
+            close();
+        });
+    }
+    quitPrompt_->setWindowTitle(QStringLiteral("Unsaved changes"));
+    quitPrompt_->setText(unsaved.size() == 1
+                             ? QStringLiteral("%1 has unsaved changes.").arg(unsaved.first())
+                             : QStringLiteral("%1 buffers have unsaved changes: %2")
+                                   .arg(unsaved.size())
+                                   .arg(unsaved.join(QStringLiteral(", "))));
+    quitPrompt_->setInformativeText(
+        QStringLiteral("Save writes them inside the workspace and quits; Discard quits without "
+                       "saving; Cancel stays."));
+    quitPrompt_->open();
 }
 
 QString MainWindow::saveActiveBufferOrReport(bool force) {

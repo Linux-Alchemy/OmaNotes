@@ -103,13 +103,18 @@ void replaceFileByRename(const std::filesystem::path& path, const QByteArray& co
 
 /// Type `:command<Return>` on the editor's own Vi command line.
 void typeViCommand(KTextEditor::View& editor, const QString& command) {
+    editor.window()->activateWindow();
     editor.setFocus();
     QTRY_VERIFY(editor.hasFocus());
-    auto* editorTarget = QApplication::focusWidget();
-    QVERIFY(editorTarget != nullptr);
+    // Type at the view's own input widget (its focus proxy), not at whatever
+    // QApplication::focusWidget() says: after a modal dialog the offscreen
+    // platform can leave that pointing at the dialog's button.
+    auto* editorTarget = editor.focusProxy() != nullptr ? editor.focusProxy() : &editor;
     QTest::keyClick(editorTarget, Qt::Key_Colon);
-    QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
-                QApplication::focusWidget() != editorTarget);
+    // The command line is a line edit inside the editor; insist on it, so a
+    // stale focus widget (a dismissed dialog's button, say) is never typed at.
+    QTRY_VERIFY(qobject_cast<QLineEdit*>(QApplication::focusWidget()) != nullptr &&
+                editor.isAncestorOf(QApplication::focusWidget()));
     auto* commandLine = QApplication::focusWidget();
     QTest::keyClicks(commandLine, command);
     QTest::keyClick(commandLine, Qt::Key_Return);
@@ -180,6 +185,8 @@ class MainWindowTest final : public QObject {
     void remappedPaneKeyReplacesTheOldRoute();
     void leaderOverridesWinOverDirectShiftKeys();
     void closesCleanly();
+    void colonQuitsWithPromptForUnsavedWork();
+    void colonQuitVariantsSaveOrDiscard();
     void scrollbarsAreNeverShown();
     void halfPageKeysScrollWritingAndReading();
 };
@@ -704,14 +711,15 @@ void MainWindowTest::refusesEditorWriteCommandsItDoesNotImplementYet() {
     editor->setFocus();
     QTRY_VERIFY(editor->hasFocus());
 
-    // :wq must never reach KTextEditor's own save, which would open a modal
-    // dialog and write outside the workspace.
+    // :saveas must never reach KTextEditor's own save, which would open a
+    // modal dialog and write outside the workspace. (:wq is ours now: it
+    // writes through the atomic saver and quits.)
     auto* editorTarget = QApplication::focusWidget();
     QTest::keyClick(editorTarget, Qt::Key_Colon);
     QTRY_VERIFY(QApplication::focusWidget() != nullptr &&
                 QApplication::focusWidget() != editorTarget);
     auto* commandLine = QApplication::focusWidget();
-    QTest::keyClicks(commandLine, QStringLiteral("wq"));
+    QTest::keyClicks(commandLine, QStringLiteral("saveas"));
     QTest::keyClick(commandLine, Qt::Key_Return);
 
     QTRY_VERIFY(status->text().contains(QStringLiteral("not available yet")));
@@ -1890,6 +1898,108 @@ void MainWindowTest::closesCleanly() {
     window.show();
     QVERIFY(window.close());
     QVERIFY(!window.isVisible());
+}
+
+void MainWindowTest::colonQuitsWithPromptForUnsavedWork() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "clean\n");
+    omanotes::MainWindow window({root, note, false});
+    window.show();
+    auto* editor = activeEditor(window);
+    QVERIFY(editor != nullptr);
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+
+    // Unsaved work: :q asks rather than leaving or refusing silently.
+    editor->document()->setText(QStringLiteral("clean\nedited\n"));
+    QTRY_VERIFY(editor->document()->isModified());
+    typeViCommand(*editor, QStringLiteral("q"));
+    auto* prompt = window.findChild<QMessageBox*>(QStringLiteral("quitPrompt"));
+    QTRY_VERIFY(prompt != nullptr && prompt->isVisible());
+    QVERIFY2(prompt->text().contains(QStringLiteral("note.md")), qPrintable(prompt->text()));
+
+    // Cancel stays, with everything as it was.
+    QTest::mouseClick(prompt->button(QMessageBox::Cancel), Qt::LeftButton);
+    QTRY_VERIFY(!prompt->isVisible());
+    QVERIFY(window.isVisible());
+    QVERIFY(activeEditor(window)->document()->isModified());
+    QCOMPARE(readFile(note), QByteArray("clean\n"));
+
+    // Save writes inside the workspace and then quits.
+    typeViCommand(*activeEditor(window), QStringLiteral("q"));
+    QTRY_VERIFY(prompt->isVisible());
+    QTest::mouseClick(prompt->button(QMessageBox::Save), Qt::LeftButton);
+    QTRY_VERIFY(!window.isVisible());
+    QCOMPARE(readFile(note), QByteArray("clean\nedited\n"));
+    Q_UNUSED(status);
+}
+
+void MainWindowTest::colonQuitVariantsSaveOrDiscard() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto note = root / "note.md";
+    writeFile(note, "clean\n");
+
+    // A clean desk: :q simply closes.
+    {
+        omanotes::MainWindow window({root, note, false});
+        window.show();
+        typeViCommand(*activeEditor(window), QStringLiteral("q"));
+        QTRY_VERIFY(!window.isVisible());
+    }
+
+    // :q! discards: the window closes and the disk is untouched.
+    {
+        omanotes::MainWindow window({root, note, false});
+        window.show();
+        auto* editor = activeEditor(window);
+        editor->document()->setText(QStringLiteral("clean\nlost\n"));
+        QTRY_VERIFY(editor->document()->isModified());
+        typeViCommand(*editor, QStringLiteral("q!"));
+        QTRY_VERIFY(!window.isVisible());
+        QCOMPARE(readFile(note), QByteArray("clean\n"));
+    }
+
+    // :wq writes the active buffer and quits, no prompt.
+    {
+        omanotes::MainWindow window({root, note, false});
+        window.show();
+        auto* editor = activeEditor(window);
+        editor->document()->setText(QStringLiteral("clean\nkept\n"));
+        QTRY_VERIFY(editor->document()->isModified());
+        typeViCommand(*editor, QStringLiteral("wq"));
+        QTRY_VERIFY(!window.isVisible());
+        QCOMPARE(readFile(note), QByteArray("clean\nkept\n"));
+        QVERIFY(window.findChild<QMessageBox*>(QStringLiteral("quitPrompt")) == nullptr);
+    }
+
+    // Save on the prompt cannot name an Untitled buffer: it refuses with a
+    // message and stays, rather than quitting past the unsaved work.
+    {
+        omanotes::MainWindow window({root, std::nullopt, false});
+        window.show();
+        auto* editor = activeEditor(window);
+        editor->document()->setText(QStringLiteral("draft"));
+        QTRY_VERIFY(editor->document()->isModified());
+        typeViCommand(*editor, QStringLiteral("q"));
+        auto* prompt = window.findChild<QMessageBox*>(QStringLiteral("quitPrompt"));
+        QTRY_VERIFY(prompt != nullptr && prompt->isVisible());
+        QTest::mouseClick(prompt->button(QMessageBox::Save), Qt::LeftButton);
+        QTRY_VERIFY(!prompt->isVisible());
+        auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+        QTRY_VERIFY2(status->text().contains(QStringLiteral("no file name")),
+                     qPrintable(status->text()));
+        QVERIFY(window.isVisible());
+
+        // Discard on the prompt closes it and quits.
+        typeViCommand(*activeEditor(window), QStringLiteral("q"));
+        QTRY_VERIFY(prompt->isVisible());
+        QTest::mouseClick(prompt->button(QMessageBox::Discard), Qt::LeftButton);
+        QTRY_VERIFY(!window.isVisible());
+    }
 }
 
 void MainWindowTest::searchOpensMatchesAndHelpRunsCommands() {
