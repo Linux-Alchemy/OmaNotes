@@ -4,6 +4,7 @@
 #include "app/launch_request.hpp"
 #include "core/buffer.hpp"
 #include "persistence/recovery_store.hpp"
+#include "session/instance_lock.hpp"
 #include "session/session_restorer.hpp"
 #include "session/session_store.hpp"
 #include "workspace/workspace_root.hpp"
@@ -50,6 +51,9 @@ class ApplicationController final : public QObject {
 
     [[nodiscard]] const RestoreReport& lastReport() const noexcept;
     [[nodiscard]] const std::map<BufferId, RecoveryId>& recoveryIds() const noexcept;
+    /// True when this instance holds the workspace's lock and so owns
+    /// recovery for it (ADR 0012).
+    [[nodiscard]] bool holdsInstanceLock() const noexcept;
     /// ADR 0010: one line naming other workspaces with unsaved work parked,
     /// built from snapshot metadata only; empty when there is none.
     [[nodiscard]] QString parkedWorkNotice() const;
@@ -67,6 +71,7 @@ class ApplicationController final : public QObject {
     QTimer debounce_;
     std::map<BufferId, RecoveryId> recoveryIds_;
     RestoreReport lastReport_;
+    std::optional<InstanceLock> lock_;
     bool started_{false};
 };
 

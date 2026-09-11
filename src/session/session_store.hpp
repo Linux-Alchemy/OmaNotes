@@ -46,6 +46,15 @@ class SessionStore final {
 
     [[nodiscard]] std::filesystem::path directoryFor(const WorkspaceRoot& root) const;
     [[nodiscard]] std::filesystem::path fileFor(const WorkspaceRoot& root) const;
+    /// `<sessions>/<workspace-id>/instance.lock`, the per-root instance lock
+    /// (ADR 0012). Lives beside the snapshot so it shares its permissions.
+    [[nodiscard]] std::filesystem::path lockFileFor(const WorkspaceRoot& root) const;
+
+    /// Create and tighten the workspace's directory chain now, as a save
+    /// would, without writing a snapshot. What the instance lock needs
+    /// before the first checkpoint.
+    [[nodiscard]] std::expected<void, SessionError>
+    ensureDirectoryFor(const WorkspaceRoot& root) const;
 
     /// Write the snapshot for `snapshot.workspaceRoot`, which must resolve as a
     /// workspace. Creates and tightens the directories, removes stale
