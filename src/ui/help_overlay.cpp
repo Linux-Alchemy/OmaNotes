@@ -24,8 +24,9 @@ HelpOverlay::HelpOverlay(QWidget* parent) : QDialog(parent) {
     list_ = new QTreeWidget(this);
     list_->setObjectName(QStringLiteral("helpCommands"));
     list_->setAccessibleName(QStringLiteral("Commands available here"));
-    list_->setHeaderLabels(
-        {QStringLiteral("Category"), QStringLiteral("Command"), QStringLiteral("Keys")});
+    // Two columns: the category said nothing the label did not (Matt's call,
+    // 2026-09-10).
+    list_->setHeaderLabels({QStringLiteral("Command"), QStringLiteral("Keys")});
     list_->setRootIsDecorated(false);
     layout->addWidget(list_, 1);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
@@ -48,12 +49,10 @@ void HelpOverlay::showCommands(const CommandRegistry& commands, const AppContext
         if (const auto shortcut = shortcuts.find(command->id); shortcut != shortcuts.end()) {
             keys.append(shortcut->second);
         }
-        auto* item = new QTreeWidgetItem(
-            list_, {command->category, command->label, keys.join(QStringLiteral(" / "))});
+        auto* item = new QTreeWidgetItem(list_, {command->label, keys.join(QStringLiteral(" / "))});
         item->setData(0, Qt::UserRole, command->id);
     }
     list_->resizeColumnToContents(0);
-    list_->resizeColumnToContents(1);
     if (list_->topLevelItemCount() > 0) {
         list_->setCurrentItem(list_->topLevelItem(0));
     }

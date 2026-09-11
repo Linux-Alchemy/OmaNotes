@@ -1625,7 +1625,7 @@ void MainWindowTest::halfPageKeysScrollWritingAndReading() {
     std::map<QString, QString> keysById;
     for (int row = 0; row < commands->topLevelItemCount(); ++row) {
         auto* item = commands->topLevelItem(row);
-        keysById[item->data(0, Qt::UserRole).toString()] = item->text(2);
+        keysById[item->data(0, Qt::UserRole).toString()] = item->text(1);
     }
     // Lower case: Ctrl+d is not Ctrl+Shift+D, and the help must not imply it.
     QCOMPARE(keysById[QStringLiteral("view.half-page-down")], QStringLiteral("Ctrl+d"));
@@ -1642,7 +1642,7 @@ void MainWindowTest::halfPageKeysScrollWritingAndReading() {
         }
     }
     QVERIFY(quit != nullptr);
-    QCOMPARE(quit->text(1), QStringLiteral("IYKYK"));
+    QCOMPARE(quit->text(0), QStringLiteral("IYKYK"));
     QTest::keyClick(commands, Qt::Key_Escape);
     QTRY_VERIFY(!help->isVisible());
 }
@@ -1857,6 +1857,8 @@ void MainWindowTest::themeDressesEveryRegion() {
     // The dialogs are separate windows the scoped rules used to miss: the
     // help overlay, the search palette, and the close prompt all theme.
     QVERIFY(sheet.contains(QStringLiteral("QTreeWidget#helpCommands")));
+    QVERIFY(sheet.contains(QStringLiteral(
+        "QTreeWidget#helpCommands QHeaderView::section { background-color: #181826")));
     QVERIFY(sheet.contains(QStringLiteral("QListWidget#searchResults")));
     QVERIFY(sheet.contains(QStringLiteral("QMessageBox")));
 }
@@ -2161,12 +2163,12 @@ void MainWindowTest::configuredKeysRouteAndAppearInHelp() {
         const auto id = item->data(0, Qt::UserRole).toString();
         if (id == QStringLiteral("file.save")) {
             sawSave = true;
-            QCOMPARE(item->text(2), QKeySequence(QStringLiteral("Ctrl+Alt+Shift+S"))
+            QCOMPARE(item->text(1), QKeySequence(QStringLiteral("Ctrl+Alt+Shift+S"))
                                         .toString(QKeySequence::NativeText));
         }
         if (id == QStringLiteral("buffer.new")) {
             sawNew = true;
-            QCOMPARE(item->text(2), QStringLiteral("Space n"));
+            QCOMPARE(item->text(1), QStringLiteral("Space n"));
         }
     }
     QVERIFY(sawSave && sawNew);
