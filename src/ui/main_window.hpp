@@ -32,6 +32,7 @@ class QLineEdit;
 class QMessageBox;
 class QSplitter;
 class QStackedWidget;
+class QToolButton;
 
 namespace omanotes {
 
@@ -110,6 +111,7 @@ class MainWindow final : public QMainWindow, public SessionHost {
 
   private:
     void registerCommands();
+    void setSidebarShown(bool shown);
     void loadKeymap();
     [[nodiscard]] QString shortcutCommand(const QKeyEvent& event, const QWidget* target) const;
     /// Register `descriptor` and, when `sequences` is given, the leader keys
@@ -218,6 +220,7 @@ class MainWindow final : public QMainWindow, public SessionHost {
     QWidget* writingArea_ = nullptr;
     QSplitter* splitter_ = nullptr;
     Sidebar* sidebar_ = nullptr;
+    QToolButton* sidebarToggle_ = nullptr;
     QLineEdit* namePrompt_ = nullptr;
     QStackedWidget* editorStack_ = nullptr;
     BufferStrip* bufferStrip_ = nullptr;
