@@ -750,7 +750,7 @@ public:
 - [x] **8.1.1** — Write and review the threat model with assets, trust boundaries, threats, and mitigations. Evidence: `docs/threat-model.md` (Change Log 2026-09-11).
 - [x] **8.1.2** — Run compiler hardening, sanitizers, static analysis, dependency review, and fuzz/property tests for parsers where justified. Evidence: hardening #37; `parser-properties` suite and `fuzz/` harnesses; `docs/dependency-review.md` (Change Log 2026-09-11).
 - [x] **8.1.3** — Resolve every release-blocking finding or record Matt's explicit deferral with impact. Evidence: F-1 (the one Blocking row) closed in #35; the moderate tier closed in #36–#39 or accepted; the sixteen Low rows deferred by Matt on 2026-09-11 with the impact stated in `docs/threat-model.md`, section 9 (Change Log 2026-09-11).
-- [ ] **8.1.4** — Verify: clean release and hardened debug builds pass the complete test matrix.
+- [x] **8.1.4** — Verify: clean release and hardened debug builds pass the complete test matrix. Evidence: both presets built from empty directories with zero warnings; 24/24 ctest on each; format-check, clang-tidy, and security-check on both binaries clean; the fuzz preset builds. One release-only test failure found and fixed (Change Log 2026-09-11).
 
 ### Task 8.2: Package for Omarchy evaluation
 
@@ -1247,3 +1247,16 @@ Decision required: approve / request changes / stop and redesign
   Blocking row and the moderate tier are closed or accepted, so the block's condition is met and
   the box is ticked with the deferral recorded in the threat model. Awaiting Matt's gate; 8.1.4
   is next.
+
+- **2026-09-11:** Block 8.1.4 on `task/8.1.4-test-matrix`: the first time the release preset has
+  run the test suite as a gate. From empty build directories, `dev` and `release` both build with
+  zero warnings, pass 24/24, and pass format-check, clang-tidy, and security-check (the release
+  binary carries PIE, full RELRO, NX stack, no RPATH, stack protector, CET, fortify); the `fuzz`
+  preset builds its five harnesses. One finding, in a test: `ui-structure` failed on release
+  alone, deterministically, because it checked that a fresh scratch editor had appeared by
+  comparing its address with the editor just destroyed, and a release allocator hands the new
+  editor the address the old one vacated, which AddressSanitizer's quarantine never does. The
+  test now holds a `QPointer` to the old editor and asserts it went null, which is what it meant.
+  No product code changed. Second sanitizer-only assumption found in the tests this phase (after
+  the `..` substring check in 8.1.2); whether the release preset joins the routine gate is for
+  the pause Matt asked for before Task 8.2.
