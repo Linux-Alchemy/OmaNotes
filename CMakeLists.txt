@@ -15,6 +15,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
 option(OMANOTES_ENABLE_SANITIZERS "Enable address and undefined behaviour sanitizers" OFF)
+option(OMANOTES_ENABLE_FUZZERS "Build the libFuzzer harnesses under fuzz/ (Clang only)" OFF)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(Warnings)
@@ -27,79 +28,23 @@ enable_testing()
 
 add_subdirectory(src)
 add_subdirectory(tests)
+if(OMANOTES_ENABLE_FUZZERS)
+    add_subdirectory(fuzz)
+endif()
 
 find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format REQUIRED)
 find_program(RUN_CLANG_TIDY_EXECUTABLE NAMES run-clang-tidy REQUIRED)
 
-set(OMANOTES_FORMAT_FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/keymap_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/workspace_search_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/application_controller.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/application_controller.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/session/session_restorer.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/session/session_restorer.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/session_restore_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/session/session_snapshot.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/session/session_snapshot.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/session/session_store.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/session/session_store.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/persistence/recovery_store.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/persistence/recovery_store.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/persistence/note_reader.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/persistence/note_reader.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/session/instance_lock.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/session/instance_lock.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/note_reader_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/recovery_store_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/session_store_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/session_snapshot_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/prefix_router.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/prefix_router.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/launch_request.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/keymap.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/keymap.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/app/launch_request.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffer.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffer_registry.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffer_registry.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/editor_adapter.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ktext_editor_adapter.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/ktext_editor_adapter.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/save_command.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/editor/save_command.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/persistence/atomic_file_writer.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/persistence/document_store.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/persistence/document_store.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/buffer_strip.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/buffer_strip.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/main_window.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/help_overlay.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/help_overlay.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/file_index.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/file_index.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/text_search.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/text_search.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/search_palette.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/search_palette.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/main_window.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/sidebar.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/sidebar.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/file_tree_model.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/file_tree_model.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/workspace_root.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/workspace/workspace_root.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/buffer_registry_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/document_store_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/atomic_save_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/launch_request_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/file_tree_model_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/main_window_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/launch_process_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/ktext_editor_adapter_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/prefix_router_test.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/vim_behaviour_test.cpp"
+# Every C++ file in the tree is format-checked; the list is discovered, not
+# kept by hand, so a new file cannot be missed (threat-model finding F-19).
+file(
+    GLOB_RECURSE OMANOTES_FORMAT_FILES
+    CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/*.cpp"
 )
 
 add_custom_target(
