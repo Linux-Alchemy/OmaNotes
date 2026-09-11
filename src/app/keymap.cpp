@@ -240,6 +240,13 @@ std::map<QString, QString> Keymap::shortcutLabels() const {
     std::map<QString, QString> labels;
     for (const auto& [id, sequence] : shortcuts_) {
         auto label = sequence.toString(QKeySequence::NativeText);
+        // Qt prints every letter as a capital, which reads as Shift being
+        // part of the chord. Ctrl+s is the unshifted key; Ctrl+Shift+S and
+        // Shift+L keep their capital because Shift really is pressed.
+        if (!label.isEmpty() && sequence.count() == 1 &&
+            !(sequence[0].keyboardModifiers() & Qt::ShiftModifier) && label.back().isLetter()) {
+            label.back() = label.back().toLower();
+        }
         if (id == QStringLiteral("pane.editor") &&
             sequence == QKeySequence(QStringLiteral("Ctrl+L"))) {
             label += QStringLiteral(" (sidebar)");

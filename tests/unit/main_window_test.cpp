@@ -1603,8 +1603,11 @@ void MainWindowTest::halfPageKeysScrollWritingAndReading() {
         auto* item = commands->topLevelItem(row);
         keysById[item->data(0, Qt::UserRole).toString()] = item->text(2);
     }
-    QCOMPARE(keysById[QStringLiteral("view.half-page-down")], QStringLiteral("Ctrl+D"));
-    QCOMPARE(keysById[QStringLiteral("view.half-page-up")], QStringLiteral("Ctrl+U"));
+    // Lower case: Ctrl+d is not Ctrl+Shift+D, and the help must not imply it.
+    QCOMPARE(keysById[QStringLiteral("view.half-page-down")], QStringLiteral("Ctrl+d"));
+    QCOMPARE(keysById[QStringLiteral("view.half-page-up")], QStringLiteral("Ctrl+u"));
+    QCOMPARE(keysById[QStringLiteral("file.save")], QStringLiteral("Ctrl+s"));
+    QCOMPARE(keysById[QStringLiteral("pane.editor")], QStringLiteral("Ctrl+l (sidebar)"));
     QTest::keyClick(commands, Qt::Key_Escape);
     QTRY_VERIFY(!help->isVisible());
 }
