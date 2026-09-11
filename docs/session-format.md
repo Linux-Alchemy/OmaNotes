@@ -157,6 +157,14 @@ looks like now, decided by `planRecovery`:
 
 ### Sensitive content
 
+Two places hold note text outside the notes themselves, and this document names both. The
+first is the recovery records below. The second is KTextEditor's own state: the editor
+component persists Vi registers and recorded macros to `$XDG_CONFIG_HOME/katevirc`, so
+yanked text and macro contents sit in the user's config directory, owner-only, for as long
+as KTextEditor keeps them. OmaNotes does not write that file and offers no switch for it;
+Matt accepted it on 2026-09-11 (threat-model finding F-5) on the same terms as the records:
+plaintext, same user, same mode, and now said out loud.
+
 Recovery records are plaintext, like Neovim's swap files and for the same
 reason: they exist to survive a crash, and a key that must be available to
 recover after a crash offers little against anyone who can already read the
