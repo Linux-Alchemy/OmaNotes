@@ -2001,6 +2001,14 @@ void MainWindowTest::themeDressesEveryRegion() {
         QStringLiteral("QTabBar#bufferStrip::tab { background-color: #101018")));
     QVERIFY(window.styleSheet().contains(
         QStringLiteral("QToolButton#sidebarToggleButton { background-color: #101018")));
+    // When a narrow window cannot show every tab, Qt puts scroll buttons at
+    // the end of the strip. They sit on the pane colour with the muted ink,
+    // like the ? and the +, not in Fusion's grey (Matt's gate finding,
+    // 2026-09-11).
+    QVERIFY(window.styleSheet().contains(
+        QStringLiteral("QTabBar#bufferStrip QToolButton { background-color: #101018")));
+    QVERIFY(window.styleSheet().contains(
+        QStringLiteral("QTabBar#bufferStrip QToolButton:hover { color: #d08050")));
     // Vi's `:` line is a child of the editor and wears the pane colour with
     // no frame; its completion drop-down has no parent, so its rule lives on
     // the application (Matt's gate finding, 2026-09-10).

@@ -1929,6 +1929,9 @@ QTabBar#bufferStrip::tab:selected { background-color: %1; color: %5; }
 QToolButton#sidebarToggleButton { background-color: %1; color: %7; border: none; padding: 2px 8px; }
 QToolButton#sidebarToggleButton:hover { color: %4; }
 QToolButton#newBufferButton { background-color: %1; color: %7; border: none; padding: 2px 8px; }
+QTabBar#bufferStrip QToolButton { background-color: %1; color: %7; border: none; padding: 0px 4px; }
+QTabBar#bufferStrip QToolButton:hover { color: %4; }
+QTabBar#bufferStrip QToolButton:disabled { color: %3; }
 QToolButton#tabCloseButton { background: transparent; color: %7; border: none; padding: 0px 2px; }
 QToolButton#tabCloseButton:hover { color: %4; }
 QToolButton#helpButton { background: transparent; color: %7; border: none; padding: 0px 6px; }
