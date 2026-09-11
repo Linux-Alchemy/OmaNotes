@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=OmaNotes
+GenericName=Markdown Notes
+Comment=Keyboard-first Markdown notes with Vim navigation
+Exec=omanotes %f
+Icon=OmaNotes
+Terminal=false
+Categories=Office;TextEditor;
+MimeType=text/markdown;
+Keywords=notes;markdown;vim;writing;
+StartupNotify=false

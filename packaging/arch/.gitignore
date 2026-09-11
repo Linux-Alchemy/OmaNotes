@@ -1,0 +1,6 @@
+# makepkg working state; the package is built here, never committed.
+/src/
+/pkg/
+/omanotes/
+/*.pkg.tar.*
+/*.log
