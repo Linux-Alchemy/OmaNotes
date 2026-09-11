@@ -5,6 +5,7 @@
 #include "editor/ktext_editor_adapter.hpp"
 #include "editor/save_command.hpp"
 #include "persistence/document_store.hpp"
+#include "persistence/note_reader.hpp"
 #include "ui/buffer_strip.hpp"
 #include "ui/help_overlay.hpp"
 #include "ui/markdown_view.hpp"
@@ -62,18 +63,19 @@ bool isMarkdown(const std::filesystem::path& path) {
     return displayName(path.extension()).compare(QStringLiteral(".md"), Qt::CaseInsensitive) == 0;
 }
 
-/// The raw bytes of a note, refused when they cannot be text.
+/// The raw bytes of a note, refused when they cannot be text. Reads through
+/// the bounded reader: no symlink on the final step, regular files only, a
+/// size limit (docs/threat-model.md, F-1).
 std::expected<QByteArray, QString> readNoteBytes(const std::filesystem::path& path) {
-    std::ifstream input(path, std::ios::binary);
-    if (!input) {
-        return std::unexpected(QStringLiteral("Could not read %1").arg(displayName(path)));
+    auto bytes = readNoteFile(path);
+    if (!bytes) {
+        return std::unexpected(std::move(bytes.error().message));
     }
-    const std::string bytes(std::istreambuf_iterator<char>(input), {});
-    if (bytes.find('\0') != std::string::npos) {
+    if (bytes->contains('\0')) {
         return std::unexpected(
             QStringLiteral("Refusing binary-looking file: %1").arg(displayName(path)));
     }
-    return QByteArray::fromStdString(bytes);
+    return std::move(*bytes);
 }
 
 std::expected<QString, QString> decodeNote(const QByteArray& bytes,
@@ -1358,6 +1360,9 @@ QString MainWindow::reloadActiveBuffer(bool discardEdits) {
     }
 
     const auto& path = *state->path;
+    if (const auto moved = revalidateTrackedPath(path); moved) {
+        return *moved;
+    }
     const auto bytes = readNoteBytes(path);
     if (!bytes) {
         return bytes.error();
@@ -1382,8 +1387,37 @@ void MainWindow::trackFile(BufferId id, const std::filesystem::path& path,
     watcher_->watch(path);
 }
 
+std::optional<QString> MainWindow::revalidateTrackedPath(const std::filesystem::path& path) const {
+    // A buffer's path was canonical and inside the root when it was opened.
+    // Before reading it again, it has to still be: a directory on the way
+    // swapped for a symlink would otherwise be followed by name.
+    // Look at the name itself before resolving through it: a dangling link
+    // would otherwise be reported as a missing file, which hides the swap.
+    std::error_code error;
+    if (std::filesystem::is_symlink(std::filesystem::symlink_status(path, error)) && !error) {
+        return QStringLiteral("%1 is a symlink now; refusing to read it").arg(displayName(path));
+    }
+    const auto workspace = WorkspaceRoot::resolve(launchRequest_.root);
+    if (!workspace) {
+        return QString::fromStdString(workspace.error().message);
+    }
+    const auto resolved = workspace->resolveFile(path);
+    if (!resolved) {
+        return QString::fromStdString(resolved.error().message);
+    }
+    if (*resolved != path) {
+        return QStringLiteral("%1 now resolves elsewhere; refusing to read it")
+            .arg(displayName(path));
+    }
+    return std::nullopt;
+}
+
 void MainWindow::handleExternalChange(const std::filesystem::path& path) {
-    const auto id = buffers_.findByPath(path);
+    // The watcher hands back the exact path a buffer was tracked under. It
+    // must be matched as-is: canonicalising it now would follow whatever
+    // has since been put at that name, and a note swapped for a symlink
+    // would make its own buffer unfindable and the swap go unreported.
+    const auto id = buffers_.findByExactPath(path);
     if (!id.has_value()) {
         return;
     }
@@ -1406,6 +1440,11 @@ void MainWindow::handleExternalChange(const std::filesystem::path& path) {
         }
         return;
     case ExternalChangeAction::ReloadClean: {
+        if (const auto moved = revalidateTrackedPath(path); moved) {
+            tracked->second.note = DiskNote::ChangedOnDisk;
+            statusArea_->setText(*moved);
+            return;
+        }
         const auto bytes = readNoteBytes(path);
         const auto text = bytes ? decodeNote(*bytes, path) : std::unexpected(bytes.error());
         if (!text) {
@@ -1427,6 +1466,15 @@ void MainWindow::handleExternalChange(const std::filesystem::path& path) {
     case ExternalChangeAction::PromptConflict:
         tracked->second.note = DiskNote::ChangedOnDisk;
         refreshEditorStatus();
+        if (current.state == DiskRevision::State::Unreadable) {
+            // Not a regular file any more, or past the size limit: the
+            // buffer is kept as the trustworthy copy, edits or not.
+            statusArea_->setText(
+                QStringLiteral("%1 on disk could not be read safely (not a regular file, or "
+                               "too large); the buffer is kept")
+                    .arg(name));
+            return;
+        }
         statusArea_->setText(
             QStringLiteral("%1 changed on disk; your edits are kept. :w! overwrites, :e! reloads")
                 .arg(name));

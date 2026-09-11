@@ -42,6 +42,14 @@ complete document. A temporary older than fifteen minutes is presumed
 abandoned by a crashed writer and removed before the next save; younger ones
 may belong to a live instance and are left alone.
 
+Recovery records are not shared that way. One instance per workspace holds an
+advisory lock, `instance.lock` beside `session.json`, and only that instance
+restores, adopts, or checkpoints into existing records (ADR 0012). A second
+instance on the same root restores the desk's structure with dirty buffers
+reopened clean from disk, reports them as held by another OmaNotes, and keeps
+its own unsaved text in its own new records. The lock is dropped by the kernel
+when the process ends, however it ends, and the file itself is never deleted.
+
 Nothing in the store is ever followed through a symlink. A symlinked
 directory or `session.json` is refused, on read and on write, with a
 diagnostic.

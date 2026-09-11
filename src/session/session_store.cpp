@@ -113,6 +113,15 @@ std::filesystem::path SessionStore::fileFor(const WorkspaceRoot& root) const {
     return directoryFor(root) / kFileName;
 }
 
+std::filesystem::path SessionStore::lockFileFor(const WorkspaceRoot& root) const {
+    return directoryFor(root) / "instance.lock";
+}
+
+std::expected<void, SessionError>
+SessionStore::ensureDirectoryFor(const WorkspaceRoot& root) const {
+    return prepareDirectory(directoryFor(root));
+}
+
 std::expected<void, SessionError>
 SessionStore::prepareDirectory(const std::filesystem::path& directory) const {
     // Create from the `omanotes` level down; anything above is the desktop's.

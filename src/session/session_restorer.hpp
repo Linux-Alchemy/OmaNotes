@@ -46,6 +46,10 @@ class SessionHost {
 struct RestoreReport {
     int restored{0};
     int recovered{0};
+    /// Buffers whose unsaved text belongs to another live instance (ADR
+    /// 0012): reopened clean from disk when they have a note, otherwise not
+    /// opened. Counted so the status line can say so.
+    int heldElsewhere{0};
     /// One line per item that did not come back, phrased for the status line.
     std::vector<QString> skipped;
     /// Buffers that came back from a recovery record, keyed by the id the
@@ -62,8 +66,12 @@ struct RestoreReport {
 /// Reads the disk to plan; never writes it.
 class SessionRestorer final {
   public:
+    /// `adoptRecords` is false for an instance that does not hold the
+    /// workspace's lock: it must not read or take over recovery records, so
+    /// dirty buffers come back clean from disk and scratch ones stay parked.
     [[nodiscard]] RestoreReport restore(const SessionSnapshot& snapshot, const WorkspaceRoot& root,
-                                        const RecoveryStore& recovery, SessionHost& host) const;
+                                        const RecoveryStore& recovery, SessionHost& host,
+                                        bool adoptRecords = true) const;
 
     /// Bring back records the snapshot no longer references, as dirty
     /// buffers. Unsaved text is never discarded for lack of bookkeeping.

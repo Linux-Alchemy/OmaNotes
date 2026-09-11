@@ -50,6 +50,10 @@ class BufferRegistry final {
     /// Identity of the buffer already holding `path`, if one is open. Unlike
     /// `open`, this never creates or activates a buffer.
     [[nodiscard]] std::optional<BufferId> findByPath(const std::filesystem::path& path) const;
+    /// The buffer tracked under exactly `path`, compared without resolving
+    /// it again. For callers that hold the path a buffer was opened under
+    /// and must not follow what the filesystem has since put there.
+    [[nodiscard]] std::optional<BufferId> findByExactPath(const std::filesystem::path& path) const;
     [[nodiscard]] std::optional<std::size_t> indexOf(BufferId id) const noexcept;
     [[nodiscard]] std::size_t count() const noexcept;
 

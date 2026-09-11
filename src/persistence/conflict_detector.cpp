@@ -1,11 +1,8 @@
 #include "persistence/conflict_detector.hpp"
 
-#include <QCryptographicHash>
+#include "persistence/note_reader.hpp"
 
-#include <fstream>
-#include <iterator>
-#include <string>
-#include <system_error>
+#include <QCryptographicHash>
 
 namespace omanotes {
 
@@ -14,21 +11,17 @@ SavedRevision SavedRevision::of(QByteArrayView contents) {
 }
 
 DiskRevision DiskRevision::read(const std::filesystem::path& path) {
-    std::error_code error;
-    if (!std::filesystem::exists(path, error) || error) {
-        return {DiskRevision::State::Missing, {}};
-    }
-
-    std::ifstream input(path, std::ios::binary);
-    if (!input) {
-        return {DiskRevision::State::Unreadable, {}};
-    }
-    const std::string bytes(std::istreambuf_iterator<char>(input), {});
-    if (input.bad()) {
-        return {DiskRevision::State::Unreadable, {}};
+    // The same bounded reader as the editor: a note that is a symlink now,
+    // not a regular file, or past the size limit is "unreadable", which the
+    // classifier turns into a prompt rather than a reload.
+    const auto bytes = readNoteFile(path);
+    if (!bytes) {
+        return {bytes.error().code == NoteReadErrorCode::Missing ? DiskRevision::State::Missing
+                                                                 : DiskRevision::State::Unreadable,
+                {}};
     }
     return {DiskRevision::State::Present,
-            QCryptographicHash::hash(QByteArrayView(bytes), QCryptographicHash::Sha256)};
+            QCryptographicHash::hash(QByteArrayView(*bytes), QCryptographicHash::Sha256)};
 }
 
 ExternalChangeAction classifyExternalChange(const SavedRevision& known, const DiskRevision& current,

@@ -166,6 +166,10 @@ class MainWindow final : public QMainWindow, public SessionHost {
     QString reloadActiveBuffer(bool discardEdits);
     void handleExternalChange(const std::filesystem::path& path);
     void trackFile(BufferId id, const std::filesystem::path& path, QByteArrayView contents);
+    /// The message that stops a re-read of a tracked note whose path no
+    /// longer resolves to itself inside the root; empty when it still does.
+    [[nodiscard]] std::optional<QString>
+    revalidateTrackedPath(const std::filesystem::path& path) const;
     [[nodiscard]] EditorAdapter* activeEditor() const;
     EditorAdapter& createEditorFor(BufferId id);
     /// Intercept the editor's own file commands (`:w`, `:e`, and friends)

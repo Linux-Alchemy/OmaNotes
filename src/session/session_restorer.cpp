@@ -45,6 +45,12 @@ QString RestoreReport::summary() const {
                       ? QStringLiteral("recovered 1 with unsaved changes")
                       : QStringLiteral("recovered %1 with unsaved changes").arg(recovered));
     }
+    if (heldElsewhere > 0) {
+        parts << (heldElsewhere == 1
+                      ? QStringLiteral("1 with unsaved changes held by another OmaNotes")
+                      : QStringLiteral("%1 with unsaved changes held by another OmaNotes")
+                            .arg(heldElsewhere));
+    }
     if (!skipped.empty()) {
         QStringList items;
         for (const auto& item : skipped) {
@@ -56,7 +62,8 @@ QString RestoreReport::summary() const {
 }
 
 RestoreReport SessionRestorer::restore(const SessionSnapshot& snapshot, const WorkspaceRoot& root,
-                                       const RecoveryStore& recovery, SessionHost& host) const {
+                                       const RecoveryStore& recovery, SessionHost& host,
+                                       bool adoptRecords) const {
     RestoreReport report;
     host.applyWindow(snapshot.window);
 
@@ -73,7 +80,19 @@ RestoreReport SessionRestorer::restore(const SessionSnapshot& snapshot, const Wo
     std::optional<BufferId> activate;
     for (const auto& buffer : snapshot.buffers) {
         std::optional<BufferId> opened;
-        if (buffer.recovery) {
+        if (buffer.recovery && !adoptRecords) {
+            // Another instance owns that text. Its note comes back clean;
+            // its record is neither read nor claimed.
+            ++report.heldElsewhere;
+            if (buffer.path) {
+                if (const auto resolved = resolveSessionPath(root, *buffer.path); resolved) {
+                    opened = host.openNote(*resolved);
+                    if (opened) {
+                        ++report.restored;
+                    }
+                }
+            }
+        } else if (buffer.recovery) {
             const auto record = recovery.load(*buffer.recovery);
             if (!record) {
                 report.skipped.push_back(QStringLiteral("%1 (unsaved changes unreadable: %2)")
