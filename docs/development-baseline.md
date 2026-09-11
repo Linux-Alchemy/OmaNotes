@@ -1,17 +1,18 @@
 # Development Baseline
 
-> Captured on 2026-08-29 from the primary Omanotes development machine.
+> Captured on 2026-08-29 from the primary Omanotes development machine; refreshed
+> 2026-09-11 with the dependency review (`docs/dependency-review.md`).
 
 ## Target environment
 
 | Component | Tested baseline |
 | --- | --- |
-| Distribution | Omarchy 4.0.1-1 |
+| Distribution | Omarchy 4.0.3-1 |
 | Session | Wayland on Hyprland |
-| Kernel | Linux 7.1.9-arch1-2 |
-| Qt | qt6-base 6.11.2-2; qt6-declarative 6.11.2-1 |
+| Kernel | Linux 7.2.3-arch1-3 |
+| Qt | qt6-base 6.11.2-3; qt6-declarative 6.11.2-1 |
 | KTextEditor/KF6 | 6.29.0-1 |
-| CMake | 4.4.2-1 |
+| CMake | 4.4.3-2 |
 | Ninja | 1.13.2-3 |
 | Clang toolchain | 22.1.8-1 |
 | GCC toolchain | 16.2.1+r23+gd564253eb6c8-1 |

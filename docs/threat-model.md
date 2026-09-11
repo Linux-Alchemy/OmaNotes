@@ -4,8 +4,12 @@
 > **Audited tip:** `main` at `479fb3c` (PR #32 merged). Line numbers refer to that tip.
 > **Amended 2026-09-11:** findings F-1 and F-7 closed on `task/8.1.3-high-severity` (#35).
 > Second pass the same day: F-2, F-3, F-4, F-6, F-8, F-10, F-13 closed across #36, #37, #38, #39;
-> F-5 and F-9 accepted by Matt's ruling and recorded below. Rows carry their new status; line
-> numbers elsewhere are from the audited tip and drift by the size of those changes.
+> F-5 and F-9 accepted by Matt's ruling and recorded below. Block 8.1.2 closed F-18 and F-19 with
+> tests. **The remaining Low rows are deferred by Matt's ruling of 2026-09-11**: the High and
+> moderate tiers are closed or accepted, and he judged the Lows not worth chasing before the
+> first release. Their impact is as each row states; none affects A4 or A5. Rows carry their
+> new status; line numbers elsewhere are from the audited tip and drift by the size of those
+> changes.
 > **Rule of the document:** every mitigation names the code that does it and the test that
 > proves it. A row with no test says so. A threat with no mitigation is listed, not omitted.
 
@@ -673,8 +677,8 @@ unless Matt defers with a recorded reason; **Low** may be deferred to the limita
 | F-15b | Low | A planted recovery record restores with no provenance mark. | T-P5 | Approve a "recovered" mark in the tab or status until first save, or accept. |
 | F-16 | Low | Theme files read unbounded on the UI thread. | T-C2 | Approve a 64 KiB cap like the keymap. |
 | F-17 | Low | No depth or count cap on the sidebar; eager path fetch on restore; no timeouts. | T-D1 | Approve a per-directory entry cap and a note in the limitations list. |
-| F-18 | Low | Test drift: `hostile-schemes.md` unrendered, two schemes untested, fixture README overstates (10,000 rows, "truncates visibly"), no ctest timeout. | T-N1, T-N3, T-N4 | Approve fixing tests and README in 8.1.2. |
-| F-19 | Low | Fault seam not plumbed through the note save path; `cert-*` off; format-check list incomplete; leak checks manual. | T-S2, T-B1 | Approve in 8.1.2: plumb faults, enable `cert-*` and fix what fires, generate the format list from the target sources. |
+| F-18 | **Closed 2026-09-11** (8.1.2) | Test drift: `hostile-schemes.md` unrendered, two schemes untested, fixture README overstated, no ctest timeout. | T-N1, T-N3, T-N4 | Done: the fixture is rendered by a test, both schemes covered, README corrected, every ctest has a timeout. |
+| F-19 | **Closed in part 2026-09-11** (8.1.2) | Fault seam not plumbed through the note save path; `cert-*` off; format-check list incomplete; leak checks manual. | T-S2, T-B1 | Done: faults reach the note writer with five injected failures tested; the format list is discovered from the tree. Not done, deferred with the Low tier: `cert-*` and automated leak checks. |
 | F-20 | Decide | Dependency policy has no mechanism; 138-object closure; baseline stale; minimums not derived. | T-B3 | Rule what 8.3 records: an SBOM from `pacman -Qi`, a named advisory feed, and derived minimums. |
 | F-21 | Low | Three `qFatal` paths in release without a checkpoint. | T-B5 | Approve converting to a status message plus graceful exit, or accept as startup-only. |
 | F-22 | Decide | Recovery records accumulate without bound for dead workspaces. | T-P4 | Rule: keep forever (current), or add a documented age bound with a visible listing. |
