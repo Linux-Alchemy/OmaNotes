@@ -1,6 +1,7 @@
 #include "ui/help_overlay.hpp"
 
 #include <QDialogButtonBox>
+#include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
 #include <QStringList>
@@ -52,9 +53,13 @@ void HelpOverlay::showCommands(const CommandRegistry& commands, const AppContext
         auto* item = new QTreeWidgetItem(list_, {command->label, keys.join(QStringLiteral(" / "))});
         item->setData(0, Qt::UserRole, command->id);
     }
+    // Each column hugs its longest entry with a little room to spare; the
+    // Keys column does not stretch to the edge (Matt's call, 2026-09-10).
+    list_->header()->setStretchLastSection(false);
     list_->resizeColumnToContents(0);
-    // Room between the columns: the longest label must not touch its keys.
     list_->setColumnWidth(0, list_->columnWidth(0) + 32);
+    list_->resizeColumnToContents(1);
+    list_->setColumnWidth(1, list_->columnWidth(1) + 24);
     if (list_->topLevelItemCount() > 0) {
         list_->setCurrentItem(list_->topLevelItem(0));
     }

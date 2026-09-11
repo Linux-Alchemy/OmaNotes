@@ -1860,6 +1860,7 @@ QDialog#helpOverlay, QDialog#searchPalette, QMessageBox { background-color: %1; 
 QDialog#helpOverlay QLabel, QDialog#searchPalette QLabel, QMessageBox QLabel { color: %5; }
 QTreeWidget#helpCommands, QListWidget#searchResults, QPlainTextEdit#searchPreview { background-color: %3; color: %5; border: none; }
 QTreeWidget#helpCommands::item:selected, QListWidget#searchResults::item:selected { background-color: %6; color: %8; }
+QTreeWidget#helpCommands QHeaderView { background-color: %3; border: none; }
 QTreeWidget#helpCommands QHeaderView::section { background-color: %3; color: %5; border: none; padding: 4px 6px; }
 QLineEdit#searchQuery { background-color: %3; color: %5; border: 1px solid %2; padding: 4px 6px; selection-background-color: %6; selection-color: %8; }
 QDialog QPushButton { background-color: %3; color: %5; border: 1px solid %2; padding: 4px 14px; }
