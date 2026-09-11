@@ -32,6 +32,8 @@ Every phase runs the checks available at that point. The canonical developer pre
 cmake --preset dev
 cmake --build --preset dev
 ctest --preset dev --output-on-failure
+cmake --build --preset release
+ctest --preset release --output-on-failure
 cmake --build --preset dev --target format-check
 cmake --build --preset dev --target clang-tidy
 cmake --build --preset dev --target security-check
@@ -39,7 +41,9 @@ cmake --build --preset release --target security-check
 ```
 
 The dev invocation of the security check reports what a sanitizer build can and cannot show;
-the release invocation is the evidence (`docs/development-baseline.md`, F-8).
+the release invocation is the evidence (`docs/development-baseline.md`, F-8). The test suite
+runs on both presets because the release allocator, optimiser, and assertion set differ from
+the sanitizer build's; 8.1.4 found a test that only ever passed under AddressSanitizer.
 
 Development builds enable AddressSanitizer and UndefinedBehaviorSanitizer where compatible with the target Omarchy toolchain. Release builds must not weaken path, state-file, or Markdown safety checks.
 
@@ -763,7 +767,7 @@ public:
 **Blocks:**
 
 - [x] **8.2.1** — Record the licence and the distribution route. Evidence: MIT, `LICENSE` at the root (ADR 0014); the GitHub repository is the distribution, PKGBUILD primary, `cmake --install` fallback, AUR/Package Repository/companion plugin deferred (ADR 0013, superseding ADR 0002); `omanotes` has no collision in the official Arch repositories (Change Log 2026-09-11).
-- [ ] **8.2.2** — Add CMake install rules (binary, desktop entry, icon, licence) and a PKGBUILD that builds the release configuration from a clean clone of the repository, never the working tree; lint the package.
+- [ ] **8.2.2** — Add CMake install rules (binary, desktop entry, icon, licence) and a PKGBUILD that builds the release configuration from a clean clone of the repository, never the working tree; lint the package with `namcap` (developer tool, install approved 2026-09-11).
 - [ ] **8.2.3** — Install, launch from the Omarchy launcher and from the CLI, upgrade, and uninstall on the target Omarchy system without orphaning user-authored notes or XDG state.
 - [ ] **8.2.4** — Verify: package metadata, dependency list, file ownership, licence placement, desktop launch, CLI launch, and removal checks pass, and the documented path works from a fresh clone.
 
@@ -777,7 +781,7 @@ public:
 
 **Blocks:**
 
-- [ ] **8.3.1** — Document user installation, key language, launch contract, recovery, and troubleshooting.
+- [ ] **8.3.1** — Document user installation, key language, launch contract, recovery, and troubleshooting: the real `README.md`, replacing the placeholder. **Last block before the project is called done**, at Matt's direction (2026-09-11).
 - [ ] **8.3.2** — Document the component/data flow for design-level understanding without requiring C++ fluency.
 - [ ] **8.3.3** — Record remaining limitations, the licence, and the steps to cut a tagged source release on GitHub; the AUR and plugin routes stay recorded as deferred (ADR 0013).
 - [ ] **8.3.4** — Verify: a clean checkout follows the documented build/test/package path without tribal knowledge.
@@ -788,6 +792,7 @@ public:
 - [ ] Install/upgrade/uninstall preserve notes and handle XDG state as documented.
 - [ ] Architecture and security documents match the shipped code.
 - [ ] **Matt gate:** use the package built from the repository for an agreed daily-use trial and approve any tagged release separately.
+- [ ] **Last of all:** the placeholder `README.md` is replaced by the finished one (8.3.1). The project is not called done while the placeholder banner is there.
 - [ ] No direct push to `main`, tagged release, AUR or Omarchy Package Repository submission, or plugin-board submission occurs without explicit approval. Approved work may be pushed to a review branch solely to open its pull request.
 
 ## Quick Reference: Phase Boundaries
@@ -1272,5 +1277,10 @@ Decision required: approve / request changes / stop and redesign
   licence placement named. 8.3.3 drops the publication checklist for the tagged-release steps.
   The phase goal, checkpoint, and quick-reference row say GitHub rather than AUR. The outline's
   initial-scope line and open questions 1, 6, and 7 are annotated to match. The README stays
-  in 8.3, written when the application is complete, at Matt's direction. Found on the way: the
+  in 8.3, written when the application is complete, at Matt's direction; a placeholder
+  `README.md` marks the gap and the checkpoint says it is the last thing before done. Two
+  rulings from the same pause, made on the orchestrator's recommendation: the release preset
+  now runs the test suite in the build-wide quality contract (twelve seconds; it would have
+  caught 8.1.4's finding a phase earlier), and `namcap` is approved as the package lint for
+  8.2.2. The copyright line matches the account's other MIT repositories. Found on the way: the
   repository had been public with no licence file, which is all rights reserved.

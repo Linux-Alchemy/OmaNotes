@@ -20,7 +20,7 @@ headers intact.
 ## Decision
 
 OmaNotes is licensed under the MIT License. `LICENSE` at the repository root carries the text,
-copyright Matt Klimo, 2026. Contributions are accepted under the same licence. Source files
+copyright Linux-Alchemy, 2026, matching the account's other MIT repositories. Contributions are accepted under the same licence. Source files
 do not need per-file headers; the root file governs.
 
 ## Consequences

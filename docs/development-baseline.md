@@ -56,6 +56,7 @@ cmake --build --preset dev --target format-check
 cmake --build --preset dev --target clang-tidy
 cmake --preset release
 cmake --build --preset release
+ctest --preset release --output-on-failure
 cmake --build --preset release --target security-check
 ```
 
