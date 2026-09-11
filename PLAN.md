@@ -1105,3 +1105,30 @@ Decision required: approve / request changes / stop and redesign
   must bring the save prompt back. Two items parked on Matt's fine-tuning list, to be
   worked before Phase 8: a proper in-app close command (with the prompt), and the
   `[No Name]` polish.
+
+- **2026-09-10:** Fine-tuning pass on `polish/untitled-and-dirty-marker`, one PR for the lot,
+  every item driven by Matt's hands-on findings after the Phase 7 gate. Chrome: `[No Name]`
+  is `Untitled`; no `[+]` dirty marker anywhere (the close prompt and the recovery record
+  carry that state); the status line shows the mode alone, sentence case, without
+  KTextEditor's `VI:` prefix; no scrollbars (zero-size via the stylesheet, KTextEditor
+  offering no switch; wheel, keys and trackpad still scroll); the `?` glyph and both bars
+  wear the pane colour; the sidebar's selection bar is painted only while the sidebar has
+  focus and neither pane carries an accent line; help is two columns, themed header, sized
+  to its content, unshifted letters in lower case (`Ctrl+s`), the discarding close renamed
+  "Close buffer, discard", and `:q` listed as "IYKYK". Editor: `Ctrl+D`/`Ctrl+U` released
+  from Kate's Comment/Uppercase actions so Vi's half page works (the reading view scrolls
+  half a screen on the same keys); Vi's `:` line and its completion drop-down themed (the
+  drop-down is a parentless QCompleter popup, reached only by an application-level rule).
+  Bundled syntax themes "OmaNotes Dark/Light" (Breeze copies under `src/editor/themes/`,
+  loaded from KSyntaxHighlighting's `themes-addons` resource path) with CurrentLine and
+  Separator fully transparent: `current-line-color`, set since Phase 6, was never a
+  KTextEditor config key, so the grey current-line bar and the icon-border hairline had
+  been the theme's all along. The parked close item lands here: `:q` quits with a
+  Save / Discard / Cancel prompt for unsaved work, `:q!` discards, `:wq`/`:x` write the
+  active buffer first, `:wqa`/`:xa` write every named one, an unsaved Untitled refuses with
+  "no file name"; Vi's own `:q` had asked a host application OmaNotes never registers, so
+  it did nothing. Bugs found on the way and fixed: the sidebar's first-entry row was
+  current but never selected (a QTreeView given focus with no current row selects
+  nothing); the leader's "Space …" feedback outlived the sequence it announced; focus is
+  returned to the editor after the quit prompt. Left alone by choice: the block cursor in
+  Normal mode, hard-coded in KTextEditor's Vi mode. Awaiting Matt's gate.
