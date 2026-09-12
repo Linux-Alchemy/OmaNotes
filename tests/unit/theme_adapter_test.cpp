@@ -52,7 +52,8 @@ class ThemeAdapterTest : public QObject {
   private:
     omanotes::ThemeSources sourcesIn(const QTemporaryDir& directory) {
         const auto root = pathFor(directory.path());
-        return {root / "state" / "omarchy" / "current", root / "config" / "omarchy"};
+        return {root / "state" / "omarchy" / "current", root / "config" / "omarchy",
+                root / "config" / "omanotes"};
     }
 
   private slots:
@@ -62,6 +63,7 @@ class ThemeAdapterTest : public QObject {
     void refusesAnUnreadableTextBackgroundPair();
     void ignoresMalformedValuesRoleByRole();
     void readsAndClampsTheTextScale();
+    void appConfigOverridesTheShellTextScale();
     void refreshEmitsOnlyOnChange();
     void representativeThemesStayReadable();
     void honoursALegacyLightSelectionInk();
@@ -170,6 +172,43 @@ void ThemeAdapterTest::readsAndClampsTheTextScale() {
     writeFile(sources.configDir / "shell.toml", "[font]\nbase-size = nonsense\n");
     adapter.refresh();
     QCOMPARE(adapter.currentPalette().baseFontPointSize, 12.0);
+}
+
+void ThemeAdapterTest::appConfigOverridesTheShellTextScale() {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const auto sources = sourcesIn(directory);
+    writeFile(sources.configDir / "shell.toml", "[font]\nbase-size = 14\n");
+
+    // No override: the desktop's size, as before.
+    omanotes::ThemeAdapter adapter(sources);
+    QCOMPARE(adapter.currentPalette().baseFontPointSize, 14.0);
+
+    // The override wins, in the same syntax as Omarchy's own file.
+    writeFile(sources.appConfigDir / "config.toml", "# OmaNotes\n[font]\nbase-size = 10\n");
+    adapter.refresh();
+    QCOMPARE(adapter.currentPalette().baseFontPointSize, 10.0);
+
+    // Clamped like the desktop's value.
+    writeFile(sources.appConfigDir / "config.toml", "[font]\nbase-size = 2\n");
+    adapter.refresh();
+    QCOMPARE(adapter.currentPalette().baseFontPointSize, 6.0);
+
+    // Unparseable: back to the desktop's size, never an error.
+    writeFile(sources.appConfigDir / "config.toml", "[font]\nbase-size = large\n");
+    adapter.refresh();
+    QCOMPARE(adapter.currentPalette().baseFontPointSize, 14.0);
+
+    // A file that says nothing about fonts changes nothing.
+    writeFile(sources.appConfigDir / "config.toml", "[editor]\nwrap = true\n");
+    adapter.refresh();
+    QCOMPARE(adapter.currentPalette().baseFontPointSize, 14.0);
+
+    // No desktop value at all: the override still applies.
+    std::filesystem::remove(sources.configDir / "shell.toml");
+    writeFile(sources.appConfigDir / "config.toml", "[font]\nbase-size = 9\n");
+    adapter.refresh();
+    QCOMPARE(adapter.currentPalette().baseFontPointSize, 9.0);
 }
 
 void ThemeAdapterTest::refreshEmitsOnlyOnChange() {

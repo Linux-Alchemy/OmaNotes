@@ -786,6 +786,22 @@ public:
 - [ ] **8.3.3** — Record remaining limitations, the licence, and the steps to cut a tagged source release on GitHub; the AUR and plugin routes stay recorded as deferred (ADR 0013).
 - [ ] **8.3.4** — Verify: a clean checkout follows the documented build/test/package path without tribal knowledge.
 
+### Task 8.4: Daily-use trial findings (added 2026-09-12, see Change Log)
+
+**Files:** as each finding requires; `docs/decisions/`, `docs/configuration.md`
+
+**What it does:** Land what the Phase 8 checkpoint's daily-use trial turns up, each as its own
+ruled block, without reopening the phase's "no new features" constraint for anything else.
+
+**Don't touch:** Live reload of configuration, in-app zoom, any setting nobody has asked for.
+
+**Blocks:**
+
+- [ ] **8.4.1** — Font-size override: `~/.config/omanotes/config.toml`, `[font] base-size`,
+  overriding Omarchy's `shell.toml` value when present and valid, falling back when not
+  (ADR 0017). Tests for override, clamp, invalid, absent, and no-desktop-value; a
+  `docs/configuration.md` section.
+
 ### Phase 8 Checkpoint
 
 - [ ] Complete clean-room build, test, hardening, and package evidence is attached to the phase report.
@@ -1349,3 +1365,16 @@ Decision required: approve / request changes / stop and redesign
   where a single-stroke frame stays crisp; Matt chose to install the delivered version first
   and judge it in the launcher with his own eyes. Nothing else changes: same file name, same
   install rule, same desktop entry.
+
+- **2026-09-12:** Two rulings from the daily-use trial. The icon from #47 is kept as delivered:
+  Matt judged it in the launcher and it looks right there; the orchestrator's 24 px reservation
+  is on record and overruled. And the font size: Matt ruled for an application configuration
+  file, "the Omarchy way", with room for later settings (ADR 0017). Plan amended with Task 8.4
+  "Daily-use trial findings" and block 8.4.1, so the phase's "no new features" line stays
+  honest: this one was asked for, ruled, and recorded. Built on `task/8.4.1-font-override`:
+  `ThemeSources` gains the application's config directory, the theme adapter reads
+  `config.toml` with the flat-TOML reader it already had and applies `[font] base-size` over
+  the desktop's value; one test covers override, clamp, unparseable, an unrelated file, and no
+  desktop value at all. Four existing `ThemeSources` initialisers (two unit tests, the property
+  test, the fuzz harness) gained the third path. `docs/configuration.md` is now the
+  configuration page for both files rather than the keymap alone.

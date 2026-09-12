@@ -11,7 +11,7 @@ activation, generation, and every file below belong to Omarchy.
 | --- | --- | --- |
 | Active theme name | `$XDG_STATE_HOME/omarchy/current/theme.name` | One line, e.g. `ethereal-black`. |
 | Active theme palette | `$XDG_STATE_HOME/omarchy/current/theme/colors.toml` | Flat key/value colours (two schemas below). |
-| Text scale | `$XDG_CONFIG_HOME/omarchy/shell.toml` → `[font] base-size` | Base font size in points. |
+| Text scale | `$XDG_CONFIG_HOME/omarchy/shell.toml` → `[font] base-size` | Base font size in points. Overridden by the same key in `$XDG_CONFIG_HOME/omanotes/config.toml` when present (ADR 0017, `docs/configuration.md`). |
 
 `$XDG_STATE_HOME` defaults to `~/.local/state`, `$XDG_CONFIG_HOME` to
 `~/.config`; both are resolved through `QStandardPaths`, which honours the
