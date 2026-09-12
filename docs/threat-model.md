@@ -676,7 +676,7 @@ unless Matt defers with a recorded reason; **Low** may be deferred to the limita
 | F-12 | Low | Existence oracle in save-target errors; absolute paths in error text. | T-U2 | Approve reordering containment before the directory check and trimming paths to root-relative in messages. |
 | F-13 | **Closed as ruled 2026-09-11** (#36) | Any directory becomes the root on one argument; root identity can drift after launch. | T-R2, T-R5 | Matt's ruling: notice, not refusal. Done for `/` and home. Pinning the root by descriptor was not asked for and is not done. |
 | F-14 | Low | Symlink handling differs by layer; owner, ACLs, xattrs, hard links not preserved; hidden `.md` searchable but not listed. | T-N7, T-S5 | Approve recording all of it in ADR 0005 and `docs/search.md`. |
-| F-15 | Decide | Read-only notes are overwritten (Vim refuses with E45). | T-S5 | Rule: refuse without `!`, or accept. |
+| F-15 | ~~Decide~~ **Closed 2026-09-12** (8.4.2) | Read-only notes are overwritten (Vim refuses with E45). | T-S5 | Matt's ruling: refuse like Vim. Done: `DocumentStore::isReadOnly`, checked by a plain `:w` on the buffer's own file; `:w!` writes and keeps the mode. Tests in `document_store_test.cpp` and `main_window_test.cpp`. |
 | F-15b | Low | A planted recovery record restores with no provenance mark. | T-P5 | Approve a "recovered" mark in the tab or status until first save, or accept. |
 | F-16 | Low | Theme files read unbounded on the UI thread. | T-C2 | Approve a 64 KiB cap like the keymap. |
 | F-17 | Low | No depth or count cap on the sidebar; eager path fetch on restore; no timeouts. | T-D1 | Approve a per-directory entry cap and a note in the limitations list. |
@@ -686,10 +686,10 @@ unless Matt defers with a recorded reason; **Low** may be deferred to the limita
 | F-21 | Low | Three `qFatal` paths in release without a checkpoint. | T-B5 | Approve converting to a status message plus graceful exit, or accept as startup-only. |
 | F-22 | ~~Decide~~ **Closed 2026-09-12** | Recovery records accumulate without bound for dead workspaces. | T-P4 | Matt's ruling: a seven-day bound for roots that no longer exist, silent (ADR 0016); roots that exist are kept. ADR 0015; `SessionStore::sweepVanishedRoots`, six store tests and two launch tests. |
 | F-23 | Low | Watcher registration failures are silent. | T-W1 | Approve a status message when `addPath` fails. |
-| F-24 | Low | Qt strips its options before validation; `--smoke-test` ships. | T-R3 | Approve documenting the Qt behaviour; rule on removing the smoke hook from release. |
+| F-24 | **Accepted 2026-09-12** | Qt strips its options before validation; `--smoke-test` ships. | T-R3 | Matt's ruling: the flag validates the packaged binary in the check step and stays. Qt's option stripping recorded in `docs/limitations.md`. |
 | F-25 | Low | Line endings not normalised or tested. | T-S6 | Record in limitations; test CRLF round trip. |
 | F-26 | Low | Snapshot writer does not enforce its own upper bounds; no JSON depth limit in program code. | T-P3 | Approve clamping at capture and an explicit depth check, with a depth-bomb fixture. |
-| F-27 | Low | Reading-view copy puts HTML with workspace-relative image paths on the clipboard. | T-L2 | Rule: plain-text-only copy, or document. |
+| F-27 | **Accepted 2026-09-12** | Reading-view copy puts HTML with workspace-relative image paths on the clipboard. | T-L2 | Matt's ruling: plain text is what matters; documented in `docs/limitations.md`. |
 
 ## 10. What this document does not cover
 
