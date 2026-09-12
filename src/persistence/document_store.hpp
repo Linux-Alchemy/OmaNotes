@@ -23,6 +23,13 @@ class DocumentStore final {
     [[nodiscard]] std::expected<std::filesystem::path, SaveError>
     resolveTarget(const std::filesystem::path& requested) const;
 
+    /// True when `target` exists and this process may not write it. A plain
+    /// `:w` refuses such a file, as Vim's E45 does; `:w!` does not ask,
+    /// because the rename-replace needs only a writable directory and the
+    /// new file keeps the old one's permissions. The store itself never
+    /// refuses on this ground: whether to ask is the caller's, with the bang.
+    [[nodiscard]] static bool isReadOnly(const std::filesystem::path& target);
+
     /// Resolve `requested` and write `text` to it as UTF-8.
     [[nodiscard]] std::expected<std::filesystem::path, SaveError>
     save(const std::filesystem::path& requested, const QString& text,
