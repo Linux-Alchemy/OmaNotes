@@ -783,7 +783,7 @@ public:
 
 - [ ] **8.3.1** — Document user installation, key language, launch contract, recovery, and troubleshooting: the real `README.md`, replacing the placeholder. **Last block before the project is called done**, at Matt's direction (2026-09-11).
 - [x] **8.3.2** — Document the component/data flow for design-level understanding without requiring C++ fluency. Evidence: `docs/architecture.md` (Change Log 2026-09-12).
-- [ ] **8.3.3** — Record remaining limitations, the licence, and the steps to cut a tagged source release on GitHub; the AUR and plugin routes stay recorded as deferred (ADR 0013).
+- [x] **8.3.3** — Record remaining limitations, the licence, and the steps to cut a tagged source release on GitHub; the AUR and plugin routes stay recorded as deferred (ADR 0013). Evidence: `docs/limitations.md`, `docs/release.md` (Change Log 2026-09-12).
 - [ ] **8.3.4** — Verify: a clean checkout follows the documented build/test/package path without tribal knowledge.
 
 ### Task 8.4: Daily-use trial findings (added 2026-09-12, see Change Log)
@@ -1389,3 +1389,16 @@ Decision required: approve / request changes / stop and redesign
   reading map to the other documents and the seventeen ADRs. Every behavioural claim was
   checked against the header comments, ADR 0005, ADR 0006, the tree model, and the atomic
   writer before it went in. No code changed.
+
+- **2026-09-12:** Block 8.3.3 on `docs/8.3.3-limitations-and-release`. `docs/limitations.md`
+  sorts what the application does not do into three kinds: left out on purpose (the outline's
+  non-goals and ADR 0013's deferrals), accepted with the cost recorded (every deferred Low
+  finding by number, the Vim deviations from the acceptance suite, the search and size
+  bounds, the session and recovery trade-offs from ADRs 0010 to 0017), and awaiting a ruling.
+  Three findings turned out to still say "decide": F-20 was in fact ruled on 2026-09-11 and
+  answered by `docs/dependency-review.md`, so its row is corrected; F-15 (read-only notes are
+  overwritten), F-24 (the smoke-test hook ships), and F-27 (reading-view copy is HTML) are put
+  to Matt in the document's last table. `docs/release.md` states the licence and its edges,
+  the single source of the version number, the eight steps to cut a tagged source release
+  when Matt approves one (nothing is tagged by this block), and what a release is not.
+  `docs/packaging.md` points at it. No code.
