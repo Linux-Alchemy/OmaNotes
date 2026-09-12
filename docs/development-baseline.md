@@ -24,8 +24,8 @@ Omanotes is developed from two machines, both running the same Omarchy and toolc
 
 | Machine | Role | Validated |
 | --- | --- | --- |
-| `legion` | Original development machine; captured the baseline above | Phases 1-3 |
-| `shadowvault` | Second development machine, prepared 2026-09-03 | Phases 1-3 re-validated from a clean build directory |
+| First machine | Original development machine; captured the baseline above | Phases 1-3 |
+| Second machine | Prepared 2026-09-03 | Phases 1-3 re-validated from a clean build directory |
 
 Both report Omarchy 4.0.1-1, qt6-base 6.11.2-2, ktexteditor 6.29.0-1, cmake 4.4.2-1, and clang 22.1.8-1.
 Any additional machine must install the approved dependency set below and pass the canonical local

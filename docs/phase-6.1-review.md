@@ -36,7 +36,7 @@ Commands run and actual results:
 
 ```text
 $ cmake --preset dev
--- Build files have been written to: /home/reaper/github/omanotes/build/dev
+-- Build files have been written to: ~/github/omanotes/build/dev
 
 $ cmake --build --preset dev
 [21/21] Linking CXX executable tests/omanotes_markdown_tests
@@ -104,7 +104,7 @@ My reservations:
 How to run it:
 
 ```sh
-cd /home/reaper/github/omanotes
+cd ~/github/omanotes
 git switch phase/6.1-reading-view
 cmake --preset dev && cmake --build --preset dev
 ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 ./build/dev/src/omanotes .
