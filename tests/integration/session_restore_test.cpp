@@ -17,6 +17,7 @@
 #include <QTextBrowser>
 #include <QtTest>
 
+#include <chrono>
 #include <filesystem>
 #include <memory>
 
@@ -38,6 +39,18 @@ void writeFile(const std::filesystem::path& path, const QByteArray& contents) {
     QFile file(QString::fromStdString(path.string()));
     QVERIFY2(file.open(QIODevice::WriteOnly), qPrintable(file.errorString()));
     QCOMPARE(file.write(contents), contents.size());
+}
+
+/// Backdate every regular file under `directory`, as a week away would.
+void ageFilesIn(const std::filesystem::path& directory, std::chrono::days age) {
+    const auto then = std::filesystem::file_time_type::clock::now() - age;
+    std::error_code error;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(directory, error)) {
+        std::error_code ignored;
+        if (entry.is_regular_file(ignored)) {
+            std::filesystem::last_write_time(entry.path(), then, ignored);
+        }
+    }
 }
 
 KTextEditor::View* activeView(omanotes::MainWindow& window) {
@@ -183,6 +196,8 @@ class SessionRestoreTest final : public QObject {
     void secondInstanceLeavesTheFirstsRecordsAlone();
     void theLockFollowsTheLiveInstance();
     void parkedWorkNoticeSurvivesAVanishedRoot();
+    void vanishedRootNoticeSaysTheDirectoryIsGone();
+    void vanishedRootStateIsRemovedAfterTheRetentionPeriod();
     void orphanRecordComesBackDirty();
     void recoveredNoteChangedOnDiskRefusesPlainWrite();
     void readingViewFollowsTheCursor();
@@ -503,6 +518,61 @@ void SessionRestoreTest::parkedWorkNoticeSurvivesAVanishedRoot() {
     QVERIFY(launch.controller->parkedWorkNotice().isEmpty());
     std::filesystem::create_directories(workspace.root);
     launch.close();
+}
+
+void SessionRestoreTest::vanishedRootNoticeSaysTheDirectoryIsGone() {
+    Workspace first;
+    Workspace other;
+    QVERIFY(first.valid() && other.valid());
+    writeFile(first.note("secret.md"), "# Secret\n");
+    {
+        Launch launch(first);
+        launch.openFromSidebar(first.note("secret.md"));
+        typeInto(*launch.window, QStringLiteral("private thought\n"));
+        launch.close();
+    }
+    QCOMPARE(first.recoveryRecords(), 1);
+    // The workspace itself goes; its state does not.
+    QVERIFY(std::filesystem::remove_all(first.root) > 0);
+
+    Launch elsewhere(other, std::nullopt, false, first.sessions);
+    const auto line = status(*elsewhere.window);
+    QVERIFY2(line.contains(QStringLiteral("Unsaved work from")), qPrintable(line));
+    QVERIFY(line.contains(QStringLiteral("that directory is gone")));
+    QVERIFY(line.contains(QStringLiteral("(1 buffer)")));
+    QVERIFY(line.contains(QStringLiteral("Records kept until")));
+    // No advice to open what cannot be opened, and no text.
+    QVERIFY(!line.contains(QStringLiteral("Open it to recover")));
+    QVERIFY(!line.contains(QStringLiteral("private thought")));
+    elsewhere.close();
+    QCOMPARE(first.recoveryRecords(), 1);
+}
+
+void SessionRestoreTest::vanishedRootStateIsRemovedAfterTheRetentionPeriod() {
+    Workspace first;
+    Workspace other;
+    QVERIFY(first.valid() && other.valid());
+    writeFile(first.note("secret.md"), "# Secret\n");
+    {
+        Launch launch(first);
+        launch.openFromSidebar(first.note("secret.md"));
+        typeInto(*launch.window, QStringLiteral("private thought\n"));
+        launch.close();
+    }
+    QCOMPARE(first.recoveryRecords(), 1);
+    QVERIFY(std::filesystem::remove_all(first.root) > 0);
+    const auto stateDirectory = first.sessionFile().parent_path();
+    ageFilesIn(stateDirectory, std::chrono::days{8});
+
+    Launch elsewhere(other, std::nullopt, false, first.sessions);
+    const auto line = status(*elsewhere.window);
+    QVERIFY2(line.contains(QStringLiteral("Removed unsaved work from")), qPrintable(line));
+    QVERIFY(line.contains(QStringLiteral("(1 buffer)")));
+    QVERIFY(line.contains(QStringLiteral("gone for 7 days")));
+    QVERIFY(!line.contains(QStringLiteral("Unsaved work from")));
+    QVERIFY(!line.contains(QStringLiteral("private thought")));
+    QVERIFY(!std::filesystem::exists(stateDirectory));
+    elsewhere.close();
 }
 
 void SessionRestoreTest::orphanRecordComesBackDirty() {

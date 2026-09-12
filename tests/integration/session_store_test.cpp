@@ -1,5 +1,7 @@
 #include "session/session_store.hpp"
 
+#include "session/instance_lock.hpp"
+
 #include <QCryptographicHash>
 #include <QFile>
 #include <QTemporaryDir>
@@ -88,6 +90,40 @@ struct Fixture {
     [[nodiscard]] const omanotes::WorkspaceRoot& root() const { return *resolved; }
 };
 
+/// A second workspace whose state lives in the same store. Its root can be
+/// deleted to stand in for a workspace that has vanished.
+struct Sibling {
+    QTemporaryDir dir;
+    std::filesystem::path root;
+    std::filesystem::path directory;
+
+    explicit Sibling(const std::filesystem::path& sessions)
+        : root(pathFor(dir.path())),
+          directory(sessions / omanotes::SessionStore::workspaceId(root)) {}
+};
+
+omanotes::SessionSnapshot dirtySnapshotFor(const omanotes::WorkspaceRoot& root) {
+    auto snapshot = snapshotFor(root, 1);
+    snapshot.buffers[0].modified = true;
+    snapshot.buffers[0].recovery = QUuid::createUuid();
+    return snapshot;
+}
+
+/// Park one dirty buffer and one record file for `sibling`, then delete its
+/// workspace directory from under it.
+void parkAndVanish(const omanotes::SessionStore& store, const Sibling& sibling) {
+    const auto root = omanotes::WorkspaceRoot::resolve(sibling.root);
+    QVERIFY(root.has_value());
+    QVERIFY(store.save(dirtySnapshotFor(*root)).has_value());
+    std::filesystem::create_directories(sibling.directory / "recovery");
+    writeFile(sibling.directory / "recovery" / "record.json", "{\"contents\":\"x\",\"version\":1}");
+    QVERIFY(std::filesystem::remove_all(sibling.root) > 0);
+}
+
+std::filesystem::file_time_type daysFromNow(int days) {
+    return std::filesystem::file_time_type::clock::now() + std::chrono::days{days};
+}
+
 /// Flatten a load result for assertions: absent on error or on no session.
 std::optional<omanotes::SessionSnapshot> loadOptional(const omanotes::SessionStore& store,
                                                       const omanotes::WorkspaceRoot& root) {
@@ -116,6 +152,12 @@ class SessionStoreTest final : public QObject {
     void refusesSymlinksInTheStore();
     void refusesASnapshotWrittenForAnotherRoot();
     void concurrentSaversNeverProduceAPartialFile();
+    void sweepsAVanishedRootAfterTheRetentionPeriod();
+    void keepsAVanishedRootInsideTheRetentionPeriod();
+    void neverSweepsARootThatStillExists();
+    void neverSweepsItsOwnDirectory();
+    void leavesAVanishedRootWhoseLockIsHeld();
+    void neverFollowsASymlinkedSibling();
 };
 
 void SessionStoreTest::derivesAStableOpaqueWorkspaceId() {
@@ -413,6 +455,114 @@ void SessionStoreTest::concurrentSaversNeverProduceAPartialFile() {
     QVERIFY(final.has_value());
     const auto last = present(final);
     QVERIFY(std::ranges::any_of(candidates, [&last](const auto& c) { return c == last; }));
+}
+
+void SessionStoreTest::sweepsAVanishedRootAfterTheRetentionPeriod() {
+    Fixture fixture;
+    QVERIFY(fixture.valid());
+    const omanotes::SessionStore store(fixture.sessions);
+    QVERIFY(store.save(snapshotFor(fixture.root(), 1)).has_value());
+    const Sibling sibling(fixture.sessions);
+    parkAndVanish(store, sibling);
+    const auto own = omanotes::SessionStore::workspaceId(fixture.root().path());
+
+    // The scan sees the sibling for what it is, from metadata alone.
+    const auto seen = store.listSiblings(own);
+    QCOMPARE(seen.size(), std::size_t{1});
+    QCOMPARE(seen[0].root, sibling.root);
+    QCOMPARE(seen[0].directory, sibling.directory);
+    QCOMPARE(seen[0].dirtyBuffers, std::size_t{1});
+    QVERIFY(!seen[0].rootExists);
+
+    const auto swept = store.sweepVanishedRoots(own, daysFromNow(8));
+    QCOMPARE(swept.size(), std::size_t{1});
+    QCOMPARE(swept[0].root, sibling.root);
+    QCOMPARE(swept[0].dirtyBuffers, std::size_t{1});
+    QVERIFY(!std::filesystem::exists(sibling.directory));
+    QVERIFY(store.listSiblings(own).empty());
+    // Our own state is untouched.
+    QVERIFY(std::filesystem::exists(store.fileFor(fixture.root())));
+}
+
+void SessionStoreTest::keepsAVanishedRootInsideTheRetentionPeriod() {
+    Fixture fixture;
+    QVERIFY(fixture.valid());
+    const omanotes::SessionStore store(fixture.sessions);
+    const Sibling sibling(fixture.sessions);
+    parkAndVanish(store, sibling);
+    const auto own = omanotes::SessionStore::workspaceId(fixture.root().path());
+
+    QVERIFY(store.sweepVanishedRoots(own, daysFromNow(0)).empty());
+    QVERIFY(store.sweepVanishedRoots(own, daysFromNow(6)).empty());
+    QVERIFY(std::filesystem::exists(sibling.directory / "session.json"));
+    QVERIFY(std::filesystem::exists(sibling.directory / "recovery" / "record.json"));
+}
+
+void SessionStoreTest::neverSweepsARootThatStillExists() {
+    Fixture fixture;
+    QVERIFY(fixture.valid());
+    const omanotes::SessionStore store(fixture.sessions);
+    const Sibling sibling(fixture.sessions);
+    const auto root = omanotes::WorkspaceRoot::resolve(sibling.root);
+    QVERIFY(root.has_value());
+    QVERIFY(store.save(dirtySnapshotFor(*root)).has_value());
+    const auto own = omanotes::SessionStore::workspaceId(fixture.root().path());
+
+    const auto seen = store.listSiblings(own);
+    QCOMPARE(seen.size(), std::size_t{1});
+    QVERIFY(seen[0].rootExists);
+    QVERIFY(store.sweepVanishedRoots(own, daysFromNow(400)).empty());
+    QVERIFY(std::filesystem::exists(sibling.directory / "session.json"));
+}
+
+void SessionStoreTest::neverSweepsItsOwnDirectory() {
+    Fixture fixture;
+    QVERIFY(fixture.valid());
+    const omanotes::SessionStore store(fixture.sessions);
+    QVERIFY(store.save(dirtySnapshotFor(fixture.root())).has_value());
+    const auto own = omanotes::SessionStore::workspaceId(fixture.root().path());
+    // The running workspace's directory disappears under it.
+    QVERIFY(std::filesystem::remove_all(fixture.root().path()) > 0);
+
+    QVERIFY(store.listSiblings(own).empty());
+    QVERIFY(store.sweepVanishedRoots(own, daysFromNow(8)).empty());
+    QVERIFY(std::filesystem::exists(store.fileFor(fixture.root())));
+}
+
+void SessionStoreTest::leavesAVanishedRootWhoseLockIsHeld() {
+    Fixture fixture;
+    QVERIFY(fixture.valid());
+    const omanotes::SessionStore store(fixture.sessions);
+    const Sibling sibling(fixture.sessions);
+    parkAndVanish(store, sibling);
+    const auto own = omanotes::SessionStore::workspaceId(fixture.root().path());
+
+    // Another instance still has the workspace open (ADR 0012).
+    const auto lock = omanotes::InstanceLock::acquire(sibling.directory / "instance.lock");
+    QVERIFY(lock.held());
+    QVERIFY(store.sweepVanishedRoots(own, daysFromNow(8)).empty());
+    QVERIFY(std::filesystem::exists(sibling.directory / "session.json"));
+}
+
+void SessionStoreTest::neverFollowsASymlinkedSibling() {
+    Fixture fixture;
+    QVERIFY(fixture.valid());
+    const omanotes::SessionStore store(fixture.sessions);
+    const Sibling sibling(fixture.sessions);
+    parkAndVanish(store, sibling);
+    const auto own = omanotes::SessionStore::workspaceId(fixture.root().path());
+
+    // The sibling's directory becomes a symlink to a directory outside the
+    // store that holds the same, now aged-out, state.
+    const auto elsewhere = fixture.sessions.parent_path() / "elsewhere";
+    std::filesystem::rename(sibling.directory, elsewhere);
+    std::filesystem::create_directory_symlink(elsewhere, sibling.directory);
+
+    QVERIFY(store.listSiblings(own).empty());
+    QVERIFY(store.sweepVanishedRoots(own, daysFromNow(8)).empty());
+    QVERIFY(std::filesystem::is_symlink(sibling.directory));
+    QVERIFY(std::filesystem::exists(elsewhere / "session.json"));
+    QVERIFY(std::filesystem::exists(elsewhere / "recovery" / "record.json"));
 }
 
 QTEST_GUILESS_MAIN(SessionStoreTest)

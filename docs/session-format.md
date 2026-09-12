@@ -136,10 +136,16 @@ they come back as orphans on the next normal launch.
   deleted; it is restored as a dirty buffer on the next launch and reported,
   the way Neovim announces a swap file. Text is only ever removed by a save
   or a discard.
-- **Other workspaces:** never touched. A workspace that has moved or been
-  deleted keeps its records until the user removes
-  `~/.local/state/omanotes/sessions/<id>/` by hand. Deleting unsaved work
-  because a directory went missing is not a decision this program makes.
+- **Other workspaces:** never touched while their root exists. A workspace
+  whose directory has gone keeps its state, records included, for seven days
+  after the program last wrote into it; then the whole
+  `~/.local/state/omanotes/sessions/<id>/` directory is removed at the next
+  launch of any workspace, and the status line says so if it held unsaved
+  text (ADR 0015). Inside those seven days the launch notice names the
+  vanished directory, the record count, where the records are, and the day
+  they expire, so the text can be retrieved by hand. Only a clean "not there"
+  counts as gone: a permission error or an unreachable mount keeps the state,
+  and a workspace another instance still holds the lock on is never swept.
 
 ### Restoring a record
 

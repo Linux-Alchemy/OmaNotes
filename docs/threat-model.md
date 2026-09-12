@@ -434,9 +434,10 @@ elsewhere after launch).
   encryption. Directory `0700`, file `0600` (`recovery_store.cpp:23-24`, `:56-79`, `:261`);
   test `recovery_store_test.cpp:114-152`. Matt accepted the plaintext statement at the 7.3
   gate.
-- Residue: records for a workspace that is deleted or renamed are kept forever, without a
-  count or age bound or a way to see them from the program (`docs/session-format.md:125-134`
-  calls this deliberate). Finding F-22.
+- Residue, bounded 2026-09-12: records for a workspace whose root no longer exists are kept
+  seven days past the last write into its state directory, announced at launch with their
+  location and expiry, then removed (ADR 0015, `SessionStore::sweepVanishedRoots`). Records for
+  a root that exists are kept until that root is opened. Finding F-22, closed.
 
 **T-P5. A planted or symlinked recovery record redirects a write or restores a lie.**
 - Status: **Partial.**
@@ -573,7 +574,8 @@ elsewhere after launch).
 
 **T-D2. A huge note.** See T-N4. Finding F-1.
 
-**T-D3. Unbounded recovery-record accumulation.** See T-P4. Finding F-22.
+**T-D3. Recovery-record accumulation.** Bounded for vanished roots by ADR 0015; unbounded only
+across roots that still exist, each of which the user can open. See T-P4. Finding F-22, closed.
 
 ### 6.11 Build, toolchain, and dependencies
 
@@ -681,7 +683,7 @@ unless Matt defers with a recorded reason; **Low** may be deferred to the limita
 | F-19 | **Closed in part 2026-09-11** (8.1.2) | Fault seam not plumbed through the note save path; `cert-*` off; format-check list incomplete; leak checks manual. | T-S2, T-B1 | Done: faults reach the note writer with five injected failures tested; the format list is discovered from the tree. Not done, deferred with the Low tier: `cert-*` and automated leak checks. |
 | F-20 | Decide | Dependency policy has no mechanism; 138-object closure; baseline stale; minimums not derived. | T-B3 | Rule what 8.3 records: an SBOM from `pacman -Qi`, a named advisory feed, and derived minimums. |
 | F-21 | Low | Three `qFatal` paths in release without a checkpoint. | T-B5 | Approve converting to a status message plus graceful exit, or accept as startup-only. |
-| F-22 | Decide | Recovery records accumulate without bound for dead workspaces. | T-P4 | Rule: keep forever (current), or add a documented age bound with a visible listing. |
+| F-22 | ~~Decide~~ **Closed 2026-09-12** | Recovery records accumulate without bound for dead workspaces. | T-P4 | Matt's ruling: a seven-day bound for roots that no longer exist, announced with location and expiry while it runs; roots that exist are kept. ADR 0015; `SessionStore::sweepVanishedRoots`, six store tests and two launch tests. |
 | F-23 | Low | Watcher registration failures are silent. | T-W1 | Approve a status message when `addPath` fails. |
 | F-24 | Low | Qt strips its options before validation; `--smoke-test` ships. | T-R3 | Approve documenting the Qt behaviour; rule on removing the smoke hook from release. |
 | F-25 | Low | Line endings not normalised or tested. | T-S6 | Record in limitations; test CRLF round trip. |

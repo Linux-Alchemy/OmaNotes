@@ -399,6 +399,7 @@ add_test(NAME session-snapshot COMMAND omanotes_session_tests)
 add_executable(omanotes_session_store_tests
     integration/session_store_test.cpp
     "${CMAKE_SOURCE_DIR}/src/session/session_store.cpp"
+    "${CMAKE_SOURCE_DIR}/src/session/instance_lock.cpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_store.hpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_snapshot.cpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_snapshot.hpp"
@@ -425,6 +426,7 @@ add_executable(omanotes_recovery_store_tests
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.cpp"
     "${CMAKE_SOURCE_DIR}/src/persistence/atomic_file_writer.hpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_store.cpp"
+    "${CMAKE_SOURCE_DIR}/src/session/instance_lock.cpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_store.hpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_snapshot.cpp"
     "${CMAKE_SOURCE_DIR}/src/session/session_snapshot.hpp"

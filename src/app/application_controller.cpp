@@ -3,11 +3,13 @@
 #include "ui/main_window.hpp"
 
 #include <QByteArray>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QStringList>
 
 #include <algorithm>
+#include <chrono>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -16,11 +18,6 @@ namespace omanotes {
 
 namespace {
 
-/// How many sibling session directories the parked-work scan will read. The
-/// notice is a courtesy; it must not make launch slow on a machine that has
-/// opened a thousand workspaces.
-constexpr int kParkedScanLimit = 64;
-
 QString displayRoot(const std::filesystem::path& root) {
     auto text = QFile::decodeName(QByteArray::fromStdString(root.native()));
     const auto home = QDir::homePath();
@@ -28,6 +25,20 @@ QString displayRoot(const std::filesystem::path& root) {
         return QLatin1Char('~') + text.mid(home.size());
     }
     return text;
+}
+
+QString bufferCount(std::size_t count) {
+    return QStringLiteral("%1 %2").arg(count).arg(count == 1 ? QStringLiteral("buffer")
+                                                             : QStringLiteral("buffers"));
+}
+
+/// A file-clock instant as a calendar day, for "kept until".
+QString dayOf(std::filesystem::file_time_type when) {
+    const auto system =
+        std::chrono::system_clock::now() + (when - std::filesystem::file_time_type::clock::now());
+    const auto seconds =
+        std::chrono::duration_cast<std::chrono::seconds>(system.time_since_epoch()).count();
+    return QDateTime::fromSecsSinceEpoch(seconds).date().toString(QStringLiteral("d MMM"));
 }
 
 } // namespace
@@ -153,6 +164,22 @@ void ApplicationController::start() {
     if (const auto summary = lastReport_.summary(); !summary.isEmpty()) {
         status << summary;
     }
+    if (root) {
+        // ADR 0015: state for a root that has been gone longer than the
+        // retention period goes now, and is announced if it held text.
+        // Geometry-only state goes quietly; there was nothing in it to lose.
+        for (const auto& gone :
+             sessions_.sweepVanishedRoots(SessionStore::workspaceId(root->path()),
+                                          std::filesystem::file_time_type::clock::now())) {
+            if (gone.dirtyBuffers > 0) {
+                status << QStringLiteral(
+                              "Removed unsaved work from %1 (%2): that directory has been gone "
+                              "for %3 days")
+                              .arg(displayRoot(gone.root), bufferCount(gone.dirtyBuffers))
+                              .arg(SessionStore::kVanishedRootRetention.count());
+            }
+        }
+    }
     if (const auto notice = parkedWorkNotice(); !notice.isEmpty()) {
         status << notice;
     }
@@ -246,46 +273,39 @@ bool ApplicationController::holdsInstanceLock() const noexcept {
 }
 
 QString ApplicationController::parkedWorkNotice() const {
-    const auto own = SessionStore::workspaceId(request_.root);
-    std::error_code error;
     // The root can have vanished since launch; the notice is a courtesy and
     // must not be the thing that brings the window down.
     const auto root = resolveRoot();
     if (!root) {
         return {};
     }
-    const auto sessions = sessions_.fileFor(*root).parent_path().parent_path();
-    if (!std::filesystem::is_directory(sessions, error)) {
-        return {};
-    }
-    QStringList parked;
-    int scanned = 0;
-    for (const auto& entry : std::filesystem::directory_iterator(sessions, error)) {
-        if (++scanned > kParkedScanLimit) {
-            break;
-        }
-        std::error_code ignored;
-        if (!entry.is_directory(ignored) || entry.is_symlink(ignored) ||
-            entry.path().filename().string() == own) {
+    QStringList waiting;
+    QStringList gone;
+    const auto retention = std::chrono::duration_cast<std::filesystem::file_time_type::duration>(
+        SessionStore::kVanishedRootRetention);
+    for (const auto& parked : sessions_.listSiblings(SessionStore::workspaceId(root->path()))) {
+        if (parked.dirtyBuffers == 0) {
             continue;
         }
-        // Metadata only: the snapshot names its root and counts its dirty
-        // buffers; no recovery record is opened.
-        const auto snapshot = readSessionSnapshot(entry.path() / "session.json");
-        if (!snapshot || snapshot->dirtyBufferCount() == 0) {
-            continue;
+        if (parked.rootExists) {
+            waiting << QStringLiteral("%1 (%2)").arg(displayRoot(parked.root),
+                                                     bufferCount(parked.dirtyBuffers));
+        } else {
+            // "Open it to recover" would point at a door that no longer
+            // exists. Say where the text is and how long it will be there.
+            gone << QStringLiteral("Unsaved work from %1 (%2); that directory is gone. Records "
+                                   "kept until %3 in %4")
+                        .arg(displayRoot(parked.root), bufferCount(parked.dirtyBuffers),
+                             dayOf(parked.lastActivity + retention), displayRoot(parked.directory));
         }
-        const auto count = snapshot->dirtyBufferCount();
-        parked << QStringLiteral("%1 (%2 %3)")
-                      .arg(displayRoot(snapshot->workspaceRoot))
-                      .arg(count)
-                      .arg(count == 1 ? QStringLiteral("buffer") : QStringLiteral("buffers"));
     }
-    if (parked.isEmpty()) {
-        return {};
+    QStringList parts;
+    if (!waiting.isEmpty()) {
+        parts << QStringLiteral("Unsaved work waiting in %1. Open it to recover.")
+                     .arg(waiting.join(QStringLiteral(", ")));
     }
-    return QStringLiteral("Unsaved work waiting in %1. Open it to recover.")
-        .arg(parked.join(QStringLiteral(", ")));
+    parts << gone;
+    return parts.join(QStringLiteral(" · "));
 }
 
 } // namespace omanotes

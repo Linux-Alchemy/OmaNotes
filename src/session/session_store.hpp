@@ -10,8 +10,27 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace omanotes {
+
+/// One sibling workspace directory as a launch scan sees it: its snapshot's
+/// metadata, whether the root it names is still there, and the last time the
+/// program wrote anything into it. Built without opening a recovery record.
+struct ParkedWorkspace {
+    std::filesystem::path directory;
+    std::filesystem::path root;
+    std::size_t dirtyBuffers{0};
+    bool rootExists{true};
+    std::filesystem::file_time_type lastActivity;
+};
+
+/// A workspace directory the retention sweep removed, for the status line.
+struct SweptWorkspace {
+    std::filesystem::path root;
+    std::size_t dirtyBuffers{0};
+};
 
 /// Keeps one structural snapshot per workspace beneath the XDG state
 /// directory (docs/session-format.md, ADR 0011).
@@ -29,6 +48,14 @@ class SessionStore final {
     /// and removed before the next save. Younger ones may belong to a
     /// concurrent instance and are left alone.
     static constexpr std::chrono::minutes kStaleTemporaryAge{15};
+    /// State for a root that no longer exists is kept this long past the
+    /// last write into it, then removed at launch (ADR 0015, finding F-22).
+    /// A root that exists is never swept, whatever its age.
+    static constexpr std::chrono::days kVanishedRootRetention{7};
+    /// How many sibling directories a launch scan reads. The notice and the
+    /// sweep are courtesies; they must not make launch slow on a machine
+    /// that has opened a thousand workspaces.
+    static constexpr int kSiblingScanLimit = 64;
 
     /// `sessionsDirectory` is the `sessions` directory itself; it and its
     /// parents are created on first save. `faults` is a test-only seam and is
@@ -68,6 +95,19 @@ class SessionStore final {
     /// diagnostic; the file is never modified.
     [[nodiscard]] std::expected<std::optional<SessionSnapshot>, SessionError>
     load(const WorkspaceRoot& root) const;
+
+    /// Every other workspace's directory that holds a readable snapshot,
+    /// metadata only (ADR 0010). `ownId` is this launch's workspace id and is
+    /// skipped. Symlinked entries are skipped, never followed.
+    [[nodiscard]] std::vector<ParkedWorkspace> listSiblings(std::string_view ownId) const;
+
+    /// Remove the directories of workspaces whose root no longer exists and
+    /// whose last write is older than `now - kVanishedRootRetention`, unless
+    /// another instance holds their lock (ADR 0012). Returns what went, so
+    /// the caller can say so. `now` is a parameter so tests need not wait a
+    /// week; production passes the file clock's now.
+    [[nodiscard]] std::vector<SweptWorkspace>
+    sweepVanishedRoots(std::string_view ownId, std::filesystem::file_time_type now) const;
 
   private:
     [[nodiscard]] std::expected<void, SessionError>

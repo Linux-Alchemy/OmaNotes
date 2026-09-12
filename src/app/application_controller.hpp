@@ -55,7 +55,9 @@ class ApplicationController final : public QObject {
     /// recovery for it (ADR 0012).
     [[nodiscard]] bool holdsInstanceLock() const noexcept;
     /// ADR 0010: one line naming other workspaces with unsaved work parked,
-    /// built from snapshot metadata only; empty when there is none.
+    /// built from snapshot metadata only; empty when there is none. A root
+    /// that no longer exists is named as gone, with where its records are
+    /// and the day they expire (ADR 0015).
     [[nodiscard]] QString parkedWorkNotice() const;
 
   private:
