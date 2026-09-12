@@ -797,10 +797,13 @@ ruled block, without reopening the phase's "no new features" constraint for anyt
 
 **Blocks:**
 
-- [ ] **8.4.1** — Font-size override: `~/.config/omanotes/config.toml`, `[font] base-size`,
+- [x] **8.4.1** — Font-size override: `~/.config/omanotes/config.toml`, `[font] base-size`,
   overriding Omarchy's `shell.toml` value when present and valid, falling back when not
   (ADR 0017). Tests for override, clamp, invalid, absent, and no-desktop-value; a
-  `docs/configuration.md` section.
+  `docs/configuration.md` section. Evidence: #48 (Change Log 2026-09-12).
+- [x] **8.4.2** — Read-only notes: a plain `:w` refuses a note the user may not write, with
+  Vim's E45 wording; `:w!` writes it and keeps its mode (threat-model F-15, Matt's ruling of
+  2026-09-12). One store test, one window test. Evidence: Change Log 2026-09-12.
 
 ### Phase 8 Checkpoint
 
@@ -1402,3 +1405,14 @@ Decision required: approve / request changes / stop and redesign
   the single source of the version number, the eight steps to cut a tagged source release
   when Matt approves one (nothing is tagged by this block), and what a release is not.
   `docs/packaging.md` points at it. No code.
+
+- **2026-09-12:** Block 8.4.2 on `task/8.4.2-readonly-notes`, and the three rulings from the
+  limitations document. F-15, refuse like Vim: `DocumentStore::isReadOnly` asks whether the
+  target exists and this process may not write it; a plain `:w` on the buffer's own file
+  refuses with "'readonly' option is set (add ! to override)", and `:w!` writes through the
+  same atomic path, which already kept the file's mode. The reason it overwrote before is that
+  a rename-replace needs only a writable directory. Two tests, on the store and through the
+  window against a 0444 file. F-24 accepted: the smoke-test flag is how the package's check
+  step proves the packaged binary starts. F-27 accepted: plain text is what matters. The
+  limitations document's last table records the rulings, the threat model closes the rows,
+  the Vim acceptance record gains the E45 row. 8.4.1 ticked, which #48 had left unticked.

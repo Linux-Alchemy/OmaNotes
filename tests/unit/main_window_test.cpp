@@ -30,6 +30,9 @@
 #include <QWheelEvent>
 #include <QtTest>
 
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <filesystem>
 #include <map>
 #include <utility>
@@ -169,6 +172,7 @@ class MainWindowTest final : public QObject {
     void reloadsOverUnsavedEditsOnlyWithBang();
     void reportsADeletedFileAndWritesItAgainOnSave();
     void refusesToOverwriteAnotherExistingFileWithoutBang();
+    void refusesToWriteAReadOnlyNoteWithoutBang();
     void leavesTheWroteConfirmationStandingAfterItsOwnSave();
     void interceptsWriteWhenTheCommandCompletionPopupHasFocus();
     void everyCommandHasOneImplementationAndARoute();
@@ -1159,6 +1163,44 @@ void MainWindowTest::refusesToOverwriteAnotherExistingFileWithoutBang() {
 
     typeViCommand(*editor, QStringLiteral("w! existing.md"));
     QTRY_COMPARE(readFile(existing), QByteArray("# Scratch\n"));
+}
+
+void MainWindowTest::refusesToWriteAReadOnlyNoteWithoutBang() {
+    if (::geteuid() == 0) {
+        QSKIP("root can write anything; the read-only question has no answer here");
+    }
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto root = std::filesystem::canonical(pathFor(temporary.path()));
+    const auto locked = root / "locked.md";
+    writeFile(locked, "# Locked\n");
+    QCOMPARE(::chmod(locked.c_str(), 0444), 0);
+
+    omanotes::MainWindow window({root, std::nullopt, false});
+    window.show();
+    auto* status = window.findChild<QLabel*>(QStringLiteral("statusArea"));
+    QVERIFY(status != nullptr);
+    window.focusRequestedFile(locked);
+    auto* editor = activeEditor(window);
+    QVERIFY(editor != nullptr);
+    editor->document()->insertText(editor->document()->documentEnd(), QStringLiteral("more\n"));
+    QVERIFY(editor->document()->isModified());
+
+    // Vim's E45, and the file is untouched.
+    typeViCommand(*editor, QStringLiteral("w"));
+    QTRY_VERIFY2(status->text().contains(QStringLiteral("'readonly' option is set")),
+                 qPrintable(status->text()));
+    QVERIFY(status->text().contains(QStringLiteral("add ! to override")));
+    QCOMPARE(readFile(locked), QByteArray("# Locked\n"));
+    QVERIFY(editor->document()->isModified());
+
+    // The bang writes it, and the note keeps its permissions.
+    typeViCommand(*editor, QStringLiteral("w!"));
+    QTRY_COMPARE(readFile(locked), QByteArray("# Locked\nmore\n"));
+    QVERIFY(!editor->document()->isModified());
+    struct stat mode{};
+    QCOMPARE(::stat(locked.c_str(), &mode), 0);
+    QCOMPARE(mode.st_mode & 07777, mode_t{0444});
 }
 
 void MainWindowTest::leavesTheWroteConfirmationStandingAfterItsOwnSave() {

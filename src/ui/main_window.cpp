@@ -1842,6 +1842,12 @@ QString MainWindow::saveTo(const std::filesystem::path& requested, bool force) {
                        QLatin1String(kAddBangToOverride);
             }
         } else {
+            // Vim's E45: a note the user may not write is not written by a
+            // plain :w, however writable its directory is (threat model F-15).
+            if (DocumentStore::isReadOnly(*destination)) {
+                return QStringLiteral("%1: 'readonly' option is set").arg(name) +
+                       QLatin1String(kAddBangToOverride);
+            }
             switch (classifyExternalChange(tracked->second.known, current, editor->isModified())) {
             case ExternalChangeAction::Unchanged:
             case ExternalChangeAction::FileRemoved:

@@ -3,6 +3,8 @@
 #include <QByteArray>
 #include <QByteArrayView>
 
+#include <unistd.h>
+
 #include <cctype>
 #include <system_error>
 #include <utility>
@@ -51,6 +53,14 @@ DocumentStore::resolveTarget(const std::filesystem::path& requested) const {
     }
 
     return joined;
+}
+
+bool DocumentStore::isReadOnly(const std::filesystem::path& target) {
+    std::error_code error;
+    if (!std::filesystem::exists(target, error) || error) {
+        return false;
+    }
+    return ::access(target.c_str(), W_OK) != 0;
 }
 
 std::expected<std::filesystem::path, SaveError>

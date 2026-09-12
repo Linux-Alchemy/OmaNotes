@@ -39,8 +39,9 @@ The full acceptance record is `docs/vim-acceptance.md`. The deviations a Vim use
   component's, so writes go through the atomic writer inside the root and reloads respect
   the tracked revision (ADR 0005, ADR 0006). `:q` is the only way out; the compositor's
   close is a kill, answered by recovery.
-- **Read-only notes are overwritten** by a plain `:w`, where Vim refuses with E45 unless
-  forced. Awaiting a ruling (threat model F-15).
+- **A read-only note refuses a plain `:w`** with Vim's E45 wording, "'readonly' option is
+  set (add ! to override)"; `:w!` writes it and the note keeps its permissions. Fixed on
+  Matt's ruling of 2026-09-12 (threat model F-15).
 
 ## Files and the workspace
 
@@ -97,8 +98,8 @@ Full detail in `docs/session-format.md`.
 - **No remote resources of any kind.** Images must live inside the root and under a size
   budget; everything else in a note is text (ADR 0009).
 - **Copying from the reading view puts HTML on the clipboard** with workspace-relative image
-  paths, which other applications may not resolve (F-27). Recorded here as the ruling
-  unless Matt asks for plain-text copy.
+  paths, which other applications may not resolve (F-27). Terminals and editors take the
+  plain-text flavour and see no difference. Accepted by Matt on 2026-09-12.
 
 ## Configuration and appearance
 
@@ -121,17 +122,19 @@ Both files are described in `docs/configuration.md`.
 - **Three startup failures exit without a checkpoint** (`qFatal` paths). They are reachable
   only before a window exists, so there is nothing to checkpoint (F-21).
 - **`--smoke-test` ships in the release binary**, and Qt strips its own options before the
-  launch grammar sees them (F-24).
+  launch grammar sees them (F-24). Accepted by Matt on 2026-09-12: the flag makes the
+  application quit as soon as its window is shown, and the package's check step uses it to
+  prove the exact binary being packaged starts; removing it would blind that check.
 - **`cert-*` clang-tidy checks and automated leak checks are not enabled** (F-19 residue).
 
-## Awaiting a ruling
+## Ruled on 2026-09-12
 
-Three findings still say "decide" rather than "accepted":
+The three findings that still said "decide" when this document was written:
 
-| Finding | Question | Smallest decision |
+| Finding | Question | Ruling |
 | --- | --- | --- |
-| F-15 | A read-only note is overwritten by a plain `:w` | Refuse without `!` as Vim does, or accept as is |
-| F-24 | The smoke-test hook ships in release builds | Remove it from release, or accept |
-| F-27 | Reading-view copy is HTML with relative image paths | Plain-text copy, or accept this document as the record |
+| F-15 | A read-only note was overwritten by a plain `:w` | Refuse like Vim. Fixed in block 8.4.2 |
+| F-24 | The smoke-test hook ships in release builds | Accepted: it validates the packaged binary |
+| F-27 | Reading-view copy is HTML with relative image paths | Accepted: plain text is what matters |
 
-Each is small. None affects saved notes or the workspace boundary.
+Nothing is awaiting a ruling.
