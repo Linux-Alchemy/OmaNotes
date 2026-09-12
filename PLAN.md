@@ -784,7 +784,7 @@ public:
 - [ ] **8.3.1** — Document user installation, key language, launch contract, recovery, and troubleshooting: the real `README.md`, replacing the placeholder. **Last block before the project is called done**, at Matt's direction (2026-09-11).
 - [x] **8.3.2** — Document the component/data flow for design-level understanding without requiring C++ fluency. Evidence: `docs/architecture.md` (Change Log 2026-09-12).
 - [x] **8.3.3** — Record remaining limitations, the licence, and the steps to cut a tagged source release on GitHub; the AUR and plugin routes stay recorded as deferred (ADR 0013). Evidence: `docs/limitations.md`, `docs/release.md` (Change Log 2026-09-12).
-- [ ] **8.3.4** — Verify: a clean checkout follows the documented build/test/package path without tribal knowledge.
+- [x] **8.3.4** — Verify: a clean checkout follows the documented build/test/package path without tribal knowledge. Evidence: ; a fresh clone from GitHub walked through every preset, gate, both install routes, and the fuzzers with no step outside the docs (Change Log 2026-09-12).
 
 ### Task 8.4: Daily-use trial findings (added 2026-09-12, see Change Log)
 
@@ -1416,3 +1416,22 @@ Decision required: approve / request changes / stop and redesign
   step proves the packaged binary starts. F-27 accepted: plain text is what matters. The
   limitations document's last table records the rulings, the threat model closes the rows,
   the Vim acceptance record gains the E45 row. 8.4.1 ticked, which #48 had left unticked.
+
+- **2026-09-12:** Block 8.3.4 on `docs/8.3.4-testing-and-clean-checkout`. `docs/testing.md`
+  is the authoritative page for building and testing: the three presets, the nine-command
+  gate with what each command proves, the fact that the test harness sets its own
+  environment so nothing is exported by hand (the offscreen platform, sanitizer options, and
+  private XDG directories are per-test properties in `tests/CMakeLists.txt`), the one case
+  where you do set them (running a test binary directly), all twenty-four suites in a table
+  with what each answers, the fuzzers with the Qt-only sanitizer exception, and what is not
+  automated. `docs/development-baseline.md` points at it. The verification: a fresh clone
+  from GitHub in a scratch directory, following only the docs. Dev preset configured, built
+  clean, 24/24 under the sanitizers with no environment set by hand; format-check and
+  clang-tidy silent; `docs/packaging.md` route 2 exactly as written with a staged install
+  showing the four files; security-check passing; the README's build line and a launch of the
+  built binary; the fuzz preset built and one harness run; route 1's `makepkg` from the
+  clone's own `packaging/arch`, 98 seconds, check step 24/24 plus the security check,
+  `namcap` clean on both. No step needed knowledge outside the docs. Found on the way: the
+  gate-command notes the orchestrator had been carrying about exporting test environment
+  variables were unnecessary; the harness does it. The fuzzer instructions lived only in a
+  CMake comment; they are now on the page.
