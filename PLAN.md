@@ -1340,3 +1340,12 @@ Decision required: approve / request changes / stop and redesign
   exercised the notice against a vanished root went with the function. Docs: ADR 0010 and 0015
   carry their superseded clauses, `docs/session-format.md` and the threat model (T-R5, T-P4,
   F-10, F-22) say what the program now does.
+
+- **2026-09-12:** Icon, second attempt, on `task/8.2-icon-v2`. Matt judged the 8.2.2 icon good
+  but too close to Omawrite's (dark tile, page, three lines) and had a design generated to a
+  written spec (plain SVG 1.1, 128 grid, flat fills, at most four colours, readable at 24 px,
+  nothing resembling the Omawrite motif): a bracket frame with a double chevron, three colours,
+  660 bytes. The orchestrator's render at 24 px shows the hollow double-outline frame blurring
+  where a single-stroke frame stays crisp; Matt chose to install the delivered version first
+  and judge it in the launcher with his own eyes. Nothing else changes: same file name, same
+  install rule, same desktop entry.
