@@ -784,7 +784,7 @@ public:
 - [ ] **8.3.1** — Document user installation, key language, launch contract, recovery, and troubleshooting: the real `README.md`, replacing the placeholder. **Last block before the project is called done**, at Matt's direction (2026-09-11).
 - [x] **8.3.2** — Document the component/data flow for design-level understanding without requiring C++ fluency. Evidence: `docs/architecture.md` (Change Log 2026-09-12).
 - [x] **8.3.3** — Record remaining limitations, the licence, and the steps to cut a tagged source release on GitHub; the AUR and plugin routes stay recorded as deferred (ADR 0013). Evidence: `docs/limitations.md`, `docs/release.md` (Change Log 2026-09-12).
-- [x] **8.3.4** — Verify: a clean checkout follows the documented build/test/package path without tribal knowledge. Evidence: ; a fresh clone from GitHub walked through every preset, gate, both install routes, and the fuzzers with no step outside the docs (Change Log 2026-09-12).
+- [x] **8.3.4** — Verify: a clean checkout follows the documented build/test/package path without tribal knowledge. Evidence: `docs/testing.md`; a fresh clone from GitHub walked through every preset, gate, both install routes, and the fuzzers with no step outside the docs (Change Log 2026-09-12).
 
 ### Task 8.4: Daily-use trial findings (added 2026-09-12, see Change Log)
 
