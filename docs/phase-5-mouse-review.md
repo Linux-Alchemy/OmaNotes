@@ -37,7 +37,7 @@ Commands run and actual results:
 
 ```text
 $ cmake --preset dev
--- Build files have been written to: /home/reaper/github/omanotes/build/dev
+-- Build files have been written to: ~/github/omanotes/build/dev
 
 $ cmake --build --preset dev
 [64/64] Linking CXX executable tests/omanotes_process_tests
@@ -100,7 +100,7 @@ My reservations:
 How to run it:
 
 ```sh
-cd /home/reaper/github/omanotes
+cd ~/github/omanotes
 git switch fix/5-mouse-buffer-actions
 cmake --preset dev
 cmake --build --preset dev

@@ -37,7 +37,7 @@ $ cmake --preset dev
 -- Could NOT find WrapVulkanHeaders (missing: Vulkan_INCLUDE_DIR)
 -- Configuring done (0.3s)
 -- Generating done (0.1s)
--- Build files have been written to: /home/reaper/github/omanotes/build/dev
+-- Build files have been written to: ~/github/omanotes/build/dev
 
 $ cmake --build --preset dev
 [23/23] Linking CXX executable tests/omanotes_ui_tests
@@ -51,9 +51,9 @@ $ cmake --build --preset dev --target format-check
 [1/1] Checking C++ formatting
 
 $ cmake --build --preset dev --target clang-tidy
-[34/34][56.6s] /usr/bin/clang-tidy -p=/home/reaper/github/omanotes/build/dev -quiet /home/reaper/github/omanotes/src/ui/main_window.cpp
-[1/1] (1/2) Processing file /home/reaper/github/omanotes/src/ui/main_window.cpp.
-[1/1] (2/2) Processing file /home/reaper/github/omanotes/src/ui/main_window.cpp.
+[34/34][56.6s] /usr/bin/clang-tidy -p=~/github/omanotes/build/dev -quiet ~/github/omanotes/src/ui/main_window.cpp
+[1/1] (1/2) Processing file ~/github/omanotes/src/ui/main_window.cpp.
+[1/1] (2/2) Processing file ~/github/omanotes/src/ui/main_window.cpp.
 
 $ cmake --build --preset dev --target security-check
 [1/1] Checking executable hardening
@@ -95,7 +95,7 @@ My reservations:
 How to run it:
 
 ```sh
-cd /home/reaper/github/omanotes
+cd ~/github/omanotes
 cmake --preset dev
 cmake --build --preset dev
 ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 ./build/dev/src/omanotes .
