@@ -80,6 +80,7 @@ that the package follows Arch conventions. Both are run before a packaging chang
 
 ## Not yet
 
-- **Tagged releases.** There are no tags, so the package tracks `main`. When 8.3.3 cuts the
-  first tag, a plain `omanotes` PKGBUILD with a tarball source can sit beside this one.
+- **Tagged releases.** There are no tags, so the package tracks `main`. The steps to cut one,
+  and the plain `omanotes` PKGBUILD that can then sit beside this one, are in
+  `docs/release.md`.
 - **AUR.** This PKGBUILD is what an AUR submission would start from, if that is ever wanted.
