@@ -1,6 +1,7 @@
 # ADR 0010: Session State Is Root-Scoped
 
-- **Status:** Accepted; constrains Phase 7 from Task 7.1 onward
+- **Status:** Accepted; constrains Phase 7 from Task 7.1 onward. The "announced, not hidden"
+  clause is superseded by ADR 0016 (2026-09-12); the root scoping stands.
 - **Date:** 2026-09-09
 
 ## Context

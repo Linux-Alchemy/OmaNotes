@@ -1,5 +1,7 @@
 #include "session/session_store.hpp"
 
+#include "session/instance_lock.hpp"
+
 #include <QByteArray>
 #include <QCryptographicHash>
 #include <QFile>
@@ -8,8 +10,10 @@
 
 #include <sys/stat.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstring>
+#include <optional>
 #include <system_error>
 #include <utility>
 
@@ -87,6 +91,42 @@ void removeStaleTemporaries(const std::filesystem::path& directory) {
             std::filesystem::remove(entry.path(), ignored);
         }
     }
+}
+
+/// The newest write among the regular files of a workspace directory and its
+/// recovery directory: the last time the program touched it. Directory
+/// mtimes are not consulted; they move when a lock file is created.
+std::filesystem::file_time_type lastActivityIn(const std::filesystem::path& directory) {
+    // No default-constructed file time here: on libstdc++ that is the file
+    // clock's epoch, which is in the next century. Nothing readable means
+    // "now", so an unreadable directory is kept rather than expired.
+    std::optional<std::filesystem::file_time_type> newest;
+    const auto consider = [&newest](const std::filesystem::directory_entry& entry) {
+        std::error_code ignored;
+        if (entry.is_symlink(ignored) || !entry.is_regular_file(ignored)) {
+            return;
+        }
+        const auto written = entry.last_write_time(ignored);
+        if (!ignored) {
+            newest = newest ? std::max(*newest, written) : written;
+        }
+    };
+    std::error_code error;
+    for (const auto& entry : std::filesystem::directory_iterator(directory, error)) {
+        consider(entry);
+    }
+    for (const auto& entry : std::filesystem::directory_iterator(directory / "recovery", error)) {
+        consider(entry);
+    }
+    return newest.value_or(std::filesystem::file_time_type::clock::now());
+}
+
+/// Only a clean "not there" counts as gone. A permission error or an
+/// unreachable mount is not evidence of anything, and the state stays.
+bool rootIsGone(const std::filesystem::path& root) {
+    std::error_code error;
+    const bool present = std::filesystem::exists(root, error);
+    return !present && !error;
 }
 
 } // namespace
@@ -193,6 +233,64 @@ SessionStore::load(const WorkspaceRoot& root) const {
         return std::unexpected(matches.error());
     }
     return std::optional<SessionSnapshot>{std::move(*snapshot)};
+}
+
+std::vector<ParkedWorkspace> SessionStore::listSiblings(std::string_view ownId) const {
+    std::vector<ParkedWorkspace> found;
+    std::error_code error;
+    if (isSymlink(sessions_) || !std::filesystem::is_directory(sessions_, error)) {
+        return found;
+    }
+    int scanned = 0;
+    for (const auto& entry : std::filesystem::directory_iterator(sessions_, error)) {
+        if (++scanned > kSiblingScanLimit) {
+            break;
+        }
+        std::error_code ignored;
+        if (entry.is_symlink(ignored) || !entry.is_directory(ignored) ||
+            entry.path().filename().string() == ownId) {
+            continue;
+        }
+        const auto file = entry.path() / kFileName;
+        if (isSymlink(file)) {
+            continue;
+        }
+        // Metadata only: the snapshot names its root and counts its dirty
+        // buffers; no recovery record is opened.
+        const auto snapshot = readSessionSnapshot(file);
+        if (!snapshot) {
+            continue;
+        }
+        found.push_back({entry.path(), snapshot->workspaceRoot, snapshot->dirtyBufferCount(),
+                         !rootIsGone(snapshot->workspaceRoot), lastActivityIn(entry.path())});
+    }
+    return found;
+}
+
+std::vector<SweptWorkspace>
+SessionStore::sweepVanishedRoots(std::string_view ownId,
+                                 std::filesystem::file_time_type now) const {
+    std::vector<SweptWorkspace> swept;
+    const auto cutoff = now - std::chrono::duration_cast<std::filesystem::file_time_type::duration>(
+                                  kVanishedRootRetention);
+    for (const auto& parked : listSiblings(ownId)) {
+        if (parked.rootExists || parked.lastActivity >= cutoff) {
+            continue;
+        }
+        // ADR 0012: a live instance may still have this workspace open even
+        // though its directory has gone. Its lock says so; leave it alone.
+        const auto lock = InstanceLock::acquire(parked.directory / "instance.lock");
+        if (!lock.held()) {
+            continue;
+        }
+        std::error_code error;
+        std::filesystem::remove_all(parked.directory, error);
+        if (error) {
+            continue;
+        }
+        swept.push_back({parked.root, parked.dirtyBuffers});
+    }
+    return swept;
 }
 
 } // namespace omanotes

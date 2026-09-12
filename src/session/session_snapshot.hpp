@@ -86,8 +86,8 @@ struct SessionSnapshot {
     std::vector<BufferSnapshot> buffers;
     std::optional<BufferId> activeBuffer;
 
-    /// How many buffers hold unsaved work, for the parked-work notice of
-    /// ADR 0010. Answerable from this document alone.
+    /// How many buffers hold unsaved work. Answerable from this document
+    /// alone, without opening a recovery record.
     [[nodiscard]] std::size_t dirtyBufferCount() const noexcept;
 
     [[nodiscard]] bool operator==(const SessionSnapshot&) const = default;

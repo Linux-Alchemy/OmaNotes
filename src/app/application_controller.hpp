@@ -26,7 +26,9 @@ class MainWindow;
 ///
 /// On start it restores the last desk for this root unless `--fresh` was
 /// given, brings back any unreferenced recovery records as dirty buffers,
-/// then opens or focuses the file named on the command line last. While the
+/// then opens or focuses the file named on the command line last. Work
+/// parked in other roots is never mentioned (ADR 0016); state for roots
+/// that no longer exist is swept after seven days (ADR 0015). While the
 /// window runs it checkpoints dirty buffers and rewrites the snapshot two
 /// seconds after the desk last changed, when the window loses focus, and on
 /// close. A record is removed the moment its buffer is saved or discarded.
@@ -54,9 +56,6 @@ class ApplicationController final : public QObject {
     /// True when this instance holds the workspace's lock and so owns
     /// recovery for it (ADR 0012).
     [[nodiscard]] bool holdsInstanceLock() const noexcept;
-    /// ADR 0010: one line naming other workspaces with unsaved work parked,
-    /// built from snapshot metadata only; empty when there is none.
-    [[nodiscard]] QString parkedWorkNotice() const;
 
   private:
     void scheduleCheckpoint();
