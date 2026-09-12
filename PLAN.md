@@ -767,9 +767,9 @@ public:
 **Blocks:**
 
 - [x] **8.2.1** — Record the licence and the distribution route. Evidence: MIT, `LICENSE` at the root (ADR 0014); the GitHub repository is the distribution, PKGBUILD primary, `cmake --install` fallback, AUR/Package Repository/companion plugin deferred (ADR 0013, superseding ADR 0002); `omanotes` has no collision in the official Arch repositories (Change Log 2026-09-11).
-- [ ] **8.2.2** — Add CMake install rules (binary, desktop entry, icon, licence) and a PKGBUILD that builds the release configuration from a clean clone of the repository, never the working tree; lint the package with `namcap` (developer tool, install approved 2026-09-11).
+- [x] **8.2.2** — Add CMake install rules (binary, desktop entry, icon, licence) and a PKGBUILD that builds the release configuration from a clean clone of the repository, never the working tree; lint the package with `namcap` (developer tool, install approved 2026-09-11). Evidence: #44; `namcap` clean on PKGBUILD and package; the package built from a fresh clone with the release tests and security check in its check step (Change Log 2026-09-12).
 - [ ] **8.2.3** — Install, launch from the Omarchy launcher and from the CLI, upgrade, and uninstall on the target Omarchy system without orphaning user-authored notes or XDG state.
-- [ ] **8.2.4** — Verify: package metadata, dependency list, file ownership, licence placement, desktop launch, CLI launch, and removal checks pass, and the documented path works from a fresh clone.
+- [x] **8.2.4** — Verify: package metadata, dependency list, file ownership, licence placement, desktop launch, CLI launch, and removal checks pass, and the documented path works from a fresh clone. Evidence: metadata, dependencies, ownership, and licence placement from #44's package inspection; desktop launch, CLI launch, and removal checks by Matt on 2026-09-12 (Change Log 2026-09-12).
 
 ### Task 8.3: Explain the system to its orchestrator and contributors
 
@@ -1284,3 +1284,22 @@ Decision required: approve / request changes / stop and redesign
   caught 8.1.4's finding a phase earlier), and `namcap` is approved as the package lint for
   8.2.2. The copyright line matches the account's other MIT repositories. Found on the way: the
   repository had been public with no licence file, which is all rights reserved.
+
+- **2026-09-12:** Task 8.2 bookkeeping on `docs/8.2-bookkeeping`, no product code. 8.2.2 ticked
+  on #44's evidence. 8.2.4 ticked: package metadata, dependency list, file ownership, and
+  licence placement were inspected in #44; desktop launch, CLI launch, and removal were checked
+  by Matt on the installed package (`omanotes-git 0.1.0.r57.g9987c99-1`). 8.2.3 is not yet
+  ticked: install, launch from the Omarchy launcher (opens `~`, by design), launch from the CLI,
+  uninstall, and reinstall all passed, with the note and the session directory surviving
+  `pacman -R` and the session restoring on relaunch; the one contract item outstanding is
+  upgrade, which Matt runs as `git pull` then `makepkg -si` once this PR is merged, and the next
+  Change Log writer ticks the block on his result. `pacman -Ql` lists the four files and the
+  ten directories that hold them, so `docs/packaging.md` now says so rather than "four files".
+  A `fakeroot` warning seen during the orchestrator's sandboxed package build did not appear on
+  Matt's build; it was the sandbox, not the PKGBUILD. Two things surfaced from daily use and
+  are ruled but not yet built, each on its own branch after this merges: threat-model finding
+  F-22 (records for a workspace that no longer exists were kept forever) is ruled a seven-day
+  bound, with the launch notice reworded for a vanished root; and an OmaNotes-specific font
+  size override is on the table for a yes or no. The icon from #44 awaits Matt's verdict.
+  makepkg rewrote `pkgver=` in the working tree during Matt's build, as `docs/packaging.md`
+  warns; restored to the placeholder here and not committed as a change.
