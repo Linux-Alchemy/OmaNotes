@@ -48,6 +48,9 @@ Qt 6, Clang, and GCC were already present. Dependency additions and upgrades rem
 
 ## Canonical local checks
 
+The authoritative description of every check, what it proves, and the test suites is
+`docs/testing.md`. The commands, for reference:
+
 ```sh
 cmake --preset dev
 cmake --build --preset dev
