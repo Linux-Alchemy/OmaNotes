@@ -782,7 +782,7 @@ public:
 **Blocks:**
 
 - [ ] **8.3.1** — Document user installation, key language, launch contract, recovery, and troubleshooting: the real `README.md`, replacing the placeholder. **Last block before the project is called done**, at Matt's direction (2026-09-11).
-- [ ] **8.3.2** — Document the component/data flow for design-level understanding without requiring C++ fluency.
+- [x] **8.3.2** — Document the component/data flow for design-level understanding without requiring C++ fluency. Evidence: `docs/architecture.md` (Change Log 2026-09-12).
 - [ ] **8.3.3** — Record remaining limitations, the licence, and the steps to cut a tagged source release on GitHub; the AUR and plugin routes stay recorded as deferred (ADR 0013).
 - [ ] **8.3.4** — Verify: a clean checkout follows the documented build/test/package path without tribal knowledge.
 
@@ -1378,3 +1378,14 @@ Decision required: approve / request changes / stop and redesign
   desktop value at all. Four existing `ThemeSources` initialisers (two unit tests, the property
   test, the fuzz harness) gained the third path. `docs/configuration.md` is now the
   configuration page for both files rather than the keymap alone.
+
+- **2026-09-12:** Block 8.3.2 on `docs/8.3.2-architecture`: `docs/architecture.md`, written for
+  the architect rather than the compiler. The shape in a paragraph and a diagram; the seven
+  source directories with what each owns and what each is forbidden from doing; who owns
+  which data (text in the editor and its recovery record only, the file on disk as truth,
+  structure in the snapshot, configuration the user's, theme Omarchy's); the workspace root as
+  the one trust boundary and the six refusals it buys; five journeys (launch, a keystroke, a
+  save, an external edit, a crash and the launch after); what is deliberately absent; and a
+  reading map to the other documents and the seventeen ADRs. Every behavioural claim was
+  checked against the header comments, ADR 0005, ADR 0006, the tree model, and the atomic
+  writer before it went in. No code changed.
