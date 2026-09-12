@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- OmaNotes application icon. MIT, see LICENSE. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect x="4" y="4" width="56" height="56" rx="12" fill="#2e3440"/>
-  <path d="M18 21h28M18 31h28M18 41h14" stroke="#eceff4" stroke-width="4" stroke-linecap="round" fill="none"/>
-  <path d="M40 37l6 4.5-6 4.5" stroke="#88c0d0" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="24" fill="#3c434b"></rect>
+  <g transform="translate(16 16) scale(0.08)" fill="#f4f4f5" fill-rule="evenodd">
+    <path d="m1200 1200h-480v-80h400v-1040h-479.996v160h-400v720h720v-720h-80v-80h159.996v880h-400v160h-640v-1200h1200zm-1120-80h480v-80h-400l.004-400h-80.004zm0-560h80.004v-400h400v-80h-480.004z"></path>
+  </g>
+  <rect x="64" y="76" width="52" height="40" fill="#3c434b"></rect>
+  <path fill="#5b9a94" d="M72 78 L88 98 L72 118 L80 118 L96 98 L80 78 Z"></path>
+  <path fill="#5b9a94" d="M88 78 L104 98 L88 118 L96 118 L112 98 L96 78 Z"></path>
 </svg>
