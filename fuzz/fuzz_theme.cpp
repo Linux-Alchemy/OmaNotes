@@ -20,7 +20,8 @@ struct Sandbox {
 
     Sandbox() {
         const std::filesystem::path base = directory.path().toStdString();
-        sources = {base / "state" / "omarchy" / "current", base / "config" / "omarchy"};
+        sources = {base / "state" / "omarchy" / "current", base / "config" / "omarchy",
+                   base / "config" / "omanotes"};
         std::filesystem::create_directories(sources.stateDir / "theme");
         std::filesystem::create_directories(sources.configDir);
     }

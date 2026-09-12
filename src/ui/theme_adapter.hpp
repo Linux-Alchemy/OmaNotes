@@ -30,11 +30,15 @@ struct ThemePalette {
     [[nodiscard]] bool operator==(const ThemePalette& other) const = default;
 };
 
-/// Where the desktop's theme is read from. Injectable so tests point at
-/// fixtures; the defaults resolve through XDG, never hard-coded paths.
+/// Where the desktop's theme and the application's own configuration are
+/// read from. Injectable so tests point at fixtures; the defaults resolve
+/// through XDG, never hard-coded paths.
 struct ThemeSources {
     std::filesystem::path stateDir;  ///< …/omarchy/current — theme.name, theme/colors.toml
     std::filesystem::path configDir; ///< …/omarchy — shell.toml with [font] base-size
+    /// …/omanotes — config.toml, whose [font] base-size overrides the shell's
+    /// when present and valid (ADR 0017).
+    std::filesystem::path appConfigDir;
 };
 
 /// WCAG contrast ratio between two colours, 1.0 (identical) to 21.0 (black

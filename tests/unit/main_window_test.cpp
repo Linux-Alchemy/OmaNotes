@@ -1965,7 +1965,7 @@ namespace {
 omanotes::ThemeSources writeFixtureTheme(const QTemporaryDir& directory) {
     const auto root = pathFor(directory.path());
     const omanotes::ThemeSources sources{root / "state" / "omarchy" / "current",
-                                         root / "config" / "omarchy"};
+                                         root / "config" / "omarchy", root / "config" / "omanotes"};
     std::filesystem::create_directories(sources.stateDir / "theme");
     std::filesystem::create_directories(sources.configDir);
     writeFile(sources.stateDir / "theme" / "colors.toml", "mode = \"dark\"\n"

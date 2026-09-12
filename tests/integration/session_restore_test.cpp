@@ -126,7 +126,8 @@ struct Launch {
                     const std::optional<std::filesystem::path>& sessionsOverride = std::nullopt) {
         const auto& root = workspace.root;
         omanotes::LaunchRequest request{root, std::move(requested), fresh};
-        omanotes::ThemeSources sources{root / ".no-theme-state", root / ".no-theme-config"};
+        omanotes::ThemeSources sources{root / ".no-theme-state", root / ".no-theme-config",
+                                       root / ".no-app-config"};
         window = std::make_unique<omanotes::MainWindow>(request, sources);
         controller = std::make_unique<omanotes::ApplicationController>(
             *window, request, sessionsOverride.value_or(workspace.sessions));
