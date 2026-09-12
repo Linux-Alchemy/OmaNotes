@@ -5,6 +5,9 @@
 #include <QTemporaryDir>
 #include <QtTest>
 
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <filesystem>
 
 namespace {
@@ -30,6 +33,7 @@ class DocumentStoreTest final : public QObject {
     void refusesNonMarkdownTargets();
     void refusesMissingDirectories();
     void refusesTargetsOutsideTheRoot();
+    void reportsAReadOnlyTargetButWritesItWhenTold();
 };
 
 void DocumentStoreTest::savesRelativeAndNestedTargets() {
@@ -138,6 +142,36 @@ void DocumentStoreTest::refusesTargetsOutsideTheRoot() {
     QCOMPARE(absolute.error().code, omanotes::SaveErrorCode::OutsideRoot);
 
     QVERIFY(!std::filesystem::exists(outside / "escape.md"));
+}
+
+void DocumentStoreTest::reportsAReadOnlyTargetButWritesItWhenTold() {
+    if (::geteuid() == 0) {
+        QSKIP("root can write anything; the read-only question has no answer here");
+    }
+    QTemporaryDir workspaceDirectory;
+    QVERIFY(workspaceDirectory.isValid());
+    const auto root = std::filesystem::canonical(pathFor(workspaceDirectory.path()));
+    const auto workspace = omanotes::WorkspaceRoot::resolve(root);
+    QVERIFY(workspace.has_value());
+    const omanotes::DocumentStore store(*workspace);
+
+    const auto locked = root / "locked.md";
+    QVERIFY(store.save("locked.md", QStringLiteral("# Locked\n")).has_value());
+    QVERIFY(!omanotes::DocumentStore::isReadOnly(locked));
+    QCOMPARE(::chmod(locked.c_str(), 0444), 0);
+    QVERIFY(omanotes::DocumentStore::isReadOnly(locked));
+    // A file that does not exist yet is not read-only; it is new.
+    QVERIFY(!omanotes::DocumentStore::isReadOnly(root / "new.md"));
+
+    // The store does not refuse on this ground; the window does, and `:w!`
+    // does not ask. The write replaces the file and keeps its mode.
+    const auto written = store.save("locked.md", QStringLiteral("# Forced\n"));
+    QVERIFY2(written.has_value(),
+             qPrintable(written ? QString() : QString::fromStdString(written.error().message)));
+    QCOMPARE(readFile(locked), QByteArray("# Forced\n"));
+    struct stat status{};
+    QCOMPARE(::stat(locked.c_str(), &status), 0);
+    QCOMPARE(status.st_mode & 07777, mode_t{0444});
 }
 
 QTEST_MAIN(DocumentStoreTest)
