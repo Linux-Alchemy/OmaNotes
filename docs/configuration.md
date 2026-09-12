@@ -1,9 +1,27 @@
-# Key configuration
+# Configuration
 
-Omanotes reads `$XDG_CONFIG_HOME/omanotes/keymap.json` at startup. If
-`XDG_CONFIG_HOME` is unset, the standard location is
-`~/.config/omanotes/keymap.json`. It never creates or rewrites this file.
-Restart Omanotes after changing it.
+Omanotes reads two files from `$XDG_CONFIG_HOME/omanotes/` at startup, which is
+`~/.config/omanotes/` when `XDG_CONFIG_HOME` is unset: `config.toml` for
+settings and `keymap.json` for keys. It never creates or rewrites either.
+Restart Omanotes after changing them.
+
+## Settings: `config.toml`
+
+Flat TOML in the same syntax as Omarchy's own files (ADR 0017). One setting so
+far:
+
+```toml
+[font]
+base-size = 10
+```
+
+`base-size` is the text size in points for the editor, sidebar, status line,
+and reading view (which adds one point). When it is absent, Omanotes uses the
+desktop's `[font] base-size` from `~/.config/omarchy/shell.toml`, and 12 if
+that is absent too. Values are clamped to 6 to 32. An unparseable value is
+ignored, never an error.
+
+## Keys: `keymap.json`
 
 ```json
 {

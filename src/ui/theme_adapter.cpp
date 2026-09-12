@@ -160,7 +160,8 @@ ThemeSources ThemeAdapter::systemSources() {
             QFile::encodeName(QStandardPaths::writableLocation(location)).toStdString());
     };
     return {directory(QStandardPaths::GenericStateLocation) / "omarchy" / "current",
-            directory(QStandardPaths::GenericConfigLocation) / "omarchy"};
+            directory(QStandardPaths::GenericConfigLocation) / "omarchy",
+            directory(QStandardPaths::GenericConfigLocation) / "omanotes"};
 }
 
 const ThemePalette& ThemeAdapter::currentPalette() const noexcept { return palette_; }
@@ -186,6 +187,7 @@ void ThemeAdapter::refresh() {
 ThemePalette ThemeAdapter::readPalette() const {
     const auto colours = readFlatToml(sources_.stateDir / "theme" / "colors.toml");
     const auto shell = readFlatToml(sources_.configDir / "shell.toml");
+    const auto app = readFlatToml(sources_.appConfigDir / "config.toml");
 
     // Mode: stated by the semantic schema; otherwise judged from the
     // background's own luminance; dark when there is nothing to judge.
@@ -253,12 +255,18 @@ ThemePalette ThemeAdapter::readPalette() const {
         readableOn(palette.inactiveSelection,
                    {palette.mutedText, palette.selectedText, palette.text, palette.background});
 
-    if (const auto size = shell.constFind(QStringLiteral("font.base-size"));
-        size != shell.constEnd()) {
-        bool numeric = false;
-        const auto points = size->toDouble(&numeric);
-        if (numeric) {
-            palette.baseFontPointSize = std::clamp(points, kMinimumFontPoints, kMaximumFontPoints);
+    // The desktop's size first, then the application's own override (ADR
+    // 0017): the same key in the same syntax, in OmaNotes' config directory.
+    // An absent or unparseable override changes nothing, as everywhere here.
+    for (const auto* values : {&shell, &app}) {
+        if (const auto size = values->constFind(QStringLiteral("font.base-size"));
+            size != values->constEnd()) {
+            bool numeric = false;
+            const auto points = size->toDouble(&numeric);
+            if (numeric) {
+                palette.baseFontPointSize =
+                    std::clamp(points, kMinimumFontPoints, kMaximumFontPoints);
+            }
         }
     }
     return palette;

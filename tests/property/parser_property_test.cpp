@@ -428,7 +428,7 @@ void ParserPropertyTest::themeReaderAlwaysYieldsAReadablePalette() {
     QVERIFY(temporary.isValid());
     const auto base = pathFor(temporary.path());
     const omanotes::ThemeSources sources{base / "state" / "omarchy" / "current",
-                                         base / "config" / "omarchy"};
+                                         base / "config" / "omarchy", base / "config" / "omanotes"};
     const QByteArray theme(kSemanticTheme);
     const QByteArray shell("[font]\nbase-size = 14\n");
 
