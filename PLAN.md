@@ -1324,3 +1324,19 @@ Decision required: approve / request changes / stop and redesign
   look freshly written; the first test run caught it. Geometry-only state for a vanished root
   is swept quietly under the same rule; there was nothing in it to lose. 8.2.3 ticked on the
   upgrade result. Still open from the same trial: the icon verdict and the font-size override.
+
+- **2026-09-12:** ADR 0016 on the same branch, before #46 merged: parked work is announced only
+  by its own root. Matt ran the F-22 build, saw the reworded notice wrap across two rows of the
+  status bar, and asked the prior question: why tell one workspace about another at all, when
+  opening the root already restores its work and says so. His ruling reverses the "announced,
+  not hidden" clause of his own ADR 0010, knowingly and in these terms: a quieter open, some
+  responsibility left with the user, Neovim's sharp edges rather than Obsidian's hand-holding.
+  The orchestrator recommended keeping the notice for vanished roots only, the one case where
+  the text can never announce itself, and was overruled. So: no launch notice about any other
+  root, existing or gone; the ADR 0015 sweep runs silently; `parkedWorkNotice` and its helpers
+  are removed from the controller, `listSiblings` stays as the sweep's scan. Tests: the
+  parked-notice launch test now asserts silence from elsewhere and the announcement on opening
+  the root itself; the two vanished-root launch tests assert silence; the F-10 test that
+  exercised the notice against a vanished root went with the function. Docs: ADR 0010 and 0015
+  carry their superseded clauses, `docs/session-format.md` and the threat model (T-R5, T-P4,
+  F-10, F-22) say what the program now does.

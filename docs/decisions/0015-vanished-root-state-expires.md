@@ -1,6 +1,7 @@
 # ADR 0015: State for a vanished root expires after seven days
 
-- **Status:** Accepted (2026-09-12, Matt's ruling during the Phase 8 daily-use trial)
+- **Status:** Accepted (2026-09-12, Matt's ruling during the Phase 8 daily-use trial). The
+  launch-notice clause below is superseded by ADR 0016 the same day; the sweep runs silently.
 - **Resolves:** threat-model finding F-22 (recovery records accumulate without bound for dead
   workspaces); the retention question ADR 0010 deferred
 - **Supersedes:** the "kept until the user removes the directory by hand" clause of

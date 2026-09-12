@@ -68,8 +68,9 @@ separately protected and separately documented.
 A snapshot belongs to exactly one workspace root and is restored only there.
 A restorer must call `checkSessionRoot` before using any of it. The document
 is deliberately self-describing enough — root path, buffer count, dirty count
-— that the parked-work notice for *other* roots can be produced from
-snapshots alone, without opening a single recovery record.
+— that the retention sweep (ADR 0015) can judge *other* roots from snapshots
+alone, without opening a single recovery record. Nothing is said about other
+roots' work at launch (ADR 0016); a root reports its own when it is opened.
 
 ## Recovery records (Task 7.3)
 
@@ -140,12 +141,13 @@ they come back as orphans on the next normal launch.
   whose directory has gone keeps its state, records included, for seven days
   after the program last wrote into it; then the whole
   `~/.local/state/omanotes/sessions/<id>/` directory is removed at the next
-  launch of any workspace, and the status line says so if it held unsaved
-  text (ADR 0015). Inside those seven days the launch notice names the
-  vanished directory, the record count, where the records are, and the day
-  they expire, so the text can be retrieved by hand. Only a clean "not there"
-  counts as gone: a permission error or an unreachable mount keeps the state,
-  and a workspace another instance still holds the lock on is never swept.
+  launch of any workspace (ADR 0015). Nothing announces this, before or
+  after: a root reports its own unsaved work when it is opened, and a root
+  that can no longer be opened is not reported at all (ADR 0016). Inside the
+  seven days the records are in that directory's `recovery/` for anyone who
+  goes looking. Only a clean "not there" counts as gone: a permission error
+  or an unreachable mount keeps the state, and a workspace another instance
+  still holds the lock on is never swept.
 
 ### Restoring a record
 
