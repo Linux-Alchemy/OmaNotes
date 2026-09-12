@@ -6,7 +6,8 @@
 
 ## What an install ships
 
-Four files, nothing else. Tests, fuzzers, and build output never leave the build tree.
+Four files and the directories that hold them, nothing else. Tests, fuzzers, and build output
+never leave the build tree.
 
 | File | Purpose |
 | --- | --- |
@@ -44,10 +45,10 @@ makepkg -si
 **Upgrade:** `git pull` in the clone, then `makepkg -si` again in `packaging/arch`. makepkg
 notices the new commit through `pkgver()`, and pacman replaces the old package's files.
 
-**Uninstall:** `sudo pacman -R omanotes-git`. pacman removes only the four files above. Your
-notes are ordinary Markdown files it has never heard of, and the state under
-`~/.local/state/omanotes/` and `~/.config/omanotes/` is not owned by the package, so it stays.
-Delete those two directories yourself if you want a clean slate.
+**Uninstall:** `sudo pacman -R omanotes-git`. pacman removes only the four files above and any
+of their directories left empty. Your notes are ordinary Markdown files it has never heard of,
+and the state under `~/.local/state/omanotes/` and `~/.config/omanotes/` is not owned by the
+package, so it stays. Delete those two directories yourself if you want a clean slate.
 
 **Working state:** makepkg leaves `src/`, `pkg/`, a bare clone, and the built package in
 `packaging/arch/`. They are gitignored. `makepkg -c` cleans up after itself. makepkg also
