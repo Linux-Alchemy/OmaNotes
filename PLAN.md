@@ -768,7 +768,7 @@ public:
 
 - [x] **8.2.1** — Record the licence and the distribution route. Evidence: MIT, `LICENSE` at the root (ADR 0014); the GitHub repository is the distribution, PKGBUILD primary, `cmake --install` fallback, AUR/Package Repository/companion plugin deferred (ADR 0013, superseding ADR 0002); `omanotes` has no collision in the official Arch repositories (Change Log 2026-09-11).
 - [x] **8.2.2** — Add CMake install rules (binary, desktop entry, icon, licence) and a PKGBUILD that builds the release configuration from a clean clone of the repository, never the working tree; lint the package with `namcap` (developer tool, install approved 2026-09-11). Evidence: #44; `namcap` clean on PKGBUILD and package; the package built from a fresh clone with the release tests and security check in its check step (Change Log 2026-09-12).
-- [ ] **8.2.3** — Install, launch from the Omarchy launcher and from the CLI, upgrade, and uninstall on the target Omarchy system without orphaning user-authored notes or XDG state.
+- [x] **8.2.3** — Install, launch from the Omarchy launcher and from the CLI, upgrade, and uninstall on the target Omarchy system without orphaning user-authored notes or XDG state. Evidence: Matt on 2026-09-12: install, launcher launch, CLI launch, uninstall and reinstall with the note and its session preserved; upgrade after #45 merged, the installed package moving from the r57 build to r58 with the trial session intact (Change Log 2026-09-12).
 - [x] **8.2.4** — Verify: package metadata, dependency list, file ownership, licence placement, desktop launch, CLI launch, and removal checks pass, and the documented path works from a fresh clone. Evidence: metadata, dependencies, ownership, and licence placement from #44's package inspection; desktop launch, CLI launch, and removal checks by Matt on 2026-09-12 (Change Log 2026-09-12).
 
 ### Task 8.3: Explain the system to its orchestrator and contributors
@@ -1303,3 +1303,40 @@ Decision required: approve / request changes / stop and redesign
   size override is on the table for a yes or no. The icon from #44 awaits Matt's verdict.
   makepkg rewrote `pkgver=` in the working tree during Matt's build, as `docs/packaging.md`
   warns; restored to the placeholder here and not committed as a change.
+
+- **2026-09-12:** Finding F-22 ruled and closed on `fix/f22-vanished-root-retention`, after
+  Matt met the parked-work notice for `/tmp/omanotes-gate` on every launch of the installed
+  package: two unsaved test buffers from a gate run, parked under ADR 0010, whose directory
+  went when `/tmp` was cleared, so "Open it to recover" pointed at a door that no longer
+  existed and the records would have sat there indefinitely. Herdr and Omawrite were read for
+  comparison; neither parks per root (Herdr stores no unsaved text, Omawrite restores its one
+  draft wherever it next launches), so the accumulation is the shadow of ADR 0010's own
+  boundary, which stands. Matt's ruling: state for a root that no longer exists is kept seven
+  days past the last write into it, then removed at launch and announced if it held text; a
+  root that exists is never swept; thirty days rejected as overkill (ADR 0015).
+  `SessionStore::listSiblings` and `sweepVanishedRoots` replace the controller's own scan; the
+  notice for a vanished root names the directory as gone, the count, where the records are,
+  and the day they expire. Eight tests: six on the store (swept after the period, kept inside
+  it, an existing root never swept, the own directory never swept, a held lock respected, a
+  symlinked sibling never followed) and two through a launch (the reworded notice; removal and
+  its announcement after the files are aged). Found on the way: a default-constructed
+  `file_time_type` is libstdc++'s file-clock epoch in the year 2174, which made every directory
+  look freshly written; the first test run caught it. Geometry-only state for a vanished root
+  is swept quietly under the same rule; there was nothing in it to lose. 8.2.3 ticked on the
+  upgrade result. Still open from the same trial: the icon verdict and the font-size override.
+
+- **2026-09-12:** ADR 0016 on the same branch, before #46 merged: parked work is announced only
+  by its own root. Matt ran the F-22 build, saw the reworded notice wrap across two rows of the
+  status bar, and asked the prior question: why tell one workspace about another at all, when
+  opening the root already restores its work and says so. His ruling reverses the "announced,
+  not hidden" clause of his own ADR 0010, knowingly and in these terms: a quieter open, some
+  responsibility left with the user, Neovim's sharp edges rather than Obsidian's hand-holding.
+  The orchestrator recommended keeping the notice for vanished roots only, the one case where
+  the text can never announce itself, and was overruled. So: no launch notice about any other
+  root, existing or gone; the ADR 0015 sweep runs silently; `parkedWorkNotice` and its helpers
+  are removed from the controller, `listSiblings` stays as the sweep's scan. Tests: the
+  parked-notice launch test now asserts silence from elsewhere and the announcement on opening
+  the root itself; the two vanished-root launch tests assert silence; the F-10 test that
+  exercised the notice against a vanished root went with the function. Docs: ADR 0010 and 0015
+  carry their superseded clauses, `docs/session-format.md` and the threat model (T-R5, T-P4,
+  F-10, F-22) say what the program now does.

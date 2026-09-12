@@ -75,7 +75,7 @@ class SessionSnapshotTest final : public QObject {
     void neverModifiesTheFileItRefuses();
     void checksTheRootBeforeRestoring();
     void resolvesPathsThroughTheRootPolicy();
-    void countsDirtyBuffersForTheParkedWorkNotice();
+    void countsDirtyBuffersFromTheDocumentAlone();
 };
 
 void SessionSnapshotTest::roundTripsTheFullFixtureByteForByte() {
@@ -295,7 +295,7 @@ void SessionSnapshotTest::resolvesPathsThroughTheRootPolicy() {
     QCOMPARE(folder.error().code, omanotes::WorkspaceErrorCode::NotRegularFile);
 }
 
-void SessionSnapshotTest::countsDirtyBuffersForTheParkedWorkNotice() {
+void SessionSnapshotTest::countsDirtyBuffersFromTheDocumentAlone() {
     QCOMPARE(sample().dirtyBufferCount(), std::size_t{2});
     omanotes::SessionSnapshot empty;
     QCOMPARE(empty.dirtyBufferCount(), std::size_t{0});

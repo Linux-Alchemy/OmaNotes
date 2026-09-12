@@ -17,6 +17,7 @@
 #include <QTextBrowser>
 #include <QtTest>
 
+#include <chrono>
 #include <filesystem>
 #include <memory>
 
@@ -38,6 +39,18 @@ void writeFile(const std::filesystem::path& path, const QByteArray& contents) {
     QFile file(QString::fromStdString(path.string()));
     QVERIFY2(file.open(QIODevice::WriteOnly), qPrintable(file.errorString()));
     QCOMPARE(file.write(contents), contents.size());
+}
+
+/// Backdate every regular file under `directory`, as a week away would.
+void ageFilesIn(const std::filesystem::path& directory, std::chrono::days age) {
+    const auto then = std::filesystem::file_time_type::clock::now() - age;
+    std::error_code error;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(directory, error)) {
+        std::error_code ignored;
+        if (entry.is_regular_file(ignored)) {
+            std::filesystem::last_write_time(entry.path(), then, ignored);
+        }
+    }
 }
 
 KTextEditor::View* activeView(omanotes::MainWindow& window) {
@@ -175,14 +188,15 @@ class SessionRestoreTest final : public QObject {
     void cleanCloseRestoresTheDesk();
     void forcedKillRestoresDirtyTextAndSaveReleasesIt();
     void missingFileIsSkippedAndTheRestComesBack();
-    void anotherRootStartsCleanWithAParkedWorkNotice();
+    void anotherRootStartsCleanAndSaysNothingAboutParkedWork();
     void corruptStateStartsCleanAndLeavesTheFileAlone();
     void freshBypassesWithoutDestroyingTheSession();
     void requestedFileIsFocusedLast();
     void concurrentLaunchesLastCloseWinsWithoutCorruption();
     void secondInstanceLeavesTheFirstsRecordsAlone();
     void theLockFollowsTheLiveInstance();
-    void parkedWorkNoticeSurvivesAVanishedRoot();
+    void vanishedRootIsKeptAndNotMentionedInsideTheRetentionPeriod();
+    void vanishedRootStateIsRemovedAfterTheRetentionPeriod();
     void orphanRecordComesBackDirty();
     void recoveredNoteChangedOnDiskRefusesPlainWrite();
     void readingViewFollowsTheCursor();
@@ -285,7 +299,7 @@ void SessionRestoreTest::missingFileIsSkippedAndTheRestComesBack() {
     second.close();
 }
 
-void SessionRestoreTest::anotherRootStartsCleanWithAParkedWorkNotice() {
+void SessionRestoreTest::anotherRootStartsCleanAndSaysNothingAboutParkedWork() {
     Workspace first;
     Workspace other;
     QVERIFY(first.valid() && other.valid());
@@ -298,18 +312,24 @@ void SessionRestoreTest::anotherRootStartsCleanWithAParkedWorkNotice() {
     }
     QCOMPARE(first.recoveryRecords(), 1);
 
-    // Same state directory, different workspace.
+    // Same state directory, different workspace. ADR 0016: the other root's
+    // parked work is its own business until that root is opened.
     Launch elsewhere(other, std::nullopt, false, first.sessions);
     QCOMPARE(elsewhere.names(), (QStringList{omanotes::scratchDisplayName()}));
     const auto line = status(*elsewhere.window);
-    QVERIFY2(line.contains(QStringLiteral("Unsaved work waiting in")), qPrintable(line));
-    QVERIFY(line.contains(QStringLiteral("(1 buffer)")));
+    QVERIFY2(!line.contains(QStringLiteral("Unsaved work")), qPrintable(line));
     QVERIFY(!line.contains(QStringLiteral("private thought")));
     QVERIFY(!line.contains(QStringLiteral("secret.md")));
     elsewhere.close();
     // The other root's session and record are untouched by all of this.
     QCOMPARE(first.recoveryRecords(), 1);
     QVERIFY(omanotes::readSessionSnapshot(first.sessionFile()).has_value());
+
+    // Opening the root itself is where the work comes back and is announced.
+    Launch home(first);
+    QVERIFY2(status(*home.window).contains(QStringLiteral("recovered 1 with unsaved changes")),
+             qPrintable(status(*home.window)));
+    home.close();
 }
 
 void SessionRestoreTest::corruptStateStartsCleanAndLeavesTheFileAlone() {
@@ -490,19 +510,55 @@ void SessionRestoreTest::theLockFollowsTheLiveInstance() {
     three.close();
 }
 
-void SessionRestoreTest::parkedWorkNoticeSurvivesAVanishedRoot() {
-    Workspace workspace;
-    QVERIFY(workspace.valid());
-    Launch launch(workspace);
-    QVERIFY(launch.controller->parkedWorkNotice().isEmpty());
+void SessionRestoreTest::vanishedRootIsKeptAndNotMentionedInsideTheRetentionPeriod() {
+    Workspace first;
+    Workspace other;
+    QVERIFY(first.valid() && other.valid());
+    writeFile(first.note("secret.md"), "# Secret\n");
+    {
+        Launch launch(first);
+        launch.openFromSidebar(first.note("secret.md"));
+        typeInto(*launch.window, QStringLiteral("private thought\n"));
+        launch.close();
+    }
+    QCOMPARE(first.recoveryRecords(), 1);
+    // The workspace itself goes; its state does not, and nobody is told.
+    QVERIFY(std::filesystem::remove_all(first.root) > 0);
 
-    // The workspace directory disappears under a running window. The notice
-    // is a courtesy built from other roots' metadata; it must come back
-    // empty, not dereference a failed resolution.
-    std::filesystem::remove_all(workspace.root);
-    QVERIFY(launch.controller->parkedWorkNotice().isEmpty());
-    std::filesystem::create_directories(workspace.root);
-    launch.close();
+    Launch elsewhere(other, std::nullopt, false, first.sessions);
+    const auto line = status(*elsewhere.window);
+    QVERIFY2(!line.contains(QStringLiteral("Unsaved work")), qPrintable(line));
+    QVERIFY(!line.contains(QStringLiteral("Removed")));
+    QVERIFY(!line.contains(QStringLiteral("private thought")));
+    elsewhere.close();
+    QCOMPARE(first.recoveryRecords(), 1);
+    QVERIFY(std::filesystem::exists(first.sessionFile()));
+}
+
+void SessionRestoreTest::vanishedRootStateIsRemovedAfterTheRetentionPeriod() {
+    Workspace first;
+    Workspace other;
+    QVERIFY(first.valid() && other.valid());
+    writeFile(first.note("secret.md"), "# Secret\n");
+    {
+        Launch launch(first);
+        launch.openFromSidebar(first.note("secret.md"));
+        typeInto(*launch.window, QStringLiteral("private thought\n"));
+        launch.close();
+    }
+    QCOMPARE(first.recoveryRecords(), 1);
+    QVERIFY(std::filesystem::remove_all(first.root) > 0);
+    const auto stateDirectory = first.sessionFile().parent_path();
+    ageFilesIn(stateDirectory, std::chrono::days{8});
+
+    // ADR 0015 removes it; ADR 0016 says nothing about it.
+    Launch elsewhere(other, std::nullopt, false, first.sessions);
+    const auto line = status(*elsewhere.window);
+    QVERIFY2(!line.contains(QStringLiteral("Removed")), qPrintable(line));
+    QVERIFY(!line.contains(QStringLiteral("Unsaved work")));
+    QVERIFY(!line.contains(QStringLiteral("private thought")));
+    QVERIFY(!std::filesystem::exists(stateDirectory));
+    elsewhere.close();
 }
 
 void SessionRestoreTest::orphanRecordComesBackDirty() {

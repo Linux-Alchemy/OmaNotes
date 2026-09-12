@@ -9,28 +9,11 @@
 
 #include <algorithm>
 #include <system_error>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 namespace omanotes {
-
-namespace {
-
-/// How many sibling session directories the parked-work scan will read. The
-/// notice is a courtesy; it must not make launch slow on a machine that has
-/// opened a thousand workspaces.
-constexpr int kParkedScanLimit = 64;
-
-QString displayRoot(const std::filesystem::path& root) {
-    auto text = QFile::decodeName(QByteArray::fromStdString(root.native()));
-    const auto home = QDir::homePath();
-    if (!home.isEmpty() && text.startsWith(home + QLatin1Char('/'))) {
-        return QLatin1Char('~') + text.mid(home.size());
-    }
-    return text;
-}
-
-} // namespace
 
 ApplicationController::ApplicationController(MainWindow& window, LaunchRequest request,
                                              const std::filesystem::path& sessionsDirectory,
@@ -153,8 +136,13 @@ void ApplicationController::start() {
     if (const auto summary = lastReport_.summary(); !summary.isEmpty()) {
         status << summary;
     }
-    if (const auto notice = parkedWorkNotice(); !notice.isEmpty()) {
-        status << notice;
+    if (root) {
+        // ADR 0015: state for a root that has been gone longer than the
+        // retention period goes now. ADR 0016: nothing is said about it, nor
+        // about work parked in any other root; a root announces its own
+        // unsaved work when it is opened, and that is the whole contract.
+        std::ignore = sessions_.sweepVanishedRoots(SessionStore::workspaceId(root->path()),
+                                                   std::filesystem::file_time_type::clock::now());
     }
     if (!status.isEmpty()) {
         window_.showStatus(status.join(QStringLiteral(" · ")));
@@ -243,49 +231,6 @@ const std::map<BufferId, RecoveryId>& ApplicationController::recoveryIds() const
 
 bool ApplicationController::holdsInstanceLock() const noexcept {
     return lock_.has_value() && lock_->held();
-}
-
-QString ApplicationController::parkedWorkNotice() const {
-    const auto own = SessionStore::workspaceId(request_.root);
-    std::error_code error;
-    // The root can have vanished since launch; the notice is a courtesy and
-    // must not be the thing that brings the window down.
-    const auto root = resolveRoot();
-    if (!root) {
-        return {};
-    }
-    const auto sessions = sessions_.fileFor(*root).parent_path().parent_path();
-    if (!std::filesystem::is_directory(sessions, error)) {
-        return {};
-    }
-    QStringList parked;
-    int scanned = 0;
-    for (const auto& entry : std::filesystem::directory_iterator(sessions, error)) {
-        if (++scanned > kParkedScanLimit) {
-            break;
-        }
-        std::error_code ignored;
-        if (!entry.is_directory(ignored) || entry.is_symlink(ignored) ||
-            entry.path().filename().string() == own) {
-            continue;
-        }
-        // Metadata only: the snapshot names its root and counts its dirty
-        // buffers; no recovery record is opened.
-        const auto snapshot = readSessionSnapshot(entry.path() / "session.json");
-        if (!snapshot || snapshot->dirtyBufferCount() == 0) {
-            continue;
-        }
-        const auto count = snapshot->dirtyBufferCount();
-        parked << QStringLiteral("%1 (%2 %3)")
-                      .arg(displayRoot(snapshot->workspaceRoot))
-                      .arg(count)
-                      .arg(count == 1 ? QStringLiteral("buffer") : QStringLiteral("buffers"));
-    }
-    if (parked.isEmpty()) {
-        return {};
-    }
-    return QStringLiteral("Unsaved work waiting in %1. Open it to recover.")
-        .arg(parked.join(QStringLiteral(", ")));
 }
 
 } // namespace omanotes
