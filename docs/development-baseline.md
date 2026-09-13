@@ -26,8 +26,10 @@ Omanotes is developed from two machines, both running the same Omarchy and toolc
 | --- | --- | --- |
 | First machine | Original development machine; captured the baseline above | Phases 1-3 |
 | Second machine | Prepared 2026-09-03 | Phases 1-3 re-validated from a clean build directory |
+| Second machine | 2026-09-13 | Phase 8: the nine-command gate from empty `build/dev` and `build/release` (24/24 on each preset, format-check and clang-tidy silent, security-check passing), the package built from a fresh clone with its check step, `namcap` on both, installed, launched from the launcher and the CLI |
 
 Both report Omarchy 4.0.1-1, qt6-base 6.11.2-2, ktexteditor 6.29.0-1, cmake 4.4.2-1, and clang 22.1.8-1.
+The second machine on 2026-09-13 reported qt6-base 6.11.2-3, ktexteditor 6.29.0-1, cmake 4.4.3-2, and clang 22.1.8-1.
 Any additional machine must install the approved dependency set below and pass the canonical local
 checks before its results count as evidence at a phase gate.
 

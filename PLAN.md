@@ -807,8 +807,8 @@ ruled block, without reopening the phase's "no new features" constraint for anyt
 
 ### Phase 8 Checkpoint
 
-- [ ] Complete clean-room build, test, hardening, and package evidence is attached to the phase report.
-- [ ] Install/upgrade/uninstall preserve notes and handle XDG state as documented.
+- [x] Complete clean-room build, test, hardening, and package evidence is attached to the phase report. Evidence: 8.1.4 and 8.3.4 on the first machine; the second machine on 2026-09-13 (Change Log).
+- [x] Install/upgrade/uninstall preserve notes and handle XDG state as documented. Evidence: 8.2.3 on the first machine; install, launcher launch, and CLI launch on the second machine on 2026-09-13 (Change Log).
 - [ ] Architecture and security documents match the shipped code.
 - [ ] **Matt gate:** use the package built from the repository for an agreed daily-use trial and approve any tagged release separately.
 - [ ] **Last of all:** the placeholder `README.md` is replaced by the finished one (8.3.1). The project is not called done while the placeholder banner is there.
@@ -1435,3 +1435,22 @@ Decision required: approve / request changes / stop and redesign
   gate-command notes the orchestrator had been carrying about exporting test environment
   variables were unnecessary; the harness does it. The fuzzer instructions lived only in a
   CMake comment; they are now on the page.
+
+- **2026-09-13:** The second machine, Phase 8 evidence. Both build trees deleted and the
+  nine-command gate run from empty on `main` at f91a30a: dev configure and build clean with
+  zero warnings, 24/24 under the sanitizers in 85.5 s, format-check and clang-tidy silent
+  (53 files), release configure and build clean, 24/24 in 11.3 s, security-check reporting
+  PIE, full RELRO, NX stack, no RPATH, stack protector, CET IBT+SHSTK, and fortify. The
+  release binary's `--smoke-test` launch passed offscreen. `makepkg -c` in `packaging/arch`
+  cloned afresh and built `omanotes-git 0.1.0.r66.gf91a30a-1`, its check step 24/24 plus the
+  security check; the package holds exactly the four documented files. `namcap` (installed
+  by Matt for the purpose) is silent on the PKGBUILD and reports five "implicitly satisfied"
+  dependency notes on the package (glibc, libgcc, libstdc++, kparts, kxmlgui), all arriving
+  through declared dependencies, no errors. Matt installed the package and confirmed the
+  launcher entry, launch from the launcher, and launch from the CLI. The first two Phase 8
+  checkpoint boxes are ticked on that evidence; the machines table in
+  `docs/development-baseline.md` gains the row. Found on the way: `docs/limitations.md`
+  said the Omarchy theme and desktop font size wait for a restart; block 6.2.3 made both
+  live and Matt approved theme hopping on 2026-09-08, so the line now says which two files
+  are read once. Block 8.3.1 on `docs/8.3.1-readme`: the placeholder README replaced by the
+  real one, drafted for Matt's review and patching.
