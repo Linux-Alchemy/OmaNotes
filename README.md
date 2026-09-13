@@ -95,8 +95,9 @@ than one is open; `Ctrl+V` pastes in every mode because Omarchy's Super+V arrive
 with the reasoning, is in `docs/limitations.md` and `docs/vim-acceptance.md`.
 
 Every leader route and direct shortcut can be changed in `~/.config/omanotes/keymap.json`;
-the text size in `~/.config/omanotes/config.toml`. Both are read at launch and never
-written. `docs/configuration.md` is the reference.
+the text size in `~/.config/omanotes/config.toml`. Neither file exists until you create
+it: OmaNotes reads them at launch if they are there, and never writes them, so nothing
+you put in them is touched by an upgrade. `docs/configuration.md` is the reference.
 
 ## Reading view
 
@@ -166,8 +167,13 @@ budget, or remote. Only workspace-local images are shown.
 
 **The theme or text size looks wrong.** OmaNotes reads Omarchy's active theme and
 `shell.toml` font size and follows them live. A theme whose foreground and background do
-not reach a readable contrast is refused as a pair and the built-in palette is used. Set
-`[font] base-size` in `~/.config/omanotes/config.toml` to override the size.
+not reach a readable contrast is refused as a pair and the built-in palette is used. To
+override the size, create the file yourself and restart:
+
+```sh
+mkdir -p ~/.config/omanotes
+printf '[font]\nbase-size = 14\n' > ~/.config/omanotes/config.toml
+```
 
 Errors and the keymap warning also go to Qt's log: stderr when launched from a terminal,
 the journal when launched from the desktop.

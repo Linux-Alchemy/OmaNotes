@@ -2,8 +2,10 @@
 
 Omanotes reads two files from `$XDG_CONFIG_HOME/omanotes/` at startup, which is
 `~/.config/omanotes/` when `XDG_CONFIG_HOME` is unset: `config.toml` for
-settings and `keymap.json` for keys. It never creates or rewrites either.
-Restart Omanotes after changing them.
+settings and `keymap.json` for keys. It never creates or rewrites either: a fresh
+install has no `~/.config/omanotes/` directory at all, and both files are yours to
+create when you want them, so an upgrade never touches what you wrote. Restart
+Omanotes after changing them.
 
 ## Settings: `config.toml`
 
