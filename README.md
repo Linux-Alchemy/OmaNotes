@@ -5,6 +5,10 @@ Meant to blend in, OmaNotes accepts the global theme and styling of Omarchy.
 
 It is built on Qt 6 Widgets and KDE's KTextEditor with its Vi mode, so editing is Vim and everything around the editor answers to a Space leader. Notes are ordinary `.md` files in ordinary directories. A workspace is a directory, not an Obsidian-like vault: there is no database, no index file, and nothing to migrate.
 
+https://github.com/user-attachments/assets/25f253fa-4ab0-4ed4-bc74-6cf425c2a4e0
+
+*Thirty-four seconds of it in use. The file is in the repository at
+[`docs/media/omanotes-demo.mp4`](docs/media/omanotes-demo.mp4) for anywhere the player above does not render.*
 
 ## Installing
 
