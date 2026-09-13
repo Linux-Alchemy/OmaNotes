@@ -94,10 +94,35 @@ than one is open; `Ctrl+V` pastes in every mode because Omarchy's Super+V arrive
 `Ctrl+V`, so visual block is `Ctrl+Q`; `Ctrl+C` over a selection copies. The full list,
 with the reasoning, is in `docs/limitations.md` and `docs/vim-acceptance.md`.
 
-Every leader route and direct shortcut can be changed in `~/.config/omanotes/keymap.json`;
-the text size in `~/.config/omanotes/config.toml`. Neither file exists until you create
-it: OmaNotes reads them at launch if they are there, and never writes them, so nothing
-you put in them is touched by an upgrade. `docs/configuration.md` is the reference.
+## Configuration
+
+Two files, both under `~/.config/omanotes/`, both read once at launch. OmaNotes never
+creates or writes them: a fresh install has no such directory, and anything you put there
+survives every upgrade untouched. Restart after editing either.
+
+**Font size**, in `config.toml`. When the file is absent, OmaNotes uses the desktop's own
+size from Omarchy's `shell.toml`. To choose your own:
+
+```sh
+mkdir -p ~/.config/omanotes
+printf '[font]\nbase-size = 14\n' > ~/.config/omanotes/config.toml
+```
+
+The value is in points, for the editor, sidebar, status line, and reading view, clamped to
+6 to 32.
+
+**Keys**, in `keymap.json`. Leader routes and direct shortcuts can each be rebound; omitted
+commands keep their defaults, and `Space ?` always shows what is in effect:
+
+```json
+{
+  "leaderBindings": { "search.files": ["p"] },
+  "shortcuts": { "file.save": "Ctrl+Alt+Shift+S" }
+}
+```
+
+A file that fails validation is rejected as a whole, the defaults stay, and a warning at
+launch names the problem. Every field, rule, and command id is in `docs/configuration.md`.
 
 ## Reading view
 
@@ -167,13 +192,8 @@ budget, or remote. Only workspace-local images are shown.
 
 **The theme or text size looks wrong.** OmaNotes reads Omarchy's active theme and
 `shell.toml` font size and follows them live. A theme whose foreground and background do
-not reach a readable contrast is refused as a pair and the built-in palette is used. To
-override the size, create the file yourself and restart:
-
-```sh
-mkdir -p ~/.config/omanotes
-printf '[font]\nbase-size = 14\n' > ~/.config/omanotes/config.toml
-```
+not reach a readable contrast is refused as a pair and the built-in palette is used. Your
+own size goes in `config.toml`; see Configuration above.
 
 Errors and the keymap warning also go to Qt's log: stderr when launched from a terminal,
 the journal when launched from the desktop.
