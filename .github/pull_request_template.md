@@ -1,6 +1,6 @@
 ## What changed
 
-<!-- Describe the user-visible result and the approved PLAN.md blocks. -->
+<!-- Describe the user-visible result. -->
 
 ## Why
 

@@ -223,7 +223,6 @@ passes before merge, and what each check proves.
 | `docs/packaging.md` | The package and the route without one |
 | `docs/release.md` | The version, and how a release is cut |
 | `docs/decisions/` | Every design decision, numbered, with the alternatives rejected |
-| `OUTLINE.md`, `PLAN.md` | What was promised, and how it was built |
 
 ## Licence
 
