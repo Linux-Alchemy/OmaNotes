@@ -1,6 +1,7 @@
 # OmaNotes
 
-OmaNotes is a minimal markdown editor built in Omarchy *for* Omarchy. It's keyboard-first and take some influence from neovim bindings. Just enough for the nvim folks to appreciate, but not so much that a newcomer can't figure out how to quit the application. If you do get stuck though there is a handy help menu built in too. While it is meant to be driven by the keyboard, it's also fully functional using the mouse if you're into that sort of thing. 
+OmaNotes is a minimal markdown editor built in Omarchy *for* Omarchy. It's keyboard-first and takes some influence from neovim bindings. Just enough for the nvim folks to appreciate, but not so much that a newcomer can't figure out how to quit the application. If you do get stuck though there is a handy help menu built in too. While it is meant to be driven by the keyboard, it's also fully functional using the mouse if you're into that sort of thing.
+
 Meant to blend in, OmaNotes accepts the global theme and styling of Omarchy.
 
 It is built on Qt 6 Widgets and KDE's KTextEditor with its Vi mode, so editing is Vim and everything around the editor answers to a Space leader. Notes are ordinary `.md` files in ordinary directories. A workspace is a directory, not an Obsidian-like vault: there is no database, no index file, and nothing to migrate.

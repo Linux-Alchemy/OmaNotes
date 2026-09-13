@@ -109,7 +109,7 @@ combinations reach Omanotes. Their configuration is not changed by this file.
 | `help.show` | Show contextual commands |
 | `app.quit` | Quit, asking about unsaved work; the route is `:q` (listed in help as "IYKYK") |
 | `view.half-page-down`, `view.half-page-up` | Scroll half a screen; Vi's `Ctrl+D`/`Ctrl+U`, also in the reading view |
-| `view.reading` | Reserved; disabled until Phase 6 |
+| `view.reading` | Toggle the reading view |
 
 The registry's `file.open` and `buffer.show` require targets supplied by mouse
 or result selection and cannot be bound directly. Unknown or disabled commands
