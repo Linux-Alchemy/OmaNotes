@@ -105,9 +105,10 @@ Full detail in `docs/session-format.md`.
 
 Both files are described in `docs/configuration.md`.
 
-- **Read once at startup.** Changes to `config.toml`, `keymap.json`, the Omarchy theme, or
-  the desktop font size take effect on the next launch. No live reload, no in-app zoom
-  (ADR 0017).
+- **Read once at startup.** Changes to `config.toml` and `keymap.json` take effect on the
+  next launch. No live reload, no in-app zoom (ADR 0017). The Omarchy theme and the desktop
+  font size in `shell.toml` are watched and applied live (block 6.2.3); a `config.toml`
+  font size, once set, holds until the next launch.
 - **`config.toml` is a flat subset of TOML**: `[section]` headers and `key = value`. Anything
   cleverer needs the reader to grow first, deliberately.
 - **Theme files are read without a size cap** on the UI thread (F-16).

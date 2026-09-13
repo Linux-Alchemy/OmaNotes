@@ -2,8 +2,10 @@
 
 Omanotes reads two files from `$XDG_CONFIG_HOME/omanotes/` at startup, which is
 `~/.config/omanotes/` when `XDG_CONFIG_HOME` is unset: `config.toml` for
-settings and `keymap.json` for keys. It never creates or rewrites either.
-Restart Omanotes after changing them.
+settings and `keymap.json` for keys. It never creates or rewrites either: a fresh
+install has no `~/.config/omanotes/` directory at all, and both files are yours to
+create when you want them, so an upgrade never touches what you wrote. Restart
+Omanotes after changing them.
 
 ## Settings: `config.toml`
 
@@ -107,7 +109,7 @@ combinations reach Omanotes. Their configuration is not changed by this file.
 | `help.show` | Show contextual commands |
 | `app.quit` | Quit, asking about unsaved work; the route is `:q` (listed in help as "IYKYK") |
 | `view.half-page-down`, `view.half-page-up` | Scroll half a screen; Vi's `Ctrl+D`/`Ctrl+U`, also in the reading view |
-| `view.reading` | Reserved; disabled until Phase 6 |
+| `view.reading` | Toggle the reading view |
 
 The registry's `file.open` and `buffer.show` require targets supplied by mouse
 or result selection and cannot be bound directly. Unknown or disabled commands
