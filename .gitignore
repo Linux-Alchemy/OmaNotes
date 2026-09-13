@@ -2,3 +2,8 @@
 /.cache/
 compile_commands.json
 *.user
+
+# Working documents kept private after the project closed (2026-09-13)
+/PLAN.md
+/OUTLINE.md
+/CONTRIBUTING.md
